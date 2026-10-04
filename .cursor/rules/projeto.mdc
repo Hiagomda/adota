@@ -1,0 +1,89 @@
+---
+description: Produto, stack, regras invioláveis, design system, plataformas e modelo de dados do Patinha
+alwaysApply: true
+---
+
+# Patinha
+
+Rede social de resgate de animais de rua (Android e iOS). Nome provisório: Patinha. Lançamento inicial só em Belém/PA.
+
+## Como trabalhar
+
+- Execute uma fase por vez, na ordem. Ao fim de cada fase: rode lint, typecheck e testes, atualize o README, resuma o que foi feito, diga como testar e pare. Só avance quando o usuário escrever "continuar".
+- Se algo for ambíguo, pergunte antes de implementar. Não invente funcionalidades fora da fase atual.
+- Sem `any`. Sem código morto. Commits pequenos em Conventional Commits.
+- Código, tabelas e commits em inglês. Textos da interface em português do Brasil.
+
+## PRODUTO
+
+Fluxo central: alguém encontra um animal na rua, posta foto + localização ("achei esse cachorro na rua X, alguém pode resgatar?") e o app notifica protetores, ONGs e voluntários num raio próximo. Alguém toca em "Eu vou ajudar" e o post avança pelos status: Aberto → A caminho → Resgatado → Lar temporário → Para adoção → Adotado. O desfecho feliz é o que gera engajamento. Lançamento inicial só em Belém/PA.
+
+## STACK
+
+Não troque sem perguntar.
+
+- Monorepo pnpm: `apps/mobile`, `apps/api`, `apps/web`, `packages/shared` (schemas Zod e tipos).
+- Mobile: React Native + Expo (TypeScript, Expo Router, development build, EAS Build), TanStack Query, Zustand, @shopify/flash-list, expo-image, react-native-reanimated, react-native-gesture-handler, expo-haptics, expo-blur, expo-location, expo-image-picker, expo-notifications, expo-apple-authentication, ícones Feather (@expo/vector-icons), MapLibre (@maplibre/maplibre-react-native).
+- API: Node 22 + Fastify + TypeScript, Zod, Drizzle ORM com migrations SQL, BullMQ + Redis.
+- Banco: PostgreSQL 16 + PostGIS.
+- Auth: Firebase Authentication (Google, Apple e e-mail). A API valida o ID token (firebase-admin) e mapeia para a tabela `users`.
+- Push: Firebase Cloud Messaging (Android direto; iOS via chave APNs configurada no Firebase).
+- Imagens: upload direto por URL pré-assinada para MinIO; servir via imgproxy; comprimir no app antes de enviar.
+- Web público: Next.js (App Router) só para páginas públicas de post, com SEO e Open Graph.
+- Infra: Docker Compose (postgres+postgis, redis, minio, imgproxy, api, web) + Caddy com HTTPS. Alvo: VPS 4 vCPU / 8 GB.
+- Qualidade: ESLint, Prettier, Vitest, testes de integração com Postgres real, GitHub Actions.
+
+## REGRAS INVIOLÁVEIS
+
+1. Proibido vender animais: só resgate, doação e adoção. Denúncia + filtro de palavras suspeitas mandam o post para fila de moderação.
+2. Privacidade da localização: guarde a posição exata, mas feed e API pública devolvem só posição APROXIMADA (~500 m). A exata só vai para o autor, admins e quem registrou resposta `will_help` naquele post.
+3. Nunca exponha telefone/endereço no feed. Contato só após "Eu vou ajudar", via WhatsApp que o usuário optou por compartilhar.
+4. O app nunca recebe nem intermedeia dinheiro. Pedidos de ajuda só exibem o Pix da ONG/protetor, e SOMENTE perfis verificados podem criá-los.
+5. LGPD: consentimento de localização e notificações, política de privacidade, exclusão de conta dentro do app.
+6. Todo conteúdo de usuário tem botão Denunciar e é possível BLOQUEAR usuários (conteúdo de bloqueados some de feed, comentários e notificações).
+7. Não copie logo, ícones proprietários, nome ou assets do Instagram. O layout é INSPIRADO nos padrões de UX, com identidade visual própria.
+
+## DESIGN SYSTEM
+
+Inspirado no Instagram, com identidade própria. Princípios: fotos em primeiro lugar, interface limpa, gestos naturais, resposta instantânea.
+
+- Cores: fundo branco (#FFFFFF) / escuro (#000000 a #121212), texto principal quase preto, separadores finos de 0.5 px. Cor de destaque quente e acolhedora (coral/laranja, ex.: #FF6B3D) para botões e ícones ativos. Cores de urgência: vermelho (urgente), âmbar (médio), verde (tranquilo). Tema claro/escuro automático.
+- Tipografia: fonte do sistema, títulos em semibold, corpo 14-15 px, legendas 12-13 px.
+- Navegação: barra de abas inferior com 5 itens e ícones sem rótulo: Início (casa), Mapa/Explorar (lupa), Criar (botão central "+", destacado), Alertas (coração/sino) e Perfil (avatar redondo). Cabeçalho do feed com logotipo de texto simples do app à esquerda e ícones de notificação e filtro à direita.
+- "Stories de Resgate" no topo do feed: círculos com avatar e anel colorido por urgência (gradiente para não vistos, cinza para vistos). Mostram resgates urgentes próximos e atualizações recentes (antes/depois, "foi resgatado!"). Toque abre visualizador em tela cheia com barras de progresso, avançar/voltar por toque nas laterais, segurar para pausar, arrastar para baixo para fechar e botão "Eu vou ajudar" no rodapé.
+- Card de post: cabeçalho com avatar, @handle, selo de verificado, distância e tempo, menu "..."; mídia 4:5 com carrossel (pontos e contador 1/N); chips de status e urgência sobre a foto; barra de ações (curtir, comentar, compartilhar, salvar à direita); contagem de curtidas, legenda com "mais", "ver todos os N comentários" e data. Botão primário "Eu vou ajudar" nos posts abertos.
+- Interações: duplo toque na foto curte com animação de coração, haptic leve, pull-to-refresh, scroll infinito com FlashList, skeletons (nunca spinner solto), transições suaves e bottom sheets para comentários, compartilhar, denunciar, bloquear e filtros.
+- Perfil: avatar grande, contadores (posts, animais ajudados, seguidores), botões Seguir/WhatsApp, "Destaques" (bolinhas de resgates concluídos com final feliz), abas de grade 3 colunas (Posts, Salvos, Adotados).
+- Criar alerta: seletor de fotos em grade (câmera + galeria), até 5 fotos; passo de localização no mapa (pin arrastável); situação/urgência em chips; descrição com sugestões rápidas; Publicar. Deve funcionar com internet ruim (progresso, retry, rascunho salvo).
+- Mapa: pins coloridos por urgência com clusters, card inferior arrastável do animal selecionado, filtros em chips (espécie, porte, urgência, status).
+- Acessibilidade: alvos de toque mínimos de 44 px, contraste adequado, labels para leitor de tela, suporte a fonte maior.
+- Estados vazios amigáveis (ilustração simples + texto + ação) e mensagens de erro humanas em português.
+
+## REQUISITOS DE PLATAFORMA
+
+Android e iOS. Tudo deve funcionar nas duas plataformas. Use apenas APIs e componentes compatíveis com ambas e trate diferenças (teclado, safe areas, permissões de localização, gestos, status bar).
+
+- `app.config.ts` com `bundleIdentifier` (iOS) e `package` (Android), ícones/splash para as duas, e textos de permissão em português (`NSLocationWhenInUseUsageDescription`, `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`).
+- EAS Build (`eas.json` com perfis `development`, `preview` e `production`) para gerar iOS e Android na nuvem, sem depender de Mac.
+- Firebase: `GoogleService-Info.plist` (iOS) e `google-services.json` (Android); documente como subir a chave APNs no Firebase Cloud Messaging.
+- Login: Google, "Entrar com Apple" e e-mail (a App Store exige opção equivalente quando há login de terceiros).
+- Apps com conteúdo de usuários exigem na revisão: denúncia, bloqueio de usuário, filtro de conteúdo, suporte com contato visível, remoção rápida de conteúdo abusivo, política de privacidade e exclusão de conta no app.
+
+## MODELO DE DADOS
+
+PostgreSQL + PostGIS; extensões `postgis` e `pgcrypto`.
+
+- `users(id uuid pk, firebase_uid unique, name, handle unique, avatar_url, phone, whatsapp_opt_in, role in ('user','protector','ngo','admin'), verified default false, city, fcm_tokens text[], alert_radius_km default 10, created_at, deleted_at)`
+- `animals(id uuid pk, species in ('dog','cat','other'), size in ('small','medium','large'), age_estimate, sex, health_notes, temperament, status in ('open','on_the_way','rescued','fostered','for_adoption','adopted'), current_owner_id null, created_at)`
+- `posts(id uuid pk, author_id, animal_id, type in ('rescue_alert','update','adoption','help_request','lost'), urgency in ('low','medium','high'), description, location geography(Point,4326), approx_label, status, parent_post_id null, hidden default false, created_at)` com índice GIST em `location` e btree em `(status, created_at desc)`
+- `post_media(id, post_id, url, type, position)`
+- `responses(id, post_id, user_id, kind in ('will_help','seen','has_foster','can_donate'), note, created_at, unique(post_id,user_id,kind))`
+- `comments(id, post_id, user_id, body, created_at, hidden default false)`
+- `likes(user_id, post_id, pk composta)`; `saves(user_id, post_id, pk composta)`
+- `follows(follower_id, followed_id)`; `post_follows(user_id, post_id)`
+- `blocks(blocker_id, blocked_id, created_at, pk composta)`
+- `story_views(user_id, post_id, viewed_at)`
+- `fosters(user_id pk, capacity, species_accepted text[], sizes_accepted text[], location geography, radius_km, available)`
+- `help_requests(id, post_id, kind in ('food','vet','castration','transport'), goal_amount null, pix_key null, deadline null)`
+- `reports(id, reporter_id, target_type, target_id, reason, status default 'open', created_at)`
+- `notifications(id, user_id, type, payload jsonb, read_at, created_at)`
