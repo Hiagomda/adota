@@ -8,6 +8,15 @@ const env: Env = {
   PORT: 3010,
   DATABASE_URL: 'postgres://patinha:patinha@localhost:5435/patinha',
   REDIS_URL: 'redis://localhost:6380',
+  authDevMode: true,
+  MINIO_ENDPOINT: 'http://localhost:9000',
+  MINIO_ACCESS_KEY: 'patinha',
+  MINIO_SECRET_KEY: 'patinha-secret',
+  MINIO_BUCKET: 'patinha-media',
+  IMGPROXY_URL: 'http://localhost:8080',
+  IMGPROXY_KEY: '',
+  IMGPROXY_SALT: '',
+  WEB_ORIGIN: 'http://localhost:3000',
 };
 
 function createClients(

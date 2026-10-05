@@ -2,7 +2,7 @@ import type { ServiceCheck } from '@patinha/shared';
 import { buildHealthResponse, type HealthResponse } from '@patinha/shared';
 
 export interface DatabaseClient {
-  query(sql: string): Promise<unknown>;
+  query(sql: string, params?: readonly unknown[]): Promise<unknown>;
   end(): Promise<void>;
 }
 

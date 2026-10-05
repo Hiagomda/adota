@@ -2,7 +2,7 @@
 
 Rede social de resgate de animais de rua para Android e iOS. O lançamento inicial é em Belém/PA.
 
-Esta etapa cobre o monorepo, a infra local e o app Expo em development build. O feed, o mapa e o login ainda não existem.
+O site em `http://localhost:3000` lista alertas reais de Belém. O app Expo entra com contas locais, sem arquivo do Firebase.
 
 ## Requisitos
 
@@ -36,6 +36,8 @@ O imgproxy local aceita URLs sem assinatura. Antes de produção, defina `IMGPRO
 ## Scripts
 
 ```bash
+pnpm db:migrate
+pnpm db:seed      # recria as contas e os alertas de Belém
 pnpm dev:api      # http://localhost:3010
 pnpm dev:web      # http://localhost:3000
 pnpm dev:mobile   # Metro para o development build
@@ -43,6 +45,16 @@ pnpm lint
 pnpm typecheck
 pnpm test         # exige Postgres e Redis no ar
 ```
+
+Contas locais, senha nenhuma. O token é `dev:<e-mail>`:
+
+| E-mail              | Uso                   |
+| ------------------- | --------------------- |
+| maria@patinha.local | pessoa                |
+| patas@patinha.local | ONG verificada        |
+| admin@patinha.local | moderação em `/admin` |
+
+No app, a tela de entrada tem esses atalhos. Google e Apple aparecem na interface e explicam que precisam do Firebase. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem tocou em "Eu vou ajudar".
 
 ## Como testar a API
 
@@ -87,7 +99,7 @@ pnpm dlx eas-cli build --profile development --platform android
 pnpm dlx eas-cli build --profile development --platform ios
 ```
 
-4. Instale o binário no aparelho e rode `pnpm dev:mobile`. A primeira tela mostra o nome Patinha.
+4. Instale o binário no aparelho e rode `pnpm dev:mobile`. No Windows, `pnpm --filter @patinha/mobile exec expo start --web` abre a mesma interface no navegador.
 
 Conferir a config sem gerar o binário:
 
@@ -102,7 +114,7 @@ Baixe os arquivos no console do Firebase e coloque em `apps/mobile/` (eles ficam
 - Android: `google-services.json`, pacote `app.patinha.mobile`
 - iOS: `GoogleService-Info.plist`, bundle `app.patinha.mobile`
 
-Para push no iOS, o FCM precisa da chave APNs. No console do Firebase: configurações do projeto, Cloud Messaging, configuração do app Apple, envie a chave de autenticação APNs (arquivo `.p8`) com o Key ID e o Team ID. O checklist completo de publicação fica para a fase de notificações.
+O passo a passo da chave APNs está em `docs/notificacoes.md`. A publicação nas lojas está em `docs/publicacao.md`. O deploy da VPS está em `docs/deploy.md`.
 
 ## Layout
 

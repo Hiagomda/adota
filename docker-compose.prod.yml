@@ -1,0 +1,182 @@
+name: patinha
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    environment:
+      POSTGRES_USER: patinha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: patinha
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    mem_limit: 2g
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U patinha -d patinha']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
+      MINIO_DEFAULT_BUCKETS: patinha-media
+    volumes:
+      - minio:/bitnami/minio/data
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.30.1
+    environment:
+      IMGPROXY_USE_S3: 'true'
+      IMGPROXY_S3_ENDPOINT: http://minio:9000
+      IMGPROXY_S3_REGION: us-east-1
+      IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE: 'true'
+      IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: 'true'
+      IMGPROXY_ALLOWED_SOURCES: s3://patinha-media/
+      IMGPROXY_KEY: ${IMGPROXY_KEY:?set IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT:?set IMGPROXY_SALT}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      DATABASE_URL: postgres://patinha:${POSTGRES_PASSWORD}@postgres:5432/patinha
+      REDIS_URL: redis://redis:6379
+      AUTH_DEV_MODE: 'false'
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: patinha-media
+      IMGPROXY_URL: https://img.patinha.app
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
+      WEB_ORIGIN: https://app.patinha.app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 768m
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://api.patinha.app
+        NEXT_PUBLIC_SITE_URL: https://app.patinha.app
+    environment:
+      API_URL: http://api:3010
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on:
+      - api
+      - web
+      - imgproxy
+    restart: unless-stopped
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  uptime:
+    image: louislam/uptime-kuma:1
+    volumes:
+      - uptime:/app/data
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      - '127.0.0.1:3002:3001'
+
+volumes:
+  postgres:
+  minio:
+  caddy:
+  uptime:

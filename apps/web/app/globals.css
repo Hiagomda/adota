@@ -1,15 +1,28 @@
 :root {
   color-scheme: light dark;
   --background: #ffffff;
+  --surface: #f6f6f6;
   --foreground: #111111;
+  --muted: #5c5c5c;
+  --line: #e6e6e6;
   --accent: #ff6b3d;
+  --high: #e23b3b;
+  --medium: #e0a100;
+  --low: #1f8f4e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121212;
+    --background: #000000;
+    --surface: #121212;
     --foreground: #f5f5f5;
+    --muted: #b5b5b5;
+    --line: #2a2a2a;
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
@@ -24,24 +37,210 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-main {
-  min-height: 100vh;
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
-  text-align: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
 }
 
-h1 {
-  margin: 0;
+.brand {
   color: var(--accent);
-  font-size: 2.5rem;
-  font-weight: 600;
+  font-size: 1.4rem;
+  font-weight: 700;
 }
 
-p {
-  margin: 8px 0 0;
-  font-size: 1rem;
+.header-links {
+  display: flex;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.page {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 64px;
+}
+
+.intro h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.intro p {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.filters a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.filters a[data-active='true'] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.card img,
+.post-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  background: #1a1a1a;
+}
+
+.card-body,
+.post-copy {
+  padding: 14px 14px 16px;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.chip.high {
+  background: var(--high);
+}
+.chip.medium {
+  background: var(--medium);
+  color: #1a1a1a;
+}
+.chip.low {
+  background: var(--low);
+}
+
+.card h2,
+.post-copy h1 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.card p,
+.post-copy p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.empty {
+  padding: 48px 0;
+  color: var(--muted);
+}
+
+.post {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 28px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.actions a,
+.actions button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.actions a.secondary,
+.actions button.secondary {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--line);
+}
+
+.notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.diary {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.diary article {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 800px) {
+  .post {
+    grid-template-columns: 1fr;
+  }
 }

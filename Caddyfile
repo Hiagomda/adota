@@ -1,0 +1,11 @@
+api.patinha.app {
+	reverse_proxy api:3010
+}
+
+app.patinha.app {
+	reverse_proxy web:3000
+}
+
+img.patinha.app {
+	reverse_proxy imgproxy:8080
+}

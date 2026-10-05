@@ -12,6 +12,8 @@
     "lint": "prettier --check . && eslint apps/api packages/shared && pnpm --filter @patinha/mobile lint && pnpm --filter @patinha/web lint",
     "typecheck": "pnpm --filter @patinha/shared build && pnpm -r --if-present typecheck",
     "test": "pnpm --filter @patinha/shared build && pnpm -r --if-present test",
+    "db:migrate": "pnpm --filter @patinha/shared build && pnpm --filter @patinha/api db:migrate",
+    "db:seed": "pnpm --filter @patinha/shared build && pnpm --filter @patinha/api db:seed",
     "format": "prettier --write ."
   },
   "devDependencies": {

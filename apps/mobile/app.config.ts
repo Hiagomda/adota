@@ -43,9 +43,31 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
     favicon: './assets/favicon.png',
   },
+  extra: {
+    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
+  },
   plugins: [
     'expo-router',
     'expo-dev-client',
+    'expo-secure-store',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'O Patinha usa sua localização para mostrar animais que precisam de resgate perto de você e para marcar onde você encontrou um animal.',
+      },
+    ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'O Patinha acessa suas fotos para você anexar imagens do animal ao alerta de resgate.',
+        cameraPermission:
+          'O Patinha usa a câmera para você fotografar o animal que precisa de resgate.',
+      },
+    ],
+    'expo-notifications',
+    'expo-apple-authentication',
     [
       'expo-splash-screen',
       {

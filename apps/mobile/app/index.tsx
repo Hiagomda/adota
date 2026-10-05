@@ -1,61 +1,31 @@
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import { useSession } from '../src/session';
+import { useTheme } from '../src/theme';
 
-export default function HomeScreen() {
-  const isDark = useColorScheme() === 'dark';
+export default function Gate() {
+  const theme = useTheme();
+  const ready = useSession((state) => state.ready);
+  const onboarded = useSession((state) => state.onboarded);
+  const token = useSession((state) => state.token);
+  const permissionsSeen = useSession((state) => state.permissionsSeen);
 
-  return (
-    <SafeAreaView style={[styles.screen, isDark ? styles.screenDark : styles.screenLight]}>
-      <View style={styles.content}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, isDark ? styles.titleDark : styles.titleLight]}
-        >
-          Patinha
-        </Text>
-        <Text style={[styles.subtitle, isDark ? styles.subtitleDark : styles.subtitleLight]}>
-          Rede de resgate de animais de rua
-        </Text>
+  if (!ready) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.background,
+        }}
+      >
+        <ActivityIndicator color={theme.accent} />
       </View>
-    </SafeAreaView>
-  );
+    );
+  }
+  if (!onboarded) return <Redirect href="/welcome" />;
+  if (!token) return <Redirect href="/login" />;
+  if (!permissionsSeen) return <Redirect href="/permissions" />;
+  return <Redirect href="/(tabs)" />;
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  screenLight: {
-    backgroundColor: '#FFFFFF',
-  },
-  screenDark: {
-    backgroundColor: '#121212',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-  },
-  titleLight: {
-    color: '#111111',
-  },
-  titleDark: {
-    color: '#FFFFFF',
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    textAlign: 'center',
-  },
-  subtitleLight: {
-    color: '#444444',
-  },
-  subtitleDark: {
-    color: '#D0D0D0',
-  },
-});
