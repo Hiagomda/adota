@@ -14,7 +14,7 @@ export default function LegalScreen() {
         </Pressable>
         <Text style={[styles.title, { color: theme.text }]}>Termos</Text>
         <Text style={{ color: theme.muted, lineHeight: 22 }}>
-          O Patinha é uma rede para resgate de animais de rua em Belém. É proibido anunciar venda de
+          Égua, adota! é uma rede para resgate de animais de rua em Belém. É proibido anunciar venda de
           animal. O app não recebe pagamento: quando um perfil verificado mostra uma chave Pix, a
           transferência acontece fora da plataforma. Quem publica é responsável pela veracidade do
           alerta.

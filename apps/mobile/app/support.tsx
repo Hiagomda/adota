@@ -13,11 +13,11 @@ export default function SupportScreen() {
       </Pressable>
       <Text style={[styles.title, { color: theme.text }]}>Suporte</Text>
       <Text style={{ color: theme.muted, fontSize: 17, lineHeight: 24 }}>
-        Escreva para contato@patinha.app. A gente responde sobre conta, denúncia e verificação de
+        Escreva para contato@eguaadota.app. A gente responde sobre conta, denúncia e verificação de
         ONG.
       </Text>
-      <Pressable onPress={() => void Linking.openURL('mailto:contato@patinha.app')}>
-        <Text style={{ color: theme.accent, fontSize: 18 }}>contato@patinha.app</Text>
+      <Pressable onPress={() => void Linking.openURL('mailto:contato@eguaadota.app')}>
+        <Text style={{ color: theme.accent, fontSize: 18 }}>contato@eguaadota.app</Text>
       </Pressable>
     </SafeAreaView>
   );

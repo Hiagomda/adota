@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import QRCode from 'qrcode';
 import { getPost } from '../../../lib/api';
 import { statusLabel, speciesLabel } from '../../../lib/labels';
 
@@ -10,6 +11,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const width = 1080;
   const height = story ? 1920 : 1080;
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const pageUrl = `${site}/p/${post.id}`;
+  const qr = await QRCode.toDataURL(pageUrl, { margin: 1, width: 280 });
 
   return new ImageResponse(
     <div
@@ -33,13 +36,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         />
       ) : null}
       <div style={{ display: 'flex', flexDirection: 'column', padding: 56, gap: 16 }}>
-        <div style={{ color: '#ff6b3d', fontSize: 40, fontWeight: 700 }}>Patinha</div>
+        <div style={{ color: '#ff6b3d', fontSize: 40, fontWeight: 700 }}>Égua, adota!</div>
         <div style={{ fontSize: 56, fontWeight: 700 }}>
           {speciesLabel[post.animal.species] ?? 'Animal'}
         </div>
         <div style={{ fontSize: 40 }}>{post.approxLabel}</div>
         <div style={{ fontSize: 36 }}>{statusLabel[post.status]}</div>
-        <div style={{ fontSize: 28, color: '#bbbbbb' }}>{`${site}/p/${post.id}`}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <div style={{ display: 'flex', fontSize: 28, color: '#bbbbbb' }}>{pageUrl}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" src={qr} width={160} height={160} />
+        </div>
       </div>
     </div>,
     { width, height },

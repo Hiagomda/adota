@@ -1,11 +1,11 @@
-api.patinha.app {
+api.eguaadota.app {
 	reverse_proxy api:3010
 }
 
-app.patinha.app {
+app.eguaadota.app {
 	reverse_proxy web:3000
 }
 
-img.patinha.app {
+img.eguaadota.app {
 	reverse_proxy imgproxy:8080
 }

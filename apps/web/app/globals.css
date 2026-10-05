@@ -124,13 +124,123 @@ a {
   border: 1px solid var(--line);
 }
 
+.photo-wrap {
+  position: relative;
+  display: block;
+  color: inherit;
+}
+
+.photo-chips {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+}
+
 .card img,
-.post-photo {
+.post-photo,
+.gallery img {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
   background: #1a1a1a;
+}
+
+.gallery {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.gallery img {
+  scroll-snap-align: start;
+}
+
+.map-board {
+  position: relative;
+  height: min(70vh, 720px);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #16324f;
+}
+
+.map-pin {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-card {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.map-card-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 72px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.map-card-row img {
+  width: 56px;
+  height: 72px;
+  aspect-ratio: auto;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.map-card-row small {
+  display: block;
+  color: var(--muted);
+}
+
+.eyebrow,
+.lead,
+.counts {
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+
+.page h1 {
+  margin: 0 0 8px;
+}
+
+.map-pin.high {
+  background: var(--high);
+}
+
+.comments {
+  margin-top: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.comments article {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .card-body,
@@ -167,6 +277,9 @@ a {
 }
 .chip.low {
   background: var(--low);
+}
+.chip.status {
+  background: rgba(0, 0, 0, 0.62);
 }
 
 .card h2,

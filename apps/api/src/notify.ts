@@ -175,7 +175,7 @@ async function sendPush(
     await admin.messaging().sendEachForMulticast({
       tokens,
       notification: { title, body },
-      data: { postId, url: `patinha://post/${postId}` },
+      data: { postId, url: `egua://post/${postId}` },
     });
   } catch {
     // Push is best-effort. The in-app notification is already stored.

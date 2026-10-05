@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getPost } from '../../../lib/api';
+import { getPost, listComments } from '../../../lib/api';
 import { helpKindLabel, speciesLabel, statusLabel, urgencyLabel } from '../../../lib/labels';
+import { formatWhen } from '../../../lib/time';
 import { ShareBar } from './share-bar';
 
 export const dynamic = 'force-dynamic';
@@ -30,24 +32,29 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const post = await getPost(id);
   if (!post) notFound();
-  const photo = post.media[0]?.url;
+  const comments = await listComments(id);
 
   return (
     <main className="page">
       <article className="post">
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className="post-photo" src={photo} alt={post.approxLabel} />
-        ) : null}
+        <div className="gallery">
+          {post.media.map((media) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={media.url} src={media.url} alt={post.approxLabel} />
+          ))}
+        </div>
         <div className="post-copy">
           <div className="meta">
             <span className={`chip ${post.urgency}`}>{urgencyLabel[post.urgency]}</span>
-            <span>{statusLabel[post.status]}</span>
+            <span>
+              {statusLabel[post.status]} · {formatWhen(post.createdAt)}
+            </span>
           </div>
           <h1>{post.approxLabel}</h1>
           <p>{post.description}</p>
           <p>
-            {speciesLabel[post.animal.species] ?? 'Animal'} · publicado por @{post.author.handle}
+            {speciesLabel[post.animal.species] ?? 'Animal'} · publicado por{' '}
+            <Link href={`/u/${post.author.handle}`}>@{post.author.handle}</Link>
             {post.author.verified ? ' · verificado' : ''}
           </p>
           <p>
@@ -62,6 +69,19 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : null}
           <ShareBar id={post.id} title={post.approxLabel} />
+          <section className="comments">
+            <h2>Comentários</h2>
+            {comments.length === 0 ? (
+              <p>Ninguém comentou ainda. A conversa acontece no app.</p>
+            ) : null}
+            {comments.map((comment) => (
+              <article key={comment.id}>
+                <strong>@{comment.author.handle}</strong>
+                <p>{comment.body}</p>
+                <p>{formatWhen(comment.createdAt)}</p>
+              </article>
+            ))}
+          </section>
           {post.updates && post.updates.length > 0 ? (
             <section className="diary">
               {post.updates.map((update) => (

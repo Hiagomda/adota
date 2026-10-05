@@ -10,7 +10,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.accent }]}>Patinha</Text>
+      <Text style={[styles.title, { color: theme.accent }]}>Égua, adota!</Text>
       <Text style={[styles.body, { color: theme.text }]}>
         Uma rede para quem encontra, resgata e acolhe animais de rua em Belém. As fotos vêm
         primeiro. A localização pública fica aproximada.
@@ -29,7 +29,7 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, justifyContent: 'flex-end', padding: 24, gap: 16 },
-  title: { fontSize: 48, fontWeight: '700' },
+  title: { fontSize: 40, fontWeight: '700' },
   body: { fontSize: 18, lineHeight: 26 },
   button: {
     minHeight: 52,

@@ -1,4 +1,4 @@
-# Patinha
+# Égua, adota!
 
 Rede social de resgate de animais de rua para Android e iOS. O lançamento inicial é em Belém/PA.
 
@@ -50,9 +50,9 @@ Contas locais, senha nenhuma. O token é `dev:<e-mail>`:
 
 | E-mail              | Uso                   |
 | ------------------- | --------------------- |
-| maria@patinha.local | pessoa                |
-| patas@patinha.local | ONG verificada        |
-| admin@patinha.local | moderação em `/admin` |
+| maria@egua.local | pessoa                |
+| patas@egua.local | ONG verificada        |
+| admin@egua.local | moderação em `/admin` |
 
 No app, a tela de entrada tem esses atalhos. Google e Apple aparecem na interface e explicam que precisam do Firebase. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem tocou em "Eu vou ajudar".
 
@@ -82,9 +82,9 @@ Se o banco ou o Redis estiver fora, a rota responde `503` com `"status": "degrad
 
 O projeto usa Expo SDK 57, Expo Router e um development build (não é Expo Go). Identificadores:
 
-- iOS: `app.patinha.mobile`
-- Android: `app.patinha.mobile`
-- scheme: `patinha`
+- iOS: `app.egua.adota`
+- Android: `app.egua.adota`
+- scheme: `egua`
 
 Os perfis do EAS estão em `apps/mobile/eas.json`: `development`, `preview` e `production`. O perfil `development` gera um cliente de desenvolvimento. No Android o artefato é um APK, instalável sem Mac. O build de iOS também roda na nuvem do EAS.
 
@@ -111,8 +111,8 @@ pnpm --filter @patinha/mobile exec expo config --type public
 
 Baixe os arquivos no console do Firebase e coloque em `apps/mobile/` (eles ficam fora do Git):
 
-- Android: `google-services.json`, pacote `app.patinha.mobile`
-- iOS: `GoogleService-Info.plist`, bundle `app.patinha.mobile`
+- Android: `google-services.json`, pacote `app.egua.adota`
+- iOS: `GoogleService-Info.plist`, bundle `app.egua.adota`
 
 O passo a passo da chave APNs está em `docs/notificacoes.md`. A publicação nas lojas está em `docs/publicacao.md`. O deploy da VPS está em `docs/deploy.md`.
 

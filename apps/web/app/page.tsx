@@ -1,16 +1,25 @@
 import Link from 'next/link';
 import { listPosts } from '../lib/api';
 import { speciesLabel, statusLabel, typeLabel, urgencyLabel } from '../lib/labels';
+import { formatWhen } from '../lib/time';
 
 export const dynamic = 'force-dynamic';
 
 const filters = [
-  { href: '/', label: 'Todos', type: undefined },
-  { href: '/?type=rescue_alert', label: 'Resgate', type: 'rescue_alert' },
-  { href: '/?type=lost', label: 'Perdidos', type: 'lost' },
-  { href: '/?type=adoption', label: 'Adoção', type: 'adoption' },
-  { href: '/?type=help_request', label: 'Ajuda', type: 'help_request' },
+  { label: 'Todos', type: undefined },
+  { label: 'Resgate', type: 'rescue_alert' },
+  { label: 'Perdidos', type: 'lost' },
+  { label: 'Adoção', type: 'adoption' },
+  { label: 'Ajuda', type: 'help_request' },
 ];
+
+function filterHref(type: string | undefined, species: string | undefined): string {
+  const params = new URLSearchParams();
+  if (type) params.set('type', type);
+  if (species) params.set('species', species);
+  const query = params.toString();
+  return query ? `/?${query}` : '/';
+}
 
 export default async function HomePage({
   searchParams,
@@ -19,6 +28,12 @@ export default async function HomePage({
 }) {
   const query = await searchParams;
   const posts = await listPosts({ type: query.type, species: query.species });
+  const speciesFilters = [
+    { label: 'Todos os animais', species: undefined },
+    { label: 'Cachorros', species: 'dog' },
+    { label: 'Gatos', species: 'cat' },
+    { label: 'Outros', species: 'other' },
+  ];
 
   return (
     <main className="page">
@@ -33,8 +48,19 @@ export default async function HomePage({
         {filters.map((filter) => (
           <Link
             key={filter.label}
-            href={filter.href}
+            href={filterHref(filter.type, query.species)}
             data-active={filter.type === query.type || (!filter.type && !query.type)}
+          >
+            {filter.label}
+          </Link>
+        ))}
+      </nav>
+      <nav className="filters">
+        {speciesFilters.map((filter) => (
+          <Link
+            key={filter.label}
+            href={filterHref(query.type, filter.species)}
+            data-active={filter.species === query.species || (!filter.species && !query.species)}
           >
             {filter.label}
           </Link>
@@ -45,25 +71,35 @@ export default async function HomePage({
       ) : (
         <section className="grid">
           {posts.map((post) => (
-            <Link className="card" href={`/p/${post.id}`} key={post.id}>
-              {post.media[0] ? (
-                // Remote rescue photos come from several hosts; the browser loads them directly.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.media[0].thumbUrl} alt={post.approxLabel} />
-              ) : null}
+            <article className="card" key={post.id}>
+              <Link className="photo-wrap" href={`/p/${post.id}`}>
+                {post.media[0] ? (
+                  // Remote rescue photos come from several hosts; the browser loads them directly.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={post.media[0].thumbUrl} alt={post.approxLabel} />
+                ) : null}
+                <div className="photo-chips">
+                  <span className={`chip ${post.urgency}`}>{urgencyLabel[post.urgency]}</span>
+                  <span className="chip status">{statusLabel[post.status]}</span>
+                </div>
+              </Link>
               <div className="card-body">
                 <div className="meta">
-                  <span className={`chip ${post.urgency}`}>{urgencyLabel[post.urgency]}</span>
-                  <span>
-                    {typeLabel[post.type] ?? 'Alerta'} · {statusLabel[post.status]}
-                  </span>
+                  <Link href={`/u/${post.author.handle}`}>@{post.author.handle}</Link>
+                  <span>{formatWhen(post.createdAt)}</span>
                 </div>
-                <h2>{post.approxLabel}</h2>
+                <h2>
+                  <Link href={`/p/${post.id}`}>{post.approxLabel}</Link>
+                </h2>
                 <p>
-                  {speciesLabel[post.animal.species] ?? 'Animal'} · {post.description}
+                  {speciesLabel[post.animal.species] ?? 'Animal'} ·{' '}
+                  {typeLabel[post.type] ?? 'Alerta'} · {post.description}
+                </p>
+                <p>
+                  {post.counts.likes} curtidas · {post.counts.comments} comentários
                 </p>
               </div>
-            </Link>
+            </article>
           ))}
         </section>
       )}

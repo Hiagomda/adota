@@ -4,8 +4,8 @@ import { create } from 'zustand';
 import { loginWithEmail } from './api';
 import type { Account } from './types';
 
-const tokenKey = 'patinha-token';
-const flagKey = 'patinha-flags';
+const tokenKey = 'egua-token';
+const flagKey = 'egua-flags';
 
 interface Flags {
   onboarded: boolean;

@@ -25,7 +25,7 @@ interface Metrics {
 
 export default function AdminPage() {
   const [token, setToken] = useState('');
-  const [email, setEmail] = useState('admin@patinha.local');
+  const [email, setEmail] = useState('admin@egua.local');
   const [reports, setReports] = useState<Report[]>([]);
   const [verifications, setVerifications] = useState<Verification[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);

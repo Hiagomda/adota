@@ -6,7 +6,7 @@ O Android recebe push direto pelo FCM. O iOS recebe pelo FCM, que entrega via AP
 
 1. Em [developer.apple.com](https://developer.apple.com), Certificates, Identifiers & Profiles, Keys, crie uma chave com Apple Push Notifications service.
 2. Baixe o arquivo `.p8` uma única vez. Anote o Key ID e o Team ID.
-3. No console do Firebase, configurações do projeto, Cloud Messaging, app Apple `app.patinha.mobile`, envie a chave de autenticação APNs com o Key ID e o Team ID.
+3. No console do Firebase, configurações do projeto, Cloud Messaging, app Apple `app.egua.adota`, envie a chave de autenticação APNs com o Key ID e o Team ID.
 4. Coloque `GoogleService-Info.plist` em `apps/mobile/` e `google-services.json` para o Android. Esses arquivos ficam fora do Git.
 5. Defina `FIREBASE_PROJECT_ID` na API. Sem esse valor, o worker grava a notificação no app e não chama o FCM.
 

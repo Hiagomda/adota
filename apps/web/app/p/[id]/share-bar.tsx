@@ -12,10 +12,10 @@ export function ShareBar({ id, title }: { id: string; title: string }) {
 
   return (
     <div className="actions">
-      <a href={`patinha://post/${id}`}>Abrir no app</a>
+      <a href={`egua://post/${id}`}>Abrir no app</a>
       <a
         className="secondary"
-        href={`intent://post/${id}#Intent;scheme=patinha;package=app.patinha.mobile;end`}
+        href={`intent://post/${id}#Intent;scheme=egua;package=app.egua.adota;end`}
       >
         Android
       </a>

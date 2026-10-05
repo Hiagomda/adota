@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import type { Account, AppNotification, Post } from './types';
 
+export const siteUrl = process.env.EXPO_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+
 export const apiUrl =
   process.env.EXPO_PUBLIC_API_URL ??
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??

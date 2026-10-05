@@ -6,16 +6,16 @@ import { useSession } from '../src/session';
 import { useTheme } from '../src/theme';
 
 const quickAccounts = [
-  { label: 'Maria', email: 'maria@patinha.local' },
-  { label: 'Patas de Belém', email: 'patas@patinha.local' },
-  { label: 'Admin', email: 'admin@patinha.local' },
+  { label: 'Maria', email: 'maria@egua.local' },
+  { label: 'Patas de Belém', email: 'patas@egua.local' },
+  { label: 'Admin', email: 'admin@egua.local' },
 ];
 
 export default function LoginScreen() {
   const theme = useTheme();
   const router = useRouter();
   const login = useSession((state) => state.login);
-  const [email, setEmail] = useState('maria@patinha.local');
+  const [email, setEmail] = useState('maria@egua.local');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 

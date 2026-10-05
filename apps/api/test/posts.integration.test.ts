@@ -67,8 +67,8 @@ describe('posts', () => {
   });
 
   it('keeps a post inside a radius and drops one outside it', async () => {
-    await insertUser('near@patinha.local', 'near');
-    const created = await createAlert(app, 'near@patinha.local', 'Cachorro na calçada.');
+    await insertUser('near@egua.local', 'near');
+    const created = await createAlert(app, 'near@egua.local', 'Cachorro na calçada.');
     expect(created.statusCode).toBe(201);
 
     const inside = await app.inject({
@@ -86,9 +86,9 @@ describe('posts', () => {
   });
 
   it('hides the exact point until someone commits to help', async () => {
-    await insertUser('author@patinha.local', 'author');
-    await insertUser('helper@patinha.local', 'helper');
-    const created = await createAlert(app, 'author@patinha.local', 'Filhote sozinho.');
+    await insertUser('author@egua.local', 'author');
+    await insertUser('helper@egua.local', 'helper');
+    const created = await createAlert(app, 'author@egua.local', 'Filhote sozinho.');
     const postId = created.json().id as string;
 
     const stranger = await app.inject({ method: 'GET', url: `/posts/${postId}` });
@@ -99,7 +99,7 @@ describe('posts', () => {
     const author = await app.inject({
       method: 'GET',
       url: `/posts/${postId}`,
-      headers: { authorization: 'Bearer dev:author@patinha.local' },
+      headers: { authorization: 'Bearer dev:author@egua.local' },
     });
     expect(author.json().location.exact).toBe(true);
     expect(author.json().location.latitude).toBeCloseTo(-1.45234, 4);
@@ -107,7 +107,7 @@ describe('posts', () => {
     const help = await app.inject({
       method: 'POST',
       url: `/posts/${postId}/responses`,
-      headers: { authorization: 'Bearer dev:helper@patinha.local' },
+      headers: { authorization: 'Bearer dev:helper@egua.local' },
       payload: { kind: 'will_help' },
     });
     expect(help.statusCode).toBe(201);
@@ -115,7 +115,7 @@ describe('posts', () => {
     const helperView = await app.inject({
       method: 'GET',
       url: `/posts/${postId}`,
-      headers: { authorization: 'Bearer dev:helper@patinha.local' },
+      headers: { authorization: 'Bearer dev:helper@egua.local' },
     });
     expect(helperView.json().location.exact).toBe(true);
     expect(helperView.json().status).toBe('on_the_way');
@@ -123,21 +123,21 @@ describe('posts', () => {
     const duplicate = await app.inject({
       method: 'POST',
       url: `/posts/${postId}/responses`,
-      headers: { authorization: 'Bearer dev:helper@patinha.local' },
+      headers: { authorization: 'Bearer dev:helper@egua.local' },
       payload: { kind: 'will_help' },
     });
     expect(duplicate.statusCode).toBe(409);
   });
 
   it('rejects an invalid status jump and a forbidden species', async () => {
-    await insertUser('author@patinha.local', 'author');
-    const created = await createAlert(app, 'author@patinha.local', 'Cadela na praça.');
+    await insertUser('author@egua.local', 'author');
+    const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');
     const postId = created.json().id as string;
 
     const jump = await app.inject({
       method: 'PATCH',
       url: `/posts/${postId}/status`,
-      headers: { authorization: 'Bearer dev:author@patinha.local' },
+      headers: { authorization: 'Bearer dev:author@egua.local' },
       payload: { status: 'adopted' },
     });
     expect(jump.statusCode).toBe(400);
@@ -145,7 +145,7 @@ describe('posts', () => {
     const step = await app.inject({
       method: 'PATCH',
       url: `/posts/${postId}/status`,
-      headers: { authorization: 'Bearer dev:author@patinha.local' },
+      headers: { authorization: 'Bearer dev:author@egua.local' },
       payload: { status: 'on_the_way' },
     });
     expect(step.statusCode).toBe(200);
@@ -161,11 +161,11 @@ describe('posts', () => {
   });
 
   it('holds sale wording for review and hides a blocked author', async () => {
-    await insertUser('seller@patinha.local', 'seller');
-    await insertUser('reader@patinha.local', 'reader');
+    await insertUser('seller@egua.local', 'seller');
+    await insertUser('reader@egua.local', 'reader');
     const created = await createAlert(
       app,
-      'seller@patinha.local',
+      'seller@egua.local',
       'vendo esse cachorro por R$ 200',
     );
     expect(created.json().reviewStatus).toBe('pending');
@@ -186,7 +186,7 @@ describe('posts', () => {
     const blocked = await app.inject({
       method: 'GET',
       url: '/posts',
-      headers: { authorization: 'Bearer dev:reader@patinha.local' },
+      headers: { authorization: 'Bearer dev:reader@egua.local' },
     });
     expect(blocked.json().posts).toHaveLength(0);
 

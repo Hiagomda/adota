@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, urgencyLabel, useTheme } from './theme';
+import { palette, statusLabel, urgencyLabel, useTheme } from './theme';
 import type { Post } from './types';
 
 export function Avatar({
@@ -57,6 +57,18 @@ export function SkeletonCard() {
   return <View style={[styles.skeleton, { backgroundColor: theme.surface }]} />;
 }
 
+function formatWhen(iso: string): string {
+  const date = new Date(iso);
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `há ${days} d`;
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
 export function PostCard({
   post,
   onOpen,
@@ -91,17 +103,28 @@ export function PostCard({
             {post.author.name}
             {post.author.verified ? ' · verificado' : ''}
           </Text>
-          <Text style={{ color: theme.muted }}>{post.approxLabel}</Text>
+          <Text style={{ color: theme.muted }}>
+            {post.approxLabel} · {formatWhen(post.createdAt)}
+          </Text>
         </View>
         <Chip label={urgencyLabel[post.urgency] ?? 'Alerta'} tone={post.urgency} />
       </Pressable>
-      <Pressable onPress={onPhoto}>
+      <Pressable onPress={onPhoto} style={styles.photoFrame}>
         {photo ? (
           <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" />
         ) : (
           <View style={styles.photo} />
         )}
+        <View style={styles.overlay}>
+          <Chip label={statusLabel[post.status] ?? post.status} />
+          {post.media.length > 1 ? <Chip label={`1/${post.media.length}`} /> : null}
+        </View>
       </Pressable>
+      {post.status === 'open' ? (
+        <Pressable style={styles.help} onPress={onOpen}>
+          <Text style={styles.helpText}>Eu vou ajudar</Text>
+        </Pressable>
+      ) : null}
       <Text style={[styles.description, { color: theme.text }]} numberOfLines={3}>
         {post.description}
       </Text>
@@ -135,6 +158,18 @@ const styles = StyleSheet.create({
   card: { marginBottom: 12 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
   cardHeadText: { flex: 1 },
+  photoFrame: { position: 'relative' },
   photo: { width: '100%', aspectRatio: 4 / 5, backgroundColor: '#222' },
+  overlay: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 },
+  help: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    minHeight: 44,
+    borderRadius: 999,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpText: { color: '#fff', fontWeight: '700' },
   description: { paddingHorizontal: 16, paddingTop: 12, fontSize: 16, lineHeight: 22 },
 });

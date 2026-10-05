@@ -2,9 +2,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, loadPost } from '../../src/api';
+import { api, loadPost, siteUrl } from '../../src/api';
 import { useSession } from '../../src/session';
 import { nextStatus, statusLabel, useTheme } from '../../src/theme';
 
@@ -21,8 +31,10 @@ export default function PostScreen() {
   const token = useSession((state) => state.token);
   const client = useQueryClient();
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [comment, setComment] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
   const post = useQuery({
     queryKey: ['post', id, token],
     queryFn: () => loadPost(id, token),
@@ -70,7 +82,7 @@ export default function PostScreen() {
             <Image
               key={media.url}
               source={{ uri: media.url }}
-              style={styles.photo}
+              style={[styles.photo, { width }]}
               contentFit="cover"
             />
           ))}
@@ -102,8 +114,21 @@ export default function PostScreen() {
             <Pressable onPress={() => void act(`/posts/${item.id}/save`)}>
               <Text style={{ color: theme.text }}>{item.saved ? 'Salvo' : 'Salvar'}</Text>
             </Pressable>
+            <Pressable
+              onPress={() =>
+                void Share.share({
+                  message: `${item.approxLabel} no Égua, adota! ${siteUrl}/p/${item.id}`,
+                  url: `${siteUrl}/p/${item.id}`,
+                })
+              }
+            >
+              <Text style={{ color: theme.text }}>Compartilhar</Text>
+            </Pressable>
             <Pressable onPress={() => setCommentsOpen(true)}>
               <Text style={{ color: theme.text }}>Comentários</Text>
+            </Pressable>
+            <Pressable onPress={() => setReportOpen(true)}>
+              <Text style={{ color: theme.muted }}>Denunciar</Text>
             </Pressable>
           </View>
           <Pressable
@@ -229,13 +254,48 @@ export default function PostScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      <Modal
+        visible={reportOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setReportOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setReportOpen(false)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: theme.surface }]}
+            onPress={() => undefined}
+          >
+            <Text style={{ color: theme.text, fontWeight: '700' }}>Por que você denuncia?</Text>
+            {['Conteúdo abusivo', 'Parece venda de animal', 'Informação falsa', 'Spam'].map(
+              (reason) => (
+                <Pressable
+                  key={reason}
+                  style={styles.secondary}
+                  onPress={() => {
+                    void act('/reports', 'POST', {
+                      targetType: 'post',
+                      targetId: item.id,
+                      reason,
+                    }).then(() => {
+                      setReportOpen(false);
+                      setNote('Denúncia enviada. A equipe analisa antes de ocultar.');
+                    });
+                  }}
+                >
+                  <Text style={{ color: theme.text }}>{reason}</Text>
+                </Pressable>
+              ),
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   back: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
-  photo: { width: 360, aspectRatio: 4 / 5 },
+  photo: { aspectRatio: 4 / 5 },
   copy: { padding: 16, gap: 10 },
   title: { fontSize: 24, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 16 },

@@ -37,8 +37,8 @@ interface SeedUser {
 
 const people: SeedUser[] = [
   {
-    email: 'admin@patinha.local',
-    name: 'Admin Patinha',
+    email: 'admin@egua.local',
+    name: 'Equipe Égua, adota!',
     handle: 'admin',
     role: 'admin',
     verified: true,
@@ -48,7 +48,7 @@ const people: SeedUser[] = [
     lat: -1.45,
   },
   {
-    email: 'patas@patinha.local',
+    email: 'patas@egua.local',
     name: 'Patas de Belém',
     handle: 'patasbelem',
     role: 'ngo',
@@ -59,7 +59,7 @@ const people: SeedUser[] = [
     lat: -1.452,
   },
   {
-    email: 'sacramenta@patinha.local',
+    email: 'sacramenta@egua.local',
     name: 'Protetor da Sacramenta',
     handle: 'sacramenta',
     role: 'protector',
@@ -70,7 +70,7 @@ const people: SeedUser[] = [
     lat: -1.418,
   },
   {
-    email: 'amazonia@patinha.local',
+    email: 'amazonia@egua.local',
     name: 'Instituto Amazônia Animal',
     handle: 'amazoniaanimal',
     role: 'ngo',
@@ -81,7 +81,7 @@ const people: SeedUser[] = [
     lat: -1.461,
   },
   {
-    email: 'maria@patinha.local',
+    email: 'maria@egua.local',
     name: 'Maria Souza',
     handle: 'maria',
     role: 'user',
@@ -90,7 +90,7 @@ const people: SeedUser[] = [
     whatsapp: true,
   },
   {
-    email: 'joao@patinha.local',
+    email: 'joao@egua.local',
     name: 'João Lima',
     handle: 'joao',
     role: 'user',
@@ -102,7 +102,7 @@ const people: SeedUser[] = [
     foster: true,
   },
   {
-    email: 'ana@patinha.local',
+    email: 'ana@egua.local',
     name: 'Ana Ribeiro',
     handle: 'ana',
     role: 'user',
@@ -111,7 +111,7 @@ const people: SeedUser[] = [
     whatsapp: true,
   },
   {
-    email: 'pedro@patinha.local',
+    email: 'pedro@egua.local',
     name: 'Pedro Alves',
     handle: 'pedro',
     role: 'user',
@@ -123,7 +123,7 @@ const people: SeedUser[] = [
     foster: true,
   },
   {
-    email: 'lucia@patinha.local',
+    email: 'lucia@egua.local',
     name: 'Lúcia Ferreira',
     handle: 'lucia',
     role: 'user',
@@ -444,7 +444,7 @@ async function seed(pool: Pool): Promise<void> {
     if (type === 'help_request') {
       await pool.query(
         `INSERT INTO help_requests (post_id, kind, goal_amount, pix_key, deadline)
-         VALUES ($1, 'food', 400, 'patasbelem@patinha.local', now() + interval '10 days')`,
+         VALUES ($1, 'food', 400, 'patasbelem@egua.local', now() + interval '10 days')`,
         [postId],
       );
     }

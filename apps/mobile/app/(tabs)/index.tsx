@@ -53,7 +53,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
-      <Text style={[styles.brand, { color: theme.accent }]}>Patinha</Text>
+      <Text style={[styles.brand, { color: theme.accent }]}>Égua, adota!</Text>
       {feed.isLoading ? (
         <SkeletonCard />
       ) : (
@@ -111,7 +111,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  brand: { fontSize: 28, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
+  brand: { fontSize: 24, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
   stories: { paddingHorizontal: 12, paddingBottom: 12, gap: 12 },
   story: { width: 78, alignItems: 'center', gap: 4 },
   storyPhoto: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: '#E23B3B' },

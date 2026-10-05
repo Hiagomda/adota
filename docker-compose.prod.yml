@@ -98,10 +98,10 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: patinha-media
-      IMGPROXY_URL: https://img.patinha.app
+      IMGPROXY_URL: https://img.eguaadota.app
       IMGPROXY_KEY: ${IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT}
-      WEB_ORIGIN: https://app.patinha.app
+      WEB_ORIGIN: https://app.eguaadota.app
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,8 +131,8 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.patinha.app
-        NEXT_PUBLIC_SITE_URL: https://app.patinha.app
+        NEXT_PUBLIC_API_URL: https://api.eguaadota.app
+        NEXT_PUBLIC_SITE_URL: https://app.eguaadota.app
     environment:
       API_URL: http://api:3010
     depends_on:

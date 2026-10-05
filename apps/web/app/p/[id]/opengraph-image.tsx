@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import QRCode from 'qrcode';
 import { getPost } from '../../../lib/api';
 import { statusLabel } from '../../../lib/labels';
 
@@ -8,10 +9,20 @@ export const contentType = 'image/png';
 export default async function OpenGraphImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const post = await getPost(id);
-  return new ImageResponse(<Card post={post} tall={false} />, size);
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const qr = await QRCode.toDataURL(`${site}/p/${id}`, { margin: 1, width: 280 });
+  return new ImageResponse(<Card post={post} qr={qr} tall={false} />, size);
 }
 
-export function Card({ post, tall }: { post: Awaited<ReturnType<typeof getPost>>; tall: boolean }) {
+export function Card({
+  post,
+  qr,
+  tall,
+}: {
+  post: Awaited<ReturnType<typeof getPost>>;
+  qr: string;
+  tall: boolean;
+}) {
   const photo = post?.media[0]?.url;
   return (
     <div
@@ -37,9 +48,13 @@ export function Card({ post, tall }: { post: Awaited<ReturnType<typeof getPost>>
         <div style={{ height: tall ? 1280 : 760, background: '#ff6b3d' }} />
       )}
       <div style={{ display: 'flex', flexDirection: 'column', padding: 48, gap: 12 }}>
-        <div style={{ color: '#ff6b3d', fontSize: 36, fontWeight: 700 }}>Patinha · Belém</div>
+        <div style={{ color: '#ff6b3d', fontSize: 36, fontWeight: 700 }}>Égua, adota! · Belém</div>
         <div style={{ fontSize: 48, fontWeight: 700 }}>{post?.approxLabel ?? 'Alerta'}</div>
         <div style={{ fontSize: 32 }}>{post ? statusLabel[post.status] : ''}</div>
+        <div style={{ display: 'flex' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" src={qr} width={140} height={140} />
+        </div>
       </div>
     </div>
   );

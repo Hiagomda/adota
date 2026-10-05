@@ -5,12 +5,12 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
   title: {
-    default: 'Patinha',
-    template: '%s · Patinha',
+    default: 'Égua, adota!',
+    template: '%s · Égua, adota!',
   },
   description: 'Alertas de resgate de animais de rua em Belém.',
   openGraph: {
-    siteName: 'Patinha',
+    siteName: 'Égua, adota!',
     locale: 'pt_BR',
     type: 'website',
   },
@@ -25,9 +25,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body>
         <header className="site-header">
           <Link className="brand" href="/">
-            Patinha
+            Égua, adota!
           </Link>
           <nav className="header-links">
+            <Link href="/mapa">Mapa</Link>
             <Link href="/?type=lost">Perdidos</Link>
             <Link href="/?type=help_request">Ajuda</Link>
             <Link href="/admin">Moderação</Link>

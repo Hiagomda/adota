@@ -4,7 +4,7 @@ Alvo: VPS com 4 vCPU e 8 GB de RAM, Ubuntu, Docker. Os serviços públicos saem 
 
 ## Primeira vez
 
-1. Aponte `api.patinha.app`, `app.patinha.app` e `img.patinha.app` para o IP da VPS.
+1. Aponte `api.eguaadota.app`, `app.eguaadota.app` e `img.eguaadota.app` para o IP da VPS.
 2. Crie o usuário de deploy, sem senha de root por SSH.
 3. Firewall:
 
@@ -22,7 +22,7 @@ ufw enable
 6. Crie `/opt/patinha/.env` com `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `IMGPROXY_KEY`, `IMGPROXY_SALT` e `FIREBASE_PROJECT_ID`. `AUTH_DEV_MODE` fica `false`.
 7. Suba a stack: `docker compose -f docker-compose.prod.yml up -d --build`.
 8. Rode a migração: `docker compose -f docker-compose.prod.yml exec -T api pnpm --filter @patinha/api db:migrate`.
-9. No Uptime Kuma, em `127.0.0.1:3002`, monitore `https://api.patinha.app/health` e `https://app.patinha.app`.
+9. No Uptime Kuma, em `127.0.0.1:3002`, monitore `https://api.eguaadota.app/health` e `https://app.eguaadota.app`.
 
 ## Backup
 
