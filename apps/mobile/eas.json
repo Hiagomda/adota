@@ -16,7 +16,7 @@
       "distribution": "internal",
       "environment": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.86.48.25.233.sslip.io"
+        "EXPO_PUBLIC_API_URL": "http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io"
       },
       "android": {
         "buildType": "apk"
