@@ -322,6 +322,11 @@ const urgencies = ['high', 'medium', 'low'] as const;
 const sizes = ['small', 'medium', 'large'] as const;
 
 async function seed(pool: Pool): Promise<void> {
+  if (process.env.SEED_IF_EMPTY === 'true') {
+    const existing = await pool.query<{ n: number }>('select count(*)::int as n from users');
+    if ((existing.rows[0]?.n ?? 0) > 0) return;
+  }
+
   await pool.query(`
     TRUNCATE TABLE
       adoption_terms, verification_requests, notifications, reports, help_requests,

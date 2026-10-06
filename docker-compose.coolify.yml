@@ -1,0 +1,130 @@
+# Test stack for the VPS that already runs Coolify.
+# Coolify's proxy owns ports 80 and 443, so this file publishes none.
+# Public URLs come from SERVICE_URL_* and the domain fields in Coolify.
+
+name: egua-adota
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    environment:
+      POSTGRES_USER: patinha
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_DB: patinha
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    mem_limit: 1g
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U patinha -d patinha']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    environment:
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MINIO}
+      MINIO_DEFAULT_BUCKETS: patinha-media
+    volumes:
+      - minio:/bitnami/minio/data
+    restart: unless-stopped
+    mem_limit: 256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.30.1
+    environment:
+      SERVICE_URL_IMGPROXY_8080: ${SERVICE_URL_IMGPROXY_8080:-https://img.86.48.25.233.sslip.io}
+      IMGPROXY_USE_S3: 'true'
+      IMGPROXY_S3_ENDPOINT: http://minio:9000
+      IMGPROXY_S3_REGION: us-east-1
+      IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE: 'true'
+      IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: 'true'
+      IMGPROXY_ALLOWED_SOURCES: s3://patinha-media/
+      IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
+      IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
+      AWS_ACCESS_KEY_ID: ${SERVICE_USER_MINIO}
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_64_MINIO}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      SERVICE_URL_API_3010: ${SERVICE_URL_API_3010:-https://api.86.48.25.233.sslip.io}
+      NODE_ENV: production
+      PORT: '3010'
+      DATABASE_URL: postgres://patinha:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/patinha
+      REDIS_URL: redis://redis:6379
+      AUTH_DEV_MODE: 'false'
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
+      MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}
+      MINIO_BUCKET: patinha-media
+      IMGPROXY_URL: ${SERVICE_URL_IMGPROXY_8080:-https://img.86.48.25.233.sslip.io}
+      IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
+      IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
+      WEB_ORIGIN: ${SERVICE_URL_DOWNLOAD_80:-https://baixar.86.48.25.233.sslip.io}
+      SEED_IF_EMPTY: 'true'
+    command:
+      - sh
+      - -c
+      - pnpm --filter @patinha/api db:migrate && pnpm --filter @patinha/api db:seed && pnpm --filter @patinha/api start
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  download:
+    build:
+      context: .
+      dockerfile: docker/download.Dockerfile
+    environment:
+      SERVICE_URL_DOWNLOAD_80: ${SERVICE_URL_DOWNLOAD_80:-https://baixar.86.48.25.233.sslip.io}
+    volumes:
+      - apk:/apk
+    restart: unless-stopped
+    mem_limit: 64m
+
+volumes:
+  postgres:
+  minio:
+  apk:
