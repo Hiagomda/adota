@@ -26,10 +26,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         fontFamily: 'sans-serif',
       }}
     >
-        {post.media[0] ? (
-          // ImageResponse only accepts a plain img element.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+      {post.media[0] ? (
+        // ImageResponse only accepts a plain img element.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           alt=""
           src={post.media[0].url}
           style={{ width: '100%', height: story ? 1280 : 720, objectFit: 'cover' }}

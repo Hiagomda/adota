@@ -595,7 +595,8 @@ function requireUser(user: SessionUser | null): SessionUser {
 
 function requireAdmin(user: SessionUser | null): SessionUser {
   const current = requireUser(user);
-  if (current.role !== 'admin') throw new HttpError(403, 'Só a equipe da Égua, adota! pode fazer isso.');
+  if (current.role !== 'admin')
+    throw new HttpError(403, 'Só a equipe da Égua, adota! pode fazer isso.');
   return current;
 }
 

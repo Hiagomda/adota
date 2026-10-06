@@ -48,8 +48,8 @@ pnpm test         # exige Postgres e Redis no ar
 
 Contas locais, senha nenhuma. O token é `dev:<e-mail>`:
 
-| E-mail              | Uso                   |
-| ------------------- | --------------------- |
+| E-mail           | Uso                   |
+| ---------------- | --------------------- |
 | maria@egua.local | pessoa                |
 | patas@egua.local | ONG verificada        |
 | admin@egua.local | moderação em `/admin` |

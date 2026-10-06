@@ -163,11 +163,7 @@ describe('posts', () => {
   it('holds sale wording for review and hides a blocked author', async () => {
     await insertUser('seller@egua.local', 'seller');
     await insertUser('reader@egua.local', 'reader');
-    const created = await createAlert(
-      app,
-      'seller@egua.local',
-      'vendo esse cachorro por R$ 200',
-    );
+    const created = await createAlert(app, 'seller@egua.local', 'vendo esse cachorro por R$ 200');
     expect(created.json().reviewStatus).toBe('pending');
 
     const feed = await app.inject({ method: 'GET', url: '/posts' });
