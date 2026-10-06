@@ -1,28 +1,32 @@
 import {
   Camera,
+  CircleLayer,
+  Images,
   MapView,
-  MarkerView,
+  ShapeSource,
+  SymbolLayer,
   requestAndroidLocationPermissions,
   UserLocation,
 } from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform } from 'react-native';
 import type { Post } from '../types';
-
-const belem: [number, number] = [-48.49, -1.45];
+import { belem, mapStyleUrl, type MapBounds } from './geo';
+import { palette } from '../theme';
 
 export function MapCanvas({
   posts,
   selectedId,
   onSelect,
+  onBounds,
 }: {
   posts: Post[];
   selectedId: string | null;
   onSelect: (post: Post) => void;
+  onBounds?: (bounds: MapBounds) => void;
 }) {
   const [center, setCenter] = useState<[number, number]>(belem);
-  const [zoom, setZoom] = useState(11);
   const [gpsReady, setGpsReady] = useState(false);
 
   useEffect(() => {
@@ -32,11 +36,10 @@ export function MapCanvas({
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!active || permission.status !== 'granted') return;
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
       if (!active) return;
       setCenter([position.coords.longitude, position.coords.latitude]);
-      setZoom(14);
       setGpsReady(true);
     }
     void readGps();
@@ -45,41 +48,107 @@ export function MapCanvas({
     };
   }, []);
 
+  const shape = {
+    type: 'FeatureCollection' as const,
+    features: posts.map((post) => ({
+      type: 'Feature' as const,
+      id: post.id,
+      properties: {
+        id: post.id,
+        urgency: post.urgency,
+        selected: post.id === selectedId,
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [post.location.longitude, post.location.latitude],
+      },
+    })),
+  };
+
   return (
-    <MapView style={styles.map} mapStyle="https://tiles.openfreemap.org/styles/liberty">
-      <Camera
-        centerCoordinate={center}
-        zoomLevel={zoom}
-        followUserLocation={gpsReady}
-        followZoomLevel={14}
-        animationMode="easeTo"
-        animationDuration={600}
-      />
+    <MapView
+      style={{ flex: 1 }}
+      mapStyle={mapStyleUrl}
+      onRegionDidChange={(event) => {
+        const [northEast, southWest] = event.properties.visibleBounds;
+        const east = northEast?.[0];
+        const north = northEast?.[1];
+        const west = southWest?.[0];
+        const south = southWest?.[1];
+        if (
+          west === undefined ||
+          south === undefined ||
+          east === undefined ||
+          north === undefined
+        ) {
+          return;
+        }
+        onBounds?.({ west, south, east, north });
+      }}
+    >
+      <Camera centerCoordinate={center} zoomLevel={gpsReady ? 14 : 12} animationDuration={600} />
       {gpsReady ? <UserLocation visible /> : null}
-      {posts.map((post) => (
-        <MarkerView
-          key={post.id}
-          coordinate={[post.location.longitude, post.location.latitude]}
-          allowOverlap
-        >
-          <Pressable onPress={() => onSelect(post)}>
-            <View
-              style={[
-                styles.pin,
-                {
-                  backgroundColor: post.urgency === 'high' ? '#E23B3B' : '#FF6B3D',
-                  transform: [{ scale: post.id === selectedId ? 1.4 : 1 }],
-                },
-              ]}
-            />
-          </Pressable>
-        </MarkerView>
-      ))}
+      <Images
+        images={{
+          pawHigh: require('../../assets/paw-high.png'),
+          pawMedium: require('../../assets/paw-medium.png'),
+          pawLow: require('../../assets/paw-low.png'),
+        }}
+      />
+      <ShapeSource
+        id="alerts"
+        shape={shape}
+        cluster
+        clusterRadius={48}
+        clusterMaxZoomLevel={15}
+        onPress={(event) => {
+          const feature = event.features[0];
+          const id = feature?.properties?.id;
+          if (typeof id !== 'string') return;
+          const post = posts.find((item) => item.id === id);
+          if (post) onSelect(post);
+        }}
+      >
+        <CircleLayer
+          id="clusters"
+          filter={['has', 'point_count']}
+          style={{
+            circleColor: palette.acai,
+            circleRadius: 18,
+            circleStrokeWidth: 2,
+            circleStrokeColor: palette.areia,
+          }}
+        />
+        <SymbolLayer
+          id="cluster-count"
+          filter={['has', 'point_count']}
+          style={{
+            textField: ['get', 'point_count'],
+            textSize: 13,
+            textColor: palette.areia,
+          }}
+        />
+        <SymbolLayer
+          id="pins"
+          filter={['!', ['has', 'point_count']]}
+          style={{
+            iconImage: [
+              'match',
+              ['get', 'urgency'],
+              'high',
+              'pawHigh',
+              'medium',
+              'pawMedium',
+              'low',
+              'pawLow',
+              'pawMedium',
+            ],
+            iconSize: ['case', ['==', ['get', 'selected'], true], 0.5, 0.4],
+            iconAllowOverlap: true,
+            iconIgnorePlacement: true,
+          }}
+        />
+      </ShapeSource>
     </MapView>
   );
 }
-
-const styles = StyleSheet.create({
-  map: { flex: 1 },
-  pin: { width: 18, height: 18, borderRadius: 9 },
-});

@@ -35,7 +35,7 @@ export default function SettingsScreen() {
   async function removeAccount() {
     await api('/me', { method: 'DELETE', token });
     await logout();
-    router.replace('/login');
+    router.replace('/');
   }
 
   return (
@@ -45,7 +45,7 @@ export default function SettingsScreen() {
       </Pressable>
       <Text style={[styles.title, { color: theme.text }]}>Ajustes</Text>
       <Pressable onPress={() => void saveQuiet()}>
-        <Text style={{ color: theme.accent }}>Ativar silêncio noturno e raio de 15 km</Text>
+        <Text style={{ color: theme.text }}>Ativar silêncio noturno e raio de 15 km</Text>
       </Pressable>
       <TextInput
         value={organization}
@@ -55,7 +55,7 @@ export default function SettingsScreen() {
         style={[styles.input, { color: theme.text, borderColor: theme.line }]}
       />
       <Pressable onPress={() => void verify()}>
-        <Text style={{ color: theme.accent }}>Pedir verificação</Text>
+        <Text style={{ color: theme.text }}>Pedir verificação</Text>
       </Pressable>
       <Pressable
         onPress={() =>
@@ -73,7 +73,7 @@ export default function SettingsScreen() {
           }).then(() => setMessage('Lar temporário registrado no centro de Belém, raio de 8 km.'))
         }
       >
-        <Text style={{ color: theme.accent }}>Oferecer lar temporário</Text>
+        <Text style={{ color: theme.text }}>Oferecer lar temporário</Text>
       </Pressable>
       <Pressable onPress={() => router.push('/support')}>
         <Text style={{ color: theme.text }}>Suporte</Text>

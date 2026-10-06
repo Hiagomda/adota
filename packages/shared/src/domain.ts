@@ -61,6 +61,9 @@ export const createPostSchema = z.object({
   description: z.string().trim().min(1).max(2000),
   latitude: z.number().gte(-90).lte(90),
   longitude: z.number().gte(-180).lte(180),
+  accuracyM: z.number().nonnegative().max(100_000).optional(),
+  addressText: z.string().trim().max(240).optional(),
+  referencePoint: z.string().trim().max(200).optional(),
   approxLabel: z.string().trim().min(1).max(120),
   parentPostId: z.string().uuid().optional(),
   media: z
@@ -82,9 +85,13 @@ export const createPostSchema = z.object({
 
 export const feedQuerySchema = z.object({
   cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(30).default(10),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
   latitude: z.coerce.number().gte(-90).lte(90).optional(),
   longitude: z.coerce.number().gte(-180).lte(180).optional(),
+  west: z.coerce.number().gte(-180).lte(180).optional(),
+  south: z.coerce.number().gte(-90).lte(90).optional(),
+  east: z.coerce.number().gte(-180).lte(180).optional(),
+  north: z.coerce.number().gte(-90).lte(90).optional(),
   radiusKm: z.coerce.number().positive().max(100).optional(),
   species: speciesSchema.optional(),
   size: sizeSchema.optional(),

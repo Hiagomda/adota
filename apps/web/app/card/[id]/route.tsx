@@ -36,7 +36,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         />
       ) : null}
       <div style={{ display: 'flex', flexDirection: 'column', padding: 56, gap: 16 }}>
-        <div style={{ color: '#ff6b3d', fontSize: 40, fontWeight: 700 }}>Égua, adota!</div>
+        <div style={{ color: '#F7B84B', fontSize: 40, fontWeight: 700 }}>Égua, adota!</div>
         <div style={{ fontSize: 56, fontWeight: 700 }}>
           {speciesLabel[post.animal.species] ?? 'Animal'}
         </div>

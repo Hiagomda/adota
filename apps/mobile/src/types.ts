@@ -41,6 +41,9 @@ export interface Post {
     temperament: string | null;
   };
   location: { latitude: number; longitude: number; exact: boolean };
+  accuracyM: number | null;
+  addressText: string | null;
+  referencePoint: string | null;
   media: { url: string; thumbUrl: string }[];
   counts: { likes: number; comments: number };
   liked: boolean;

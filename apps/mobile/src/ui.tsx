@@ -37,7 +37,9 @@ export function Chip({ label, tone }: { label: string; tone?: 'high' | 'medium' 
           : palette.accent;
   return (
     <View style={[styles.chip, { backgroundColor: background }]}>
-      <Text style={[styles.chipText, tone === 'medium' ? styles.chipDark : null]}>{label}</Text>
+      <Text style={[styles.chipText, tone === 'high' || tone === 'low' ? null : styles.chipDark]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -147,10 +149,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: '#fff', fontWeight: '700' },
+  avatarLetter: { color: palette.acai, fontWeight: '700' },
   chip: { minHeight: 28, borderRadius: 999, paddingHorizontal: 10, justifyContent: 'center' },
   chipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  chipDark: { color: '#1a1a1a' },
+  chipDark: { color: palette.acai },
   empty: { padding: 32, gap: 8 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptyBody: { fontSize: 16, lineHeight: 22 },
@@ -159,7 +161,7 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
   cardHeadText: { flex: 1 },
   photoFrame: { position: 'relative' },
-  photo: { width: '100%', aspectRatio: 4 / 5, backgroundColor: '#222' },
+  photo: { width: '100%', aspectRatio: 4 / 5, backgroundColor: palette.acai },
   overlay: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 },
   help: {
     marginHorizontal: 16,
@@ -170,6 +172,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  helpText: { color: '#fff', fontWeight: '700' },
+  helpText: { color: palette.acai, fontWeight: '700' },
   description: { paddingHorizontal: 16, paddingTop: 12, fontSize: 16, lineHeight: 22 },
 });

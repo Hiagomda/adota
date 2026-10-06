@@ -20,6 +20,7 @@ import {
 } from './accounts.js';
 import type { Env } from './config.js';
 import { addResponse, changeStatus, createPost, getPost, listPosts } from './feed.js';
+import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
 import { presignUploads } from './media.js';
 import { enqueueRescueAlert, notifyStatusChange, type createQueue } from './notify.js';
@@ -168,6 +169,22 @@ export async function registerRoutes(
       return { uploads: await presignUploads(env, storage, user.id, body.files) };
     },
   );
+
+  app.get('/geocode/reverse', async (request) => {
+    const query = parse(
+      z.object({
+        latitude: z.coerce.number().gte(-90).lte(90),
+        longitude: z.coerce.number().gte(-180).lte(180),
+      }),
+      request.query,
+    );
+    try {
+      const address = await reverseAddress(query.latitude, query.longitude);
+      return { address };
+    } catch {
+      return { address: null };
+    }
+  });
 
   app.get('/posts', async (request) => {
     const query = parse(feedQuerySchema, request.query);

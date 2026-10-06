@@ -3,9 +3,10 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../src/api';
 import { useSession } from '../src/session';
-import { useTheme } from '../src/theme';
+import { palette, screenColumn, useTheme } from '../src/theme';
 
 export default function PermissionsScreen() {
   const theme = useTheme();
@@ -38,26 +39,29 @@ export default function PermissionsScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+      <View style={styles.column}>
       <Text style={[styles.title, { color: theme.text }]}>Perto de você</Text>
       <Text style={[styles.body, { color: theme.muted }]}>{message}</Text>
       <Pressable style={styles.button} onPress={() => void allow()}>
         <Text style={styles.buttonText}>Entendi</Text>
       </Pressable>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'flex-end', padding: 24, gap: 16 },
+  screen: { flex: 1, justifyContent: 'flex-end' },
+  column: { ...screenColumn, padding: 24, gap: 16, paddingBottom: 24 },
   title: { fontSize: 32, fontWeight: '700' },
   body: { fontSize: 17, lineHeight: 24 },
   button: {
     minHeight: 52,
     borderRadius: 999,
-    backgroundColor: '#FF6B3D',
+    backgroundColor: palette.caju,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  buttonText: { color: palette.acai, fontWeight: '700' },
 });

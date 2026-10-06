@@ -8,6 +8,7 @@
   "scripts": {
     "dev:api": "pnpm --filter @patinha/shared build && pnpm --filter @patinha/api dev",
     "dev:mobile": "pnpm --filter @patinha/mobile dev",
+    "dev:mobile:preview": "pnpm --filter @patinha/mobile preview",
     "dev:web": "pnpm --filter @patinha/web dev",
     "lint": "prettier --check . && eslint apps/api packages/shared && pnpm --filter @patinha/mobile lint && pnpm --filter @patinha/web lint",
     "typecheck": "pnpm --filter @patinha/shared build && pnpm -r --if-present typecheck",

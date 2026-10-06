@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api, loadPost } from '../../src/api';
 import { useSession } from '../../src/session';
+import { palette } from '../../src/theme';
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -80,9 +81,9 @@ const styles = StyleSheet.create({
   help: {
     minHeight: 48,
     borderRadius: 999,
-    backgroundColor: '#FF6B3D',
+    backgroundColor: palette.caju,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  helpText: { color: '#fff', fontWeight: '700' },
+  helpText: { color: palette.acai, fontWeight: '700' },
 });

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadFeed } from '../../src/api';
 import { useSession } from '../../src/session';
-import { useTheme } from '../../src/theme';
+import { palette, useTheme } from '../../src/theme';
 
 interface Profile {
   id: string;
@@ -55,7 +55,7 @@ export default function UserScreen() {
             })
           }
         >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>
+          <Text style={{ color: palette.acai, fontWeight: '700' }}>
             {person.following ? 'Seguindo' : 'Seguir'}
           </Text>
         </Pressable>
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingHorizontal: 16,
     borderRadius: 999,
-    backgroundColor: '#FF6B3D',
+    backgroundColor: palette.caju,
     alignItems: 'center',
     justifyContent: 'center',
   },

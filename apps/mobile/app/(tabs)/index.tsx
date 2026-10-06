@@ -4,15 +4,16 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed } from '../../src/api';
 import { useSession } from '../../src/session';
-import { useTheme } from '../../src/theme';
+import { screenColumn, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { EmptyState, PostCard, SkeletonCard } from '../../src/ui';
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
   const client = useQueryClient();
@@ -53,18 +54,21 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
-      <Text style={[styles.brand, { color: theme.accent }]}>Égua, adota!</Text>
+      <View style={styles.column}>
+      <Text style={[styles.brand, { color: theme.text }]}>Égua, adota!</Text>
       {feed.isLoading ? (
         <SkeletonCard />
       ) : (
         <FlashList
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           data={feed.data?.posts ?? []}
           keyExtractor={(post) => post.id}
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefetching}
               onRefresh={() => void feed.refetch()}
-              tintColor={theme.accent}
+              tintColor={theme.text}
             />
           }
           ListHeaderComponent={
@@ -106,13 +110,15 @@ export default function HomeScreen() {
           )}
         />
       )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  brand: { fontSize: 24, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
-  stories: { paddingHorizontal: 12, paddingBottom: 12, gap: 12 },
-  story: { width: 78, alignItems: 'center', gap: 4 },
+  column: { flex: 1, ...screenColumn },
+  brand: { fontSize: 24, fontWeight: '700', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  stories: { paddingHorizontal: 16, paddingBottom: 16, gap: 12, alignItems: 'flex-start' },
+  story: { width: 76, alignItems: 'center', gap: 6 },
   storyPhoto: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: '#E23B3B' },
 });

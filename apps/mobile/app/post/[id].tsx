@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadPost, siteUrl } from '../../src/api';
 import { useSession } from '../../src/session';
-import { nextStatus, statusLabel, useTheme } from '../../src/theme';
+import { nextStatus, palette, statusLabel, useTheme } from '../../src/theme';
 
 interface Comment {
   id: string;
@@ -53,10 +53,7 @@ export default function PostScreen() {
   });
 
   async function act(path: string, method = 'POST', body?: unknown) {
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    if (!token) return;
     await api(path, { method, token, body });
     await client.invalidateQueries({ queryKey: ['post', id, token] });
   }
@@ -141,10 +138,10 @@ export default function PostScreen() {
           </Pressable>
           <View style={styles.actions}>
             <Pressable onPress={() => void act(`/users/${item.author.id}/follow`)}>
-              <Text style={{ color: theme.accent }}>Seguir</Text>
+              <Text style={{ color: theme.text }}>Seguir</Text>
             </Pressable>
             <Pressable onPress={() => void act(`/posts/${item.id}/follow`)}>
-              <Text style={{ color: theme.accent }}>Seguir alerta</Text>
+              <Text style={{ color: theme.text }}>Seguir alerta</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -182,7 +179,7 @@ export default function PostScreen() {
                 )
               }
             >
-              <Text style={{ color: theme.accent }}>Aceitar termo de adoção</Text>
+              <Text style={{ color: theme.text }}>Aceitar termo de adoção</Text>
             </Pressable>
           ) : null}
           {item.status === 'adopted' ? (
@@ -206,7 +203,7 @@ export default function PostScreen() {
                 }).then(() => setNote('Acompanhamento publicado.'))
               }
             >
-              <Text style={{ color: theme.accent }}>Publicar acompanhamento</Text>
+              <Text style={{ color: theme.text }}>Publicar acompanhamento</Text>
             </Pressable>
           ) : null}
           {note ? <Text style={{ color: theme.muted }}>{note}</Text> : null}
@@ -249,7 +246,7 @@ export default function PostScreen() {
                 });
               }}
             >
-              <Text style={{ color: theme.accent }}>Publicar</Text>
+              <Text style={{ color: theme.text }}>Publicar</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -294,19 +291,19 @@ export default function PostScreen() {
 }
 
 const styles = StyleSheet.create({
-  back: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
+  back: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 },
   photo: { aspectRatio: 4 / 5 },
-  copy: { padding: 16, gap: 10 },
+  copy: { padding: 16, gap: 12 },
   title: { fontSize: 24, fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: 16 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   primary: {
     minHeight: 48,
     borderRadius: 999,
-    backgroundColor: '#FF6B3D',
+    backgroundColor: palette.caju,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: '#fff', fontWeight: '700' },
+  primaryText: { color: palette.acai, fontWeight: '700' },
   secondary: { minHeight: 44, justifyContent: 'center' },
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {

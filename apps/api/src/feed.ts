@@ -40,6 +40,9 @@ interface PostRow {
   approx_lng: number;
   exact_lat: number;
   exact_lng: number;
+  accuracy_m: number | null;
+  address_text: string | null;
+  reference_point: string | null;
   like_count: number;
   comment_count: number;
   liked: boolean;
@@ -98,6 +101,17 @@ export async function listPosts(
   ) {
     where.push(
       `ST_DWithin(p.location, ST_SetSRID(ST_MakePoint(${add(query.longitude)}, ${add(query.latitude)}), 4326)::geography, ${add(query.radiusKm * 1000)})`,
+    );
+  }
+  if (
+    query.west !== undefined &&
+    query.south !== undefined &&
+    query.east !== undefined &&
+    query.north !== undefined
+  ) {
+    // A ordem do ponto no PostGIS é longitude, latitude.
+    where.push(
+      `ST_Intersects(p.location, ST_MakeEnvelope(${add(query.west)}, ${add(query.south)}, ${add(query.east)}, ${add(query.north)}, 4326)::geography)`,
     );
   }
   if (query.cursor) {
@@ -205,9 +219,11 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     if (!animalId) throw new HttpError(500, 'Não consegui salvar o animal.');
     const post = await client.query<{ id: string }>(
       `INSERT INTO posts (
-         author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status
+         author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status,
+         accuracy_m, address_text, reference_point
        ) VALUES (
-         $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, 'open', $9, $10
+         $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, 'open', $9, $10,
+         $11, $12, $13
        ) RETURNING id`,
       [
         user.id,
@@ -220,6 +236,9 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.approxLabel,
         input.parentPostId ?? null,
         reviewStatus,
+        input.accuracyM ?? null,
+        input.addressText ?? null,
+        input.referencePoint ?? null,
       ],
     );
     const postId = post.rows[0]?.id;
@@ -328,6 +347,7 @@ function postColumns(viewerParam: string): string {
     ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
     ST_Y(p.location::geometry) AS exact_lat,
     ST_X(p.location::geometry) AS exact_lng,
+    p.accuracy_m, p.address_text, p.reference_point,
     (SELECT count(*)::int FROM likes l WHERE l.post_id = p.id) AS like_count,
     (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id AND c.hidden = false) AS comment_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${viewerParam}) AS liked,
@@ -389,6 +409,9 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
       location: exact
         ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }
         : { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
+      accuracyM: row.accuracy_m,
+      addressText: row.address_text,
+      referencePoint: row.reference_point,
       media: media.rows
         .filter((item) => item.post_id === row.id)
         .map((item) => ({

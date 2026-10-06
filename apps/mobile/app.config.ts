@@ -21,7 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
-        'Égua, adota! usa sua localização para mostrar animais que precisam de resgate perto de você e para marcar onde você encontrou um animal.',
+        'Égua, adota! usa sua localização para indicar onde o animal está e para mostrar resgates perto de você.',
       NSCameraUsageDescription:
         'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
       NSPhotoLibraryUsageDescription:
@@ -33,7 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: 'app.egua.adota',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#FF6B3D',
+      backgroundColor: '#F26B4F',
       monochromeImage: './assets/adaptive-icon.png',
     },
     predictiveBackGestureEnabled: false,
@@ -54,7 +54,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-location',
       {
         locationWhenInUsePermission:
-          'Égua, adota! usa sua localização para mostrar animais que precisam de resgate perto de você e para marcar onde você encontrou um animal.',
+          'Égua, adota! usa sua localização para indicar onde o animal está e para mostrar resgates perto de você.',
       },
     ],
     [
@@ -71,11 +71,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#FF6B3D',
+        backgroundColor: '#F26B4F',
         image: './assets/splash-icon.png',
         imageWidth: 200,
         dark: {
-          backgroundColor: '#121212',
+          backgroundColor: '#173B3F',
           image: './assets/splash-icon.png',
         },
       },

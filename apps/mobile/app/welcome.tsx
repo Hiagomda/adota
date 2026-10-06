@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../src/session';
-import { useTheme } from '../src/theme';
+import { palette, screenColumn, useTheme } from '../src/theme';
 
 export default function WelcomeScreen() {
   const theme = useTheme();
@@ -9,8 +10,9 @@ export default function WelcomeScreen() {
   const finishWelcome = useSession((state) => state.finishWelcome);
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.accent }]}>Égua, adota!</Text>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+      <View style={styles.column}>
+      <Text style={[styles.title, { color: theme.text }]}>Égua, adota!</Text>
       <Text style={[styles.body, { color: theme.text }]}>
         Uma rede para quem encontra, resgata e acolhe animais de rua em Belém. As fotos vêm
         primeiro. A localização pública fica aproximada.
@@ -18,25 +20,27 @@ export default function WelcomeScreen() {
       <Pressable
         style={styles.button}
         onPress={() => {
-          void finishWelcome().then(() => router.replace('/login'));
+          void finishWelcome().then(() => router.replace('/permissions'));
         }}
       >
         <Text style={styles.buttonText}>Começar</Text>
       </Pressable>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'flex-end', padding: 24, gap: 16 },
-  title: { fontSize: 40, fontWeight: '700' },
-  body: { fontSize: 18, lineHeight: 26 },
+  screen: { flex: 1, justifyContent: 'flex-end' },
+  column: { ...screenColumn, padding: 24, gap: 16, paddingBottom: 24 },
+  title: { fontSize: 36, fontWeight: '700' },
+  body: { fontSize: 17, lineHeight: 25 },
   button: {
     minHeight: 52,
     borderRadius: 999,
-    backgroundColor: '#FF6B3D',
+    backgroundColor: palette.caju,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  buttonText: { color: palette.acai, fontSize: 17, fontWeight: '700' },
 });

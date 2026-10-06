@@ -4,7 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DeviceFrame } from '../src/deviceFrame';
+import { flushOutbox } from '../src/place/outbox';
 import { useSession } from '../src/session';
 
 const queryClient = new QueryClient();
@@ -17,13 +18,19 @@ export default function RootLayout() {
     void hydrate();
   }, [hydrate]);
 
+  useEffect(() => {
+    void flushOutbox();
+    const timer = setInterval(() => void flushOutbox(), 20_000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
+        <DeviceFrame>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           <Stack screenOptions={{ headerShown: false }} />
-        </SafeAreaProvider>
+        </DeviceFrame>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

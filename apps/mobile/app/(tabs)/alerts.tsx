@@ -4,7 +4,7 @@ import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadNotifications } from '../../src/api';
 import { useSession } from '../../src/session';
-import { useTheme } from '../../src/theme';
+import { screenColumn, useTheme } from '../../src/theme';
 import type { AppNotification } from '../../src/types';
 import { EmptyState } from '../../src/ui';
 
@@ -46,8 +46,11 @@ export default function AlertsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
+      <View style={styles.column}>
       <Text style={[styles.title, { color: theme.text }]}>Alertas</Text>
       <SectionList
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.list}
         sections={sections}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
@@ -62,7 +65,7 @@ export default function AlertsScreen() {
         renderItem={({ item }) => (
           <Pressable onPress={() => void open(item)} style={styles.item}>
             <View
-              style={[styles.dot, { backgroundColor: item.readAt ? theme.line : theme.accent }]}
+              style={[styles.dot, { backgroundColor: item.readAt ? theme.line : theme.text }]}
             />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700' }}>
@@ -73,13 +76,16 @@ export default function AlertsScreen() {
           </Pressable>
         )}
       />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '700', padding: 16 },
-  day: { paddingHorizontal: 16, paddingTop: 12, fontWeight: '700' },
-  item: { flexDirection: 'row', gap: 12, padding: 16 },
+  column: { flex: 1, ...screenColumn },
+  title: { fontSize: 28, fontWeight: '700', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  list: { paddingBottom: 24 },
+  day: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, fontWeight: '700' },
+  item: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14, alignItems: 'flex-start' },
   dot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
 });

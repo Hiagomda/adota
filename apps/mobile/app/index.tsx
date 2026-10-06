@@ -7,7 +7,6 @@ export default function Gate() {
   const theme = useTheme();
   const ready = useSession((state) => state.ready);
   const onboarded = useSession((state) => state.onboarded);
-  const token = useSession((state) => state.token);
   const permissionsSeen = useSession((state) => state.permissionsSeen);
 
   if (!ready) {
@@ -20,12 +19,11 @@ export default function Gate() {
           backgroundColor: theme.background,
         }}
       >
-        <ActivityIndicator color={theme.accent} />
+        <ActivityIndicator color={theme.text} />
       </View>
     );
   }
   if (!onboarded) return <Redirect href="/welcome" />;
-  if (!token) return <Redirect href="/login" />;
   if (!permissionsSeen) return <Redirect href="/permissions" />;
   return <Redirect href="/(tabs)" />;
 }

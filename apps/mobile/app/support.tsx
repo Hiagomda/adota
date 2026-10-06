@@ -17,7 +17,7 @@ export default function SupportScreen() {
         ONG.
       </Text>
       <Pressable onPress={() => void Linking.openURL('mailto:contato@eguaadota.app')}>
-        <Text style={{ color: theme.accent, fontSize: 18 }}>contato@eguaadota.app</Text>
+        <Text style={{ color: theme.text, fontSize: 18 }}>contato@eguaadota.app</Text>
       </Pressable>
     </SafeAreaView>
   );

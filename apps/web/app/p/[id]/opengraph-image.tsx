@@ -31,8 +31,8 @@ export function Card({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: '#121212',
-        color: '#fff',
+        background: '#173B3F',
+        color: '#F3E8D2',
         fontFamily: 'sans-serif',
       }}
     >
@@ -45,10 +45,10 @@ export function Card({
           style={{ width: '100%', height: tall ? 1280 : 760, objectFit: 'cover' }}
         />
       ) : (
-        <div style={{ height: tall ? 1280 : 760, background: '#ff6b3d' }} />
+        <div style={{ height: tall ? 1280 : 760, background: '#F26B4F' }} />
       )}
       <div style={{ display: 'flex', flexDirection: 'column', padding: 48, gap: 12 }}>
-        <div style={{ color: '#ff6b3d', fontSize: 36, fontWeight: 700 }}>Égua, adota! · Belém</div>
+        <div style={{ color: '#F7B84B', fontSize: 36, fontWeight: 700 }}>Égua, adota! · Belém</div>
         <div style={{ fontSize: 48, fontWeight: 700 }}>{post?.approxLabel ?? 'Alerta'}</div>
         <div style={{ fontSize: 32 }}>{post ? statusLabel[post.status] : ''}</div>
         <div style={{ display: 'flex' }}>

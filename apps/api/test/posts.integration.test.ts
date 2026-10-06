@@ -189,4 +189,54 @@ describe('posts', () => {
     const open = await app.inject({ method: 'GET', url: '/posts' });
     expect(open.json().posts).toHaveLength(1);
   });
+
+  it('stores the pin, the GPS accuracy and the reference, and filters by the visible map', async () => {
+    await insertUser('place@egua.local', 'place');
+    const created = await app.inject({
+      method: 'POST',
+      url: '/posts',
+      headers: { authorization: 'Bearer dev:place@egua.local' },
+      payload: {
+        species: 'dog',
+        size: 'medium',
+        urgency: 'medium',
+        description: 'Cachorro na calçada.',
+        latitude: -1.455,
+        longitude: -48.49,
+        accuracyM: 12,
+        addressText: 'Avenida Nazaré · Nazaré · Belém',
+        referencePoint: 'em frente à padaria',
+        approxLabel: 'Avenida Nazaré · Nazaré · Belém',
+        media: [],
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const stored = await pool.query<{
+      longitude: number;
+      latitude: number;
+      accuracy_m: number;
+      reference_point: string;
+    }>(
+      `SELECT ST_X(location::geometry) AS longitude, ST_Y(location::geometry) AS latitude, accuracy_m, reference_point
+       FROM posts WHERE id = $1`,
+      [created.json().id],
+    );
+    expect(stored.rows[0]?.longitude).toBeCloseTo(-48.49, 4);
+    expect(stored.rows[0]?.latitude).toBeCloseTo(-1.455, 4);
+    expect(stored.rows[0]?.accuracy_m).toBe(12);
+    expect(stored.rows[0]?.reference_point).toBe('em frente à padaria');
+
+    const inside = await app.inject({
+      method: 'GET',
+      url: '/posts?west=-48.50&south=-1.46&east=-48.48&north=-1.45&status=open',
+    });
+    expect(inside.json().posts).toHaveLength(1);
+    expect(inside.json().posts[0].referencePoint).toBe('em frente à padaria');
+
+    const outside = await app.inject({
+      method: 'GET',
+      url: '/posts?west=-48.20&south=-1.20&east=-48.10&north=-1.10&status=open',
+    });
+    expect(outside.json().posts).toHaveLength(0);
+  });
 });

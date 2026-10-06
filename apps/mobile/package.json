@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "expo start --dev-client",
+    "preview": "expo start --web --port 8081",
     "start": "expo start --dev-client",
     "android": "expo start --android --dev-client",
     "ios": "expo start --ios --dev-client",
@@ -14,6 +15,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@maplibre/maplibre-react-native": "^10.4.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@shopify/flash-list": "2.0.2",
     "@tanstack/react-query": "^5.90.2",
     "expo": "~57.0.26",
@@ -32,6 +34,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
+    "maplibre-gl": "5.6.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -44,9 +47,9 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "babel-preset-expo": "~57.0.13",
     "@types/node": "^22.18.8",
     "@types/react": "~19.2.2",
+    "babel-preset-expo": "~57.0.13",
     "eslint": "^9.39.0",
     "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"

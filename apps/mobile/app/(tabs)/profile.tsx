@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadFeed } from '../../src/api';
 import { useSession } from '../../src/session';
-import { useTheme } from '../../src/theme';
+import { screenColumn, useTheme } from '../../src/theme';
 import { EmptyState } from '../../src/ui';
 
 export default function ProfileScreen() {
@@ -37,14 +37,15 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
-      <ScrollView>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.column}>
         <View style={styles.head}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: theme.text }]}>{me.data?.name ?? 'Sua conta'}</Text>
             <Text style={{ color: theme.muted }}>@{me.data?.handle}</Text>
           </View>
-          <Pressable onPress={() => router.push('/settings')}>
-            <Text style={{ color: theme.accent }}>Ajustes</Text>
+          <Pressable style={styles.settings} onPress={() => router.push('/settings')}>
+            <Text style={{ color: theme.text }}>Ajustes</Text>
           </Pressable>
         </View>
         <ScrollView
@@ -65,7 +66,7 @@ export default function ProfileScreen() {
         </ScrollView>
         <View style={styles.tabs}>
           {(['posts', 'saved', 'adopted'] as const).map((item) => (
-            <Pressable key={item} onPress={() => setTab(item)}>
+            <Pressable key={item} style={styles.tab} onPress={() => setTab(item)}>
               <Text style={{ color: tab === item ? theme.text : theme.muted, fontWeight: '700' }}>
                 {item === 'posts' ? 'Posts' : item === 'saved' ? 'Salvos' : 'Adotados'}
               </Text>
@@ -94,24 +95,29 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.logout}
           onPress={() => {
-            void logout().then(() => router.replace('/login'));
+            void logout().then(() => router.replace('/'));
           }}
         >
           <Text style={{ color: theme.muted }}>Sair</Text>
         </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', padding: 16, alignItems: 'center' },
+  scroll: { paddingBottom: 24 },
+  column: screenColumn,
+  head: { flexDirection: 'row', padding: 16, alignItems: 'center', gap: 12 },
+  settings: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   name: { fontSize: 24, fontWeight: '700' },
-  highlights: { paddingHorizontal: 16, gap: 10 },
-  highlight: { width: 64, height: 64, borderRadius: 32 },
-  tabs: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 16 },
+  highlights: { paddingHorizontal: 16, gap: 12 },
+  highlight: { width: 68, height: 68, borderRadius: 34 },
+  tabs: { flexDirection: 'row', paddingVertical: 8 },
+  tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '33.33%', aspectRatio: 1 },
+  cell: { width: '33.33%', aspectRatio: 1, padding: 1 },
   cellImage: { width: '100%', height: '100%' },
-  logout: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  logout: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
 });
