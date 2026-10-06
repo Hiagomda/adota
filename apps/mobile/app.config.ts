@@ -46,6 +46,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
+    eas: {
+      projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
+    },
   },
   plugins: [
     'expo-router',
