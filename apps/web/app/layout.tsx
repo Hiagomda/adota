@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { Suspense } from 'react';
+import { Chrome } from '../components/chrome';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
     default: 'Égua, adota!',
     template: '%s · Égua, adota!',
   },
-  description: 'Alertas de resgate de animais de rua em Belém.',
+  description: 'Uma comunidade para ajudar animais de rua em Belém a encontrarem um lar.',
   openGraph: {
     siteName: 'Égua, adota!',
     locale: 'pt_BR',
@@ -17,24 +18,23 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
   },
+  icons: {
+    icon: [
+      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
+      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="pt-BR">
       <body>
-        <header className="site-header">
-          <Link className="brand" href="/">
-            Égua, adota!
-          </Link>
-          <nav className="header-links">
-            <Link href="/mapa">Mapa</Link>
-            <Link href="/?type=lost">Perdidos</Link>
-            <Link href="/?type=help_request">Ajuda</Link>
-            <Link href="/admin">Moderação</Link>
-          </nav>
-        </header>
-        {children}
+        <Suspense fallback={null}>
+          <Chrome>{children}</Chrome>
+        </Suspense>
       </body>
     </html>
   );

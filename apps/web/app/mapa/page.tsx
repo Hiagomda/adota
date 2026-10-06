@@ -16,7 +16,7 @@ export default async function MapPage({
     <main className="page">
       <section className="intro">
         <h1>Onde estão os alertas em Belém.</h1>
-        <p>Cada ponto usa a localização aproximada. Toque para ver o animal e abrir o alerta.</p>
+        <p>O mapa pede o GPS do celular e marca onde você está. Toque num alerta para abrir.</p>
       </section>
       <nav className="filters">
         <a href="/mapa" data-active={!query.species}>

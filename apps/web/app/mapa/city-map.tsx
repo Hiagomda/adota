@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 export interface MapPost {
   id: string;
@@ -13,74 +15,182 @@ export interface MapPost {
   thumbUrl: string | null;
 }
 
-const bounds = { minLng: -48.56, maxLng: -48.4, minLat: -1.52, maxLat: -1.28 };
+const styleUrl = 'https://tiles.openfreemap.org/styles/liberty';
+const belem: [number, number] = [-48.49, -1.455];
+
+function locationErrorMessage(error: GeolocationPositionError): string {
+  if (error.code === error.PERMISSION_DENIED) {
+    return 'Permita a localização do celular para o mapa te encontrar.';
+  }
+  if (error.code === error.POSITION_UNAVAILABLE) {
+    return 'O GPS do celular não respondeu. Confira se a localização está ligada.';
+  }
+  return 'O GPS demorou demais. Toque em usar minha localização.';
+}
 
 export function CityMap({ posts }: { posts: MapPost[] }) {
-  const groups = useMemo(() => cluster(posts), [posts]);
-  const [selectedId, setSelectedId] = useState<string | null>(groups[0]?.id ?? null);
-  const selected = groups.find((group) => group.id === selectedId) ?? null;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const locateRef = useRef<(() => void) | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(posts[0]?.id ?? null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null);
+  const selected = posts.find((post) => post.id === selectedId) ?? null;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let cancelled = false;
+    let watchId: number | null = null;
+    const markers: Marker[] = [];
+
+    void import('maplibre-gl')
+      .then((maplibre) => {
+        if (cancelled || !containerRef.current) return;
+        try {
+          const map = new maplibre.Map({
+            container: containerRef.current,
+            style: styleUrl,
+            center: belem,
+            zoom: 11,
+          });
+          map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
+          mapRef.current = map;
+
+          let userMarker: Marker | null = null;
+          let centered = false;
+
+          function showPosition(position: GeolocationPosition) {
+            const { longitude, latitude } = position.coords;
+            if (!userMarker) {
+              const dot = document.createElement('div');
+              dot.className = 'map-me';
+              dot.title = 'Você';
+              userMarker = new maplibre.Marker({ element: dot, anchor: 'center' })
+                .setLngLat([longitude, latitude])
+                .addTo(map);
+            } else {
+              userMarker.setLngLat([longitude, latitude]);
+            }
+            if (!centered) {
+              centered = true;
+              map.flyTo({ center: [longitude, latitude], zoom: 14, essential: true });
+            }
+            setGpsMessage(null);
+          }
+
+          function startGps() {
+            if (!navigator.geolocation) {
+              setGpsMessage('Este navegador não lê o GPS do celular.');
+              return;
+            }
+            if (!window.isSecureContext) {
+              setGpsMessage(
+                'O celular só entrega o GPS em um endereço https. Abra o mapa pelo site seguro.',
+              );
+              return;
+            }
+            centered = false;
+            const options: PositionOptions = {
+              enableHighAccuracy: true,
+              maximumAge: 10_000,
+              timeout: 15_000,
+            };
+            navigator.geolocation.getCurrentPosition(
+              showPosition,
+              (error) => {
+                setGpsMessage(locationErrorMessage(error));
+              },
+              options,
+            );
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            watchId = navigator.geolocation.watchPosition(
+              showPosition,
+              (error) => {
+                setGpsMessage(locationErrorMessage(error));
+              },
+              options,
+            );
+          }
+
+          locateRef.current = startGps;
+          startGps();
+
+          for (const post of posts) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'map-marker';
+            button.dataset.urgency = post.urgency;
+            button.dataset.id = post.id;
+            button.setAttribute('aria-label', post.label);
+            button.addEventListener('click', () => setSelectedId(post.id));
+            markers.push(
+              new maplibre.Marker({ element: button, anchor: 'center' })
+                .setLngLat([post.longitude, post.latitude])
+                .addTo(map),
+            );
+          }
+        } catch (error) {
+          setMapError(error instanceof Error ? error.message : 'Não consegui abrir o mapa.');
+        }
+      })
+      .catch((error: unknown) => {
+        setMapError(error instanceof Error ? error.message : 'Não consegui abrir o mapa.');
+      });
+
+    return () => {
+      cancelled = true;
+      locateRef.current = null;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      for (const marker of markers) marker.remove();
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, [posts]);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    for (const marker of root.querySelectorAll<HTMLButtonElement>('.map-marker')) {
+      marker.classList.toggle('is-selected', marker.dataset.id === selectedId);
+    }
+  }, [selectedId, posts]);
 
   return (
     <>
-      <div className="map-board">
-        {groups.map((group) => {
-          const x = (group.longitude - bounds.minLng) / (bounds.maxLng - bounds.minLng);
-          const y = (bounds.maxLat - group.latitude) / (bounds.maxLat - bounds.minLat);
-          if (x < 0 || x > 1 || y < 0 || y > 1) return null;
-          return (
-            <button
-              key={group.id}
-              type="button"
-              className={`map-pin ${group.urgency}`}
-              style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-              aria-label={group.posts.length > 1 ? `${group.posts.length} alertas` : group.label}
-              onClick={() => setSelectedId(group.id)}
-            >
-              {group.posts.length > 1 ? group.posts.length : ''}
-            </button>
-          );
-        })}
+      <div className="map-frame">
+        <div ref={containerRef} className="map-board" />
+        <button type="button" className="map-locate" onClick={() => locateRef.current?.()}>
+          Usar minha localização
+        </button>
       </div>
+      {mapError ? <p className="map-credit">{mapError}</p> : null}
+      {gpsMessage ? <p className="map-credit">{gpsMessage}</p> : null}
+      <p className="map-credit">
+        O ponto azul é o GPS do celular. O alerta fica a cerca de 500 metros.
+      </p>
       {selected ? (
         <div className="map-card">
-          {selected.posts.map((post) => (
-            <Link key={post.id} href={`/p/${post.id}`} className="map-card-row">
-              {post.thumbUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.thumbUrl} alt="" />
-              ) : null}
-              <span>
-                <strong>{post.label}</strong>
-                <small>{post.status}</small>
-              </span>
-            </Link>
-          ))}
+          <Link href={`/p/${selected.id}`} className="map-card-row">
+            {selected.thumbUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={selected.thumbUrl} alt="" />
+            ) : null}
+            <span>
+              <strong>{selected.label}</strong>
+              <small>{selected.status}</small>
+            </span>
+          </Link>
+          <a
+            className="map-open"
+            href={`https://www.google.com/maps?q=${selected.latitude},${selected.longitude}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir no Maps
+          </a>
         </div>
       ) : null}
     </>
   );
-}
-
-function cluster(posts: MapPost[]) {
-  const buckets = new Map<string, MapPost[]>();
-  for (const post of posts) {
-    const key = `${Math.round(post.latitude / 0.008)}:${Math.round(post.longitude / 0.008)}`;
-    buckets.set(key, [...(buckets.get(key) ?? []), post]);
-  }
-  return [...buckets.entries()].map(([id, group]) => {
-    const first = group[0];
-    return {
-      id,
-      urgency: group.some((post) => post.urgency === 'high') ? 'high' : (first?.urgency ?? 'low'),
-      latitude: average(group.map((post) => post.latitude)),
-      longitude: average(group.map((post) => post.longitude)),
-      label: first?.label ?? 'Alerta',
-      posts: group,
-    };
-  });
-}
-
-function average(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
