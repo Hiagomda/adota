@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const googleServicesAndroid = path.join(appDir, 'google-services.json');
 const googleServicesIos = path.join(appDir, 'GoogleService-Info.plist');
+// Expo's Android config type omits this field. The test API is plain HTTP.
+const androidCleartext = { usesCleartextTraffic: true };
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -13,6 +15,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'egua',
   scheme: 'egua',
   version: '1.0.0',
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
@@ -31,7 +36,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'app.egua.adota',
-    usesCleartextTraffic: true,
+    versionCode: 1,
+    ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#F26B4F',
@@ -44,8 +50,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
     favicon: './assets/favicon.png',
   },
+  updates: {
+    url: 'https://u.expo.dev/b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
+    checkAutomatically: 'NEVER',
+    fallbackToCacheTimeout: 0,
+    requestHeaders: {
+      'expo-channel-name': 'preview',
+    },
+  },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
+    downloadPageUrl:
+      process.env.EXPO_PUBLIC_DOWNLOAD_URL ??
+      'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io',
     eas: {
       projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
     },
@@ -53,6 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-dev-client',
+    'expo-updates',
     'expo-secure-store',
     [
       'expo-location',

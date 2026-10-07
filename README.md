@@ -103,6 +103,8 @@ pnpm dlx eas-cli build --profile development --platform ios
 
 O perfil `preview` gera um APK que já fala com a API de teste em `http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`. A página para baixar esse arquivo é `http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`. Essa VPS já usa o proxy do Coolify nas portas 80 e 443, então o teste sobe com `docker-compose.coolify.yml`, sem um segundo Caddy.
 
+O app confere atualização ao abrir e ao voltar para primeiro plano. Mudança de JavaScript publicada com `eas update --channel preview` pede confirmação e, se a pessoa aceitar, baixa e recarrega. Um APK novo não entra por esse caminho: a página publica `version.json` com `version` e `androidVersionCode`, e o Android pede para baixar `egua-adota.apk` quando esses números são maiores que os do app instalado. Suba o `versionCode` em `apps/mobile/app.config.ts` e o mesmo valor em `download/version.json` sempre que publicar outro binário. A imagem do serviço `download` baixa o APK de `APK_URL` (o padrão está no Dockerfile) e, ao subir, copia esse arquivo e o `version.json` para o volume `apk`.
+
 Conferir a config sem gerar o binário:
 
 ```bash

@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DeviceFrame } from '../src/deviceFrame';
 import { flushOutbox } from '../src/place/outbox';
 import { useSession } from '../src/session';
+import { UpdatePrompt } from '../src/updates/UpdatePrompt';
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ export default function RootLayout() {
         <DeviceFrame>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           <Stack screenOptions={{ headerShown: false }} />
+          <UpdatePrompt />
         </DeviceFrame>
       </QueryClientProvider>
     </GestureHandlerRootView>
