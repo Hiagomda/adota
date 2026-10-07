@@ -1,0 +1,55 @@
+---
+description: Local Android release APK on the Windows work PC. Do not use EAS. Read before touching Gradle, Expo prebuild, or the download page.
+alwaysApply: true
+---
+
+# Android local build (Windows work PC)
+
+The user (Hiago) forbade EAS / Expo cloud compile. Build with Android Studio on this PC.
+
+## Status (2026-10-07)
+
+- GitHub `master` is the source. The compile copy is `C:\egua` (short path). `apps/mobile/android` is gitignored CNG — do not commit it.
+- Gradle configured and CMake/JS **release** bundle ran. **No APK yet.** Expected file: `C:\egua\apps\mobile\android\app\build\outputs\apk\release\app-release.apk`.
+- The release JS bundle already contains the test API `http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`.
+- The APK on the VPS download page is still the **debug** ~287 MB file (dev-client launcher: asks for an HTTP URL). That is not the test app.
+- Do not compile with Expo. Do not start another EAS build.
+
+## Why `C:\egua`
+
+Windows `CMAKE_OBJECT_PATH_MAX` is 250. Building from `C:\Users\hmaraujo\Desktop\adota` makes ninja fail (`manifest 'build.ninja' still dirty`). `subst` does not help (Node realpath expands it). Use the physical short tree `C:\egua` with **hoisted** `C:\egua\node_modules` (not `apps\mobile\node_modules\.pnpm`).
+
+Do not recursively delete `C:\adota` (partial bad copy). Do not copy `apps\mobile\node_modules`.
+
+## pnpm
+
+Root `package.json` must use `packageManager: pnpm@9.15.9`. pnpm 10.18.2 cannot install this lockfile (`ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY` for `next@16.3.8` even though the key exists). `.npmrc` has `node-linker=hoisted`.
+
+## Android Studio
+
+- Open **`C:\egua\apps\mobile\android`**, not the monorepo root.
+- **Gradle JDK / Version = 17** (`C:\Program Files\Java\jdk-17`). The Studio JBR is Java 25. Prefab then prints `WARNING: A restricted method in java.lang.System has been called` and AGP treats it as failure in `:react-native-worklets:configureCMake*`.
+- `gradle/gradle-daemon-jvm.properties` in the generated android tree must be `toolchainVersion=17` (Studio wrote 25). After changing Version to 17, add the foojay resolver in `settings.gradle` or Gradle asks for toolchain download repositories.
+- `org.gradle.java.home=C:\\Program Files\\Java\\jdk-17` in `gradle.properties`.
+- First sync failed on missing `android/build/generated/autolinking/autolinking.json`. Generate it with node (`expo-modules-autolinking react-native-config --platform android --json`) or the `app/build.gradle` fallback that runs that command when the file is empty.
+- Node: `C:\nvm4w\nodejs`. From `C:\egua\apps\mobile`, `require.resolve('react-native/package.json')` must be `C:\egua\node_modules\react-native\package.json`.
+- SDK: `%LOCALAPPDATA%\Android\Sdk`. NDK `27.1.12297006` is installed. Main manifest must have `android:usesCleartextTraffic="true"` (HTTP test API). `app.config.ts` already sets this for the next prebuild.
+- Release signing in the Expo template uses the **debug** keystore. If install fails, uninstall the debug app first.
+- Build **release** (`assembleRelease`), not debug. Prefer `-PreactNativeArchitectures=arm64-v8a` (quote it in PowerShell). Debug shows the Expo dev-client URL screen.
+
+## Env for the JS bundle
+
+Set before Metro/export embed:
+
+- `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io` (HTTP on purpose; API HTTPS is 503)
+- `EXPO_PUBLIC_DOWNLOAD_URL=https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
+
+There may be `C:\egua\apps\mobile\.env` with those values. Do not commit `.env`.
+
+## After the APK exists
+
+Put it on the download page. `docker/download-entrypoint.sh` copies `/opt/egua-adota.apk` over `/apk` on every start, so a volume-only copy is wiped on restart. Durable path: GitHub release + `docker/download.Dockerfile` `APK_URL` + Coolify redeploy. Do not bind another Caddy to 80/443. Do not touch Coolify projects MetalRiff, chatbot, or teste-AtivaFacil.
+
+## PowerShell
+
+No `&&`. Quote Gradle `-P` args. Use `curl.exe`, not the curl alias. Shell needs full permissions on this PC.
