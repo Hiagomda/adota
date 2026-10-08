@@ -97,6 +97,7 @@ export default function UserScreen() {
           <SkeletonRows />
         ) : profile.isError || !person ? (
           <EmptyState
+            pose="sad"
             title="Não encontrei essa pessoa"
             body={messageFrom(profile.error)}
             actionLabel="Tentar de novo"
@@ -140,7 +141,11 @@ export default function UserScreen() {
               ))}
             </View>
             {(posts.data?.posts.length ?? 0) === 0 && !posts.isLoading ? (
-              <EmptyState title="Nenhum resgate neste perfil" body="Quando esta pessoa publicar, as fotos aparecem aqui." />
+              <EmptyState
+                pose="sit"
+                title="Nenhum resgate neste perfil"
+                body="Quando esta pessoa publicar, as fotos aparecem aqui."
+              />
             ) : null}
           </>
         )}

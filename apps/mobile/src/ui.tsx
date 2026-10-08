@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatWhen } from './format';
+import { Mascot, type MascotPose } from './mascot';
 import { palette, statusLabel, urgencyLabel, useTheme } from './theme';
 import type { Post } from './types';
 
@@ -52,15 +53,18 @@ export function EmptyState({
   body,
   actionLabel,
   onAction,
+  pose = 'sad',
 }: {
   title: string;
   body: string;
   actionLabel?: string;
   onAction?: () => void;
+  pose?: MascotPose;
 }) {
   const theme = useTheme();
   return (
     <View style={styles.empty}>
+      <Mascot pose={pose} size={150} />
       <Text style={[styles.emptyTitle, { color: theme.text }]}>{title}</Text>
       <Text style={[styles.emptyBody, { color: theme.muted }]}>{body}</Text>
       {actionLabel && onAction ? (
@@ -204,11 +208,11 @@ const styles = StyleSheet.create({
   chip: { minHeight: 28, borderRadius: 999, paddingHorizontal: 10, justifyContent: 'center' },
   chipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   chipDark: { color: palette.acai },
-  empty: { padding: 32, gap: 8 },
-  emptyTitle: { fontSize: 20, fontWeight: '700' },
-  emptyBody: { fontSize: 16, lineHeight: 22 },
+  empty: { padding: 32, gap: 8, alignItems: 'center' },
+  emptyTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  emptyBody: { fontSize: 16, lineHeight: 22, textAlign: 'center' },
   emptyAction: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     marginTop: 8,
     minHeight: 44,
     paddingHorizontal: 18,

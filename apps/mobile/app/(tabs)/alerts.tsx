@@ -58,6 +58,7 @@ export default function AlertsScreen() {
       <Text style={[styles.title, { color: theme.text }]}>Notificações</Text>
       {!token ? (
         <EmptyState
+          pose="wave"
           title="Entre para ver os avisos"
           body="As notificações de resgates perto de você aparecem depois que você entra na conta."
         />
@@ -79,6 +80,7 @@ export default function AlertsScreen() {
         ListEmptyComponent={
           query.isError ? (
             <EmptyState
+              pose="sad"
               title="Não consegui buscar as notificações"
               body={messageFrom(query.error)}
               actionLabel="Tentar de novo"
@@ -86,6 +88,7 @@ export default function AlertsScreen() {
             />
           ) : (
             <EmptyState
+              pose="sit"
               title="Tudo quieto"
               body="Quando um resgate perto de você precisar de gente, o aviso aparece aqui."
             />

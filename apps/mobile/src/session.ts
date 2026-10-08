@@ -16,10 +16,12 @@ interface SessionState extends Flags {
   ready: boolean;
   token: string | null;
   user: Account | null;
+  cupuPrompt: boolean;
   hydrate: () => Promise<void>;
   finishWelcome: () => Promise<void>;
   finishPermissions: () => Promise<void>;
   login: (email: string) => Promise<void>;
+  clearCupuPrompt: () => void;
   logout: () => Promise<void>;
   setUser: (user: Account) => void;
 }
@@ -56,6 +58,7 @@ export const useSession = create<SessionState>((set, get) => ({
   ready: false,
   token: null,
   user: null,
+  cupuPrompt: false,
   onboarded: false,
   permissionsSeen: false,
   hydrate: async () => {
@@ -76,8 +79,9 @@ export const useSession = create<SessionState>((set, get) => ({
   login: async (email) => {
     const result = await loginWithEmail(email);
     await writeToken(result.token);
-    set({ token: result.token, user: result.user });
+    set({ token: result.token, user: result.user, cupuPrompt: true });
   },
+  clearCupuPrompt: () => set({ cupuPrompt: false }),
   logout: async () => {
     await writeToken(null);
     set({ token: null, user: null });

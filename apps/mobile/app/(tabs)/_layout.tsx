@@ -1,10 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
+import { AnimalCamera } from '../../src/AnimalCamera';
+import { openCreateCamera } from '../../src/createCamera';
 import { useTheme } from '../../src/theme';
 
 export default function TabsLayout() {
   const theme = useTheme();
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -32,6 +36,11 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="create"
+        listeners={{
+          tabPress: () => {
+            openCreateCamera();
+          },
+        }}
         options={{
           tabBarAccessibilityLabel: 'Criar resgate',
           tabBarIcon: ({ color }) => <Feather name="plus-circle" color={color} size={28} />,
@@ -52,5 +61,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <AnimalCamera />
+    </View>
   );
 }

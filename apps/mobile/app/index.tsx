@@ -1,5 +1,6 @@
 import { Redirect } from 'expo-router';
 import { Text, View } from 'react-native';
+import { Mascot } from '../src/mascot';
 import { useSession } from '../src/session';
 import { useTheme } from '../src/theme';
 
@@ -16,9 +17,11 @@ export default function Gate() {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
+          gap: 12,
           backgroundColor: theme.background,
         }}
       >
+        <Mascot pose="sit" size={180} label="Mascote do Égua, adota!" />
         <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700' }}>Égua, adota!</Text>
       </View>
     );

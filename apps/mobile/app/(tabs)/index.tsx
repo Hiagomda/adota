@@ -10,6 +10,7 @@ import { api, loadFeed, messageFrom } from '../../src/api';
 import { useSession } from '../../src/session';
 import { screenColumn, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
+import { Mascot } from '../../src/mascot';
 import { EmptyState, PostCard, SkeletonCard } from '../../src/ui';
 
 const emptyPosts: Post[] = [];
@@ -110,30 +111,37 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
       <View style={styles.column}>
-        <View
-          style={styles.brandRow}
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel="Égua, adota!"
-        >
-          <Image
-            source={require('../../assets/logo-mark.png')}
-            style={styles.brandMark}
-            contentFit="contain"
-          />
-          <Text style={[styles.brand, { color: theme.text }]}>
-            <Text style={{ color: theme.accent }}>Égua, </Text>adota!
-          </Text>
+        <View style={styles.brandRow}>
+          <View
+            style={styles.brand}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel="Égua, adota!"
+          >
+            <Mascot pose="sit" size={40} label="Mascote do Égua, adota!" />
+            <Text style={[styles.brandText, { color: theme.text }]}>
+              <Text style={{ color: theme.accent }}>Égua, </Text>adota!
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Animais perdidos"
+            onPress={() => router.push('/lost')}
+            style={styles.lost}
+          >
+            <Text style={{ color: theme.accent, fontSize: 16, fontWeight: '700' }}>Perdidos</Text>
+          </Pressable>
         </View>
         {feed.isLoading ? (
           <SkeletonCard />
         ) : feed.isError ? (
-          <EmptyState
-            title="Não consegui carregar os resgates"
-            body={messageFrom(feed.error)}
-            actionLabel="Tentar de novo"
-            onAction={() => void feed.refetch()}
-          />
+            <EmptyState
+              pose="sad"
+              title="Não consegui carregar os resgates"
+              body={messageFrom(feed.error)}
+              actionLabel="Tentar de novo"
+              onAction={() => void feed.refetch()}
+            />
         ) : (
           <FlashList
             style={{ flex: 1 }}
@@ -150,6 +158,7 @@ export default function HomeScreen() {
             ListHeaderComponent={header}
             ListEmptyComponent={
               <EmptyState
+                pose="sad"
                 title="Nenhum resgate por aqui"
                 body="Belém está quieta neste momento. Se você viu um animal na rua, publique para a rede ajudar."
                 actionLabel="Criar resgate"
@@ -169,13 +178,14 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 8,
   },
-  brandMark: { width: 22, height: 30 },
-  brand: { fontSize: 24, fontWeight: '700' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandText: { fontSize: 24, fontWeight: '700' },
+  lost: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   stories: { paddingHorizontal: 16, paddingBottom: 16, gap: 12, alignItems: 'flex-start' },
   story: { width: 76, alignItems: 'center', gap: 6 },
   storyPhoto: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: '#E23B3B' },

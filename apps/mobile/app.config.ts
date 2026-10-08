@@ -40,8 +40,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#F26B4F',
-      monochromeImage: './assets/adaptive-icon.png',
+      backgroundColor: '#F3E8D2',
+      monochromeImage: './assets/adaptive-icon-mono.png',
     },
     predictiveBackGestureEnabled: false,
     ...(existsSync(googleServicesAndroid) ? { googleServicesFile: './google-services.json' } : {}),
@@ -80,6 +80,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [
+      'expo-camera',
+      {
+        cameraPermission:
+          'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
+        recordAudioAndroid: false,
+      },
+    ],
+    [
       'expo-image-picker',
       {
         photosPermission:
@@ -93,7 +101,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#F26B4F',
+        backgroundColor: '#F3E8D2',
         image: './assets/splash-icon.png',
         imageWidth: 200,
         dark: {

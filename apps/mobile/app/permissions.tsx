@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../src/api';
+import { Mascot } from '../src/mascot';
 import { useSession } from '../src/session';
 import { palette, screenColumn, useTheme } from '../src/theme';
 
@@ -40,6 +41,9 @@ export default function PermissionsScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+      <View style={styles.hero}>
+        <Mascot pose="search" size={220} label="Mascote do Égua, adota!" />
+      </View>
       <View style={styles.column}>
       <Text style={[styles.title, { color: theme.text }]}>Perto de você</Text>
       <Text style={[styles.body, { color: theme.muted }]}>{message}</Text>
@@ -52,7 +56,8 @@ export default function PermissionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'flex-end' },
+  screen: { flex: 1 },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   column: { ...screenColumn, padding: 24, gap: 16, paddingBottom: 24 },
   title: { fontSize: 32, fontWeight: '700' },
   body: { fontSize: 17, lineHeight: 24 },

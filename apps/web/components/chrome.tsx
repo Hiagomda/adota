@@ -26,9 +26,13 @@ export function Chrome({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-[#e7dce3] bg-[#f6f1f4]/95 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-[480px] items-center justify-between px-4">
           <Link href="/" className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#f3e0ea] text-[#6b2454]">
-              <PawPrint className="size-5 fill-current" />
-            </span>
+            <img
+              src="/mascot-logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="size-10 shrink-0 object-contain"
+            />
             <span className="truncate font-serif text-[19px] leading-none font-bold tracking-[-0.04em] text-[#4c2340]">
               Égua, adota!
             </span>

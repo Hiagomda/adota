@@ -104,6 +104,7 @@ export default function PostScreen() {
           <Text style={{ color: theme.text }}>Fechar</Text>
         </Pressable>
         <EmptyState
+          pose="sad"
           title="Não encontrei este resgate"
           body={messageFrom(post.error)}
           actionLabel="Tentar de novo"

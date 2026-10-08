@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
 import { flushOutbox } from '../src/place/outbox';
 import { useSession } from '../src/session';
@@ -31,6 +32,7 @@ export default function RootLayout() {
         <DeviceFrame>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           <Stack screenOptions={{ headerShown: false }} />
+          <CupuOnboarding />
           <UpdatePrompt />
         </DeviceFrame>
       </QueryClientProvider>

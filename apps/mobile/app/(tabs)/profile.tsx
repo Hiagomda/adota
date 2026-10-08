@@ -60,6 +60,15 @@ export default function ProfileScreen() {
             <Text style={{ color: theme.text }}>Ajustes</Text>
           </Pressable>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Minha rede de voluntariado"
+          style={styles.network}
+          onPress={() => router.push('/voluntario')}
+        >
+          <Text style={{ color: theme.accent, fontWeight: '700' }}>Minha rede</Text>
+          <Text style={{ color: theme.muted }}>Transporte, lar temporário e selos</Text>
+        </Pressable>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -100,6 +109,7 @@ export default function ProfileScreen() {
         </View>
         {!token ? (
           <EmptyState
+            pose="wave"
             title="Entre para ver seu perfil"
             body="Seus resgates, os que você salvou e as adoções concluídas ficam ligados à sua conta."
           />
@@ -107,6 +117,7 @@ export default function ProfileScreen() {
           <SkeletonRows />
         ) : me.isError || posts.isError ? (
           <EmptyState
+            pose="sad"
             title="Não consegui abrir seu perfil"
             body={messageFrom(me.error ?? posts.error)}
             actionLabel="Tentar de novo"
@@ -117,6 +128,7 @@ export default function ProfileScreen() {
           />
         ) : (posts.data?.posts.length ?? 0) === 0 ? (
           <EmptyState
+            pose={tab === 'adopted' ? 'home' : 'sad'}
             title={
               tab === 'posts' ? 'Você ainda não publicou' : tab === 'saved' ? 'Nada salvo' : 'Nenhuma adoção por aqui'
             }
@@ -152,6 +164,7 @@ const styles = StyleSheet.create({
   column: screenColumn,
   head: { flexDirection: 'row', padding: 16, alignItems: 'center', gap: 12 },
   settings: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  network: { paddingHorizontal: 16, paddingBottom: 8, gap: 2 },
   name: { fontSize: 24, fontWeight: '700' },
   highlights: { paddingHorizontal: 16, gap: 12 },
   highlight: { width: 68, height: 68, borderRadius: 34 },
