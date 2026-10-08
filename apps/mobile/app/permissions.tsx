@@ -14,7 +14,7 @@ export default function PermissionsScreen() {
   const token = useSession((state) => state.token);
   const finishPermissions = useSession((state) => state.finishPermissions);
   const [message, setMessage] = useState(
-    'A localização mostra alertas perto de você. As notificações avisam quando alguém precisa de ajuda.',
+    'A localização mostra resgates perto de você. As notificações avisam quando alguém precisa de ajuda.',
   );
 
   async function allow() {
@@ -22,7 +22,7 @@ export default function PermissionsScreen() {
     const notifications = await Notifications.requestPermissionsAsync();
     if (location.status !== 'granted') {
       setMessage(
-        'Sem a localização, o feed usa o centro de Belém. Você pode permitir depois nas configurações do aparelho.',
+        'Sem a localização, os resgates usam o centro de Belém. Você pode permitir depois nas configurações do aparelho.',
       );
     }
     if (notifications.status === 'granted' && token) {

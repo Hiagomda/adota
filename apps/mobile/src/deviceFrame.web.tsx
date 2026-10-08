@@ -48,7 +48,7 @@ export function DeviceFrame({ children }: { children: ReactNode }) {
         </View>
       </View>
       <Text style={styles.caption}>
-        preview · {PHONE_WIDTH}×{PHONE_HEIGHT}
+        prévia · {PHONE_WIDTH}×{PHONE_HEIGHT}
       </Text>
     </View>
   );

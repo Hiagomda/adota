@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -23,6 +24,13 @@ import { PlacePicker } from '../../src/place/PlacePicker';
 import { isOfflineError, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
 import { palette, screenColumn, useTheme } from '../../src/theme';
+
+const suggestions = [
+  'Está na rua e precisa de resgate agora.',
+  'Parece machucado e não consegue andar.',
+  'Está preso e precisa de ajuda para sair.',
+  'Filhotes sozinhos, sem a mãe por perto.',
+];
 
 export default function CreateScreen() {
   const theme = useTheme();
@@ -64,7 +72,7 @@ export default function CreateScreen() {
 
   async function publish() {
     if (!token) {
-      setMessage('Entre numa conta para publicar o alerta.');
+      setMessage('Entre numa conta para publicar o resgate.');
       return;
     }
     if (photos.length === 0 || description.trim().length === 0) {
@@ -99,9 +107,11 @@ export default function CreateScreen() {
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       if (created.reviewStatus === 'pending') {
-        setMessage('Seu texto foi para revisão antes de aparecer no feed.');
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+        setMessage('Seu texto foi para revisão antes de aparecer para as outras pessoas.');
         return;
       }
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       router.push(`/post/${created.id}`);
     } catch (error) {
       if (isOfflineError(error)) {
@@ -109,7 +119,8 @@ export default function CreateScreen() {
         setPhotos([]);
         setDescription('');
         setReference('');
-        setMessage('Sem internet. O alerta ficou neste aparelho e sai sozinho quando a rede voltar.');
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+        setMessage('Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.');
         return;
       }
       setMessage(error instanceof ApiError ? error.message : 'Não consegui publicar. Tente de novo.');
@@ -135,7 +146,7 @@ export default function CreateScreen() {
             setColumnWidth((current) => (current === next ? current : next));
           }}
         >
-        <Text style={[styles.title, { color: theme.text }]}>Novo animal</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Criar resgate</Text>
         <Text style={[styles.note, { color: theme.muted }]}>{gps.message}</Text>
         <View>
           <PlacePicker
@@ -213,6 +224,31 @@ export default function CreateScreen() {
             ) : null}
           </View>
         )}
+        <View style={styles.suggestions}>
+          <Text style={[styles.note, { color: theme.muted }]}>Sugestões para a descrição</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionRow}>
+            {suggestions.map((text) => {
+              const selected = description === text;
+              return (
+                <Pressable
+                  key={text}
+                  accessibilityRole="button"
+                  style={[styles.suggestion, selected ? styles.choiceOn : { backgroundColor: theme.surface }]}
+                  onPress={() => {
+                    void Haptics.selectionAsync().catch(() => undefined);
+                    setDescription(text);
+                  }}
+                >
+                  <Text
+                    style={[styles.suggestionText, { color: selected ? palette.acai : theme.text }]}
+                  >
+                    {text}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
         <TextInput
           multiline
           value={description}
@@ -327,6 +363,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  suggestions: { gap: 8 },
+  suggestionRow: { gap: 8, paddingRight: 8 },
+  suggestion: {
+    maxWidth: 220,
+    minHeight: 44,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  suggestionText: { fontSize: 14, lineHeight: 18 },
   choice: {
     flex: 1,
     minHeight: 44,

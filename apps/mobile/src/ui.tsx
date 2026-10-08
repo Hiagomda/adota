@@ -1,6 +1,9 @@
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatWhen } from './format';
 import { palette, statusLabel, urgencyLabel, useTheme } from './theme';
 import type { Post } from './types';
 
@@ -44,12 +47,27 @@ export function Chip({ label, tone }: { label: string; tone?: 'high' | 'medium' 
   );
 }
 
-export function EmptyState({ title, body }: { title: string; body: string }) {
+export function EmptyState({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   const theme = useTheme();
   return (
     <View style={styles.empty}>
       <Text style={[styles.emptyTitle, { color: theme.text }]}>{title}</Text>
       <Text style={[styles.emptyBody, { color: theme.muted }]}>{body}</Text>
+      {actionLabel && onAction ? (
+        <Pressable accessibilityRole="button" onPress={onAction} style={styles.emptyAction}>
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -59,42 +77,56 @@ export function SkeletonCard() {
   return <View style={[styles.skeleton, { backgroundColor: theme.surface }]} />;
 }
 
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
-  if (minutes < 1) return 'agora';
-  if (minutes < 60) return `há ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `há ${hours} h`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `há ${days} d`;
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+export function SkeletonRows() {
+  const theme = useTheme();
+  return (
+    <View style={styles.rows}>
+      {[0, 1, 2, 3].map((item) => (
+        <View key={item} style={[styles.rowBone, { backgroundColor: theme.surface }]} />
+      ))}
+    </View>
+  );
 }
 
-export function PostCard({
+export const PostCard = memo(function PostCard({
   post,
   onOpen,
   onLike,
 }: {
   post: Post;
-  onOpen: () => void;
-  onLike: () => void;
+  onOpen: (id: string) => void;
+  onLike: (post: Post) => void;
 }) {
   const theme = useTheme();
-  const photo = post.media[0]?.url;
+  const photo = post.media[0]?.thumbUrl || post.media[0]?.url;
   const lastTap = useRef(0);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [heart, setHeart] = useState(false);
+  useEffect(
+    () => () => {
+      if (openTimer.current) clearTimeout(openTimer.current);
+      if (heartTimer.current) clearTimeout(heartTimer.current);
+    },
+    [],
+  );
   function onPhoto() {
     const now = Date.now();
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
-      onLike();
+      if (openTimer.current) clearTimeout(openTimer.current);
+      setHeart(true);
+      if (heartTimer.current) clearTimeout(heartTimer.current);
+      heartTimer.current = setTimeout(() => setHeart(false), 650);
+      onLike(post);
       return;
     }
     lastTap.current = now;
+    openTimer.current = setTimeout(() => onOpen(post.id), 280);
   }
   return (
     <View style={[styles.card, { backgroundColor: theme.background }]}>
-      <Pressable onPress={onOpen} style={styles.cardHead}>
+      <Pressable onPress={() => onOpen(post.id)} style={styles.cardHead}>
         <Avatar
           name={post.author.name}
           uri={post.author.avatarUrl}
@@ -109,21 +141,39 @@ export function PostCard({
             {post.approxLabel} · {formatWhen(post.createdAt)}
           </Text>
         </View>
-        <Chip label={urgencyLabel[post.urgency] ?? 'Alerta'} tone={post.urgency} />
+        <Chip label={urgencyLabel[post.urgency] ?? 'Resgate'} tone={post.urgency} />
       </Pressable>
       <Pressable onPress={onPhoto} style={styles.photoFrame}>
         {photo ? (
-          <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" />
+          <Image
+            source={{ uri: photo }}
+            style={styles.photo}
+            contentFit="cover"
+            recyclingKey={post.id}
+          />
         ) : (
           <View style={styles.photo} />
         )}
         <View style={styles.overlay}>
-          <Chip label={statusLabel[post.status] ?? post.status} />
+          <Chip label={statusLabel[post.status] ?? 'Resgate'} />
           {post.media.length > 1 ? <Chip label={`1/${post.media.length}`} /> : null}
         </View>
+        {heart ? (
+          <View pointerEvents="none" style={styles.heart}>
+            <Feather name="heart" size={72} color="#fff" />
+          </View>
+        ) : null}
       </Pressable>
       {post.status === 'open' ? (
-        <Pressable style={styles.help} onPress={onOpen}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Eu vou ajudar"
+          style={styles.help}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+            onOpen(post.id);
+          }}
+        >
           <Text style={styles.helpText}>Eu vou ajudar</Text>
         </Pressable>
       ) : null}
@@ -131,12 +181,13 @@ export function PostCard({
         {post.description}
       </Text>
       <Text style={{ color: theme.muted, paddingHorizontal: 16, paddingBottom: 16 }}>
-        {post.counts.likes} curtidas · {post.counts.comments} comentários
+        {post.counts.likes === 1 ? '1 curtida' : `${post.counts.likes} curtidas`} ·{' '}
+        {post.counts.comments === 1 ? '1 comentário' : `${post.counts.comments} comentários`}
         {post.liked ? ' · você curtiu' : ''}
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   avatarRing: { padding: 2, borderRadius: 24, borderWidth: 2, borderColor: 'transparent' },
@@ -156,13 +207,35 @@ const styles = StyleSheet.create({
   empty: { padding: 32, gap: 8 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptyBody: { fontSize: 16, lineHeight: 22 },
+  emptyAction: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActionText: { color: palette.acai, fontWeight: '700' },
   skeleton: { height: 420, margin: 16, borderRadius: 16 },
+  rows: { padding: 16, gap: 12 },
+  rowBone: { height: 72, borderRadius: 16 },
   card: { marginBottom: 12 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
   cardHeadText: { flex: 1 },
   photoFrame: { position: 'relative' },
   photo: { width: '100%', aspectRatio: 4 / 5, backgroundColor: palette.acai },
   overlay: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 },
+  heart: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   help: {
     marginHorizontal: 16,
     marginTop: 12,

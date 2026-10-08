@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSession } from '../src/session';
 import { useTheme } from '../src/theme';
 
@@ -19,7 +19,7 @@ export default function Gate() {
           backgroundColor: theme.background,
         }}
       >
-        <ActivityIndicator color={theme.text} />
+        <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700' }}>Égua, adota!</Text>
       </View>
     );
   }

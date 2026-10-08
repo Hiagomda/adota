@@ -30,7 +30,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSCameraUsageDescription:
         'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
       NSPhotoLibraryUsageDescription:
-        'Égua, adota! acessa suas fotos para você anexar imagens do animal ao alerta de resgate.',
+        'Égua, adota! acessa suas fotos para você anexar imagens do animal ao resgate.',
     },
     ...(existsSync(googleServicesIos) ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
   },
@@ -83,7 +83,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-image-picker',
       {
         photosPermission:
-          'Égua, adota! acessa suas fotos para você anexar imagens do animal ao alerta de resgate.',
+          'Égua, adota! acessa suas fotos para você anexar imagens do animal ao resgate.',
         cameraPermission:
           'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
       },
