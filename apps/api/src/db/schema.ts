@@ -119,3 +119,31 @@ export const adoptionTerms = pgTable(
   },
   (table) => [unique().on(table.postId, table.userId)],
 );
+
+export const volunteerProfiles = pgTable('volunteer_profiles', {
+  userId: uuid('user_id').primaryKey(),
+  isTransportAvailable: boolean('is_transport_available').notNull().default(false),
+  isFosterAvailable: boolean('is_foster_available').notNull().default(false),
+  fosterPetTypes: jsonb('foster_pet_types').notNull().default([]),
+  fosterMaxDays: integer('foster_max_days'),
+  serviceRadiusKm: integer('service_radius_km').notNull().default(10),
+});
+
+export const userXpHistory = pgTable('user_xp_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  actionType: text('action_type').notNull(),
+  points: integer('points').notNull(),
+  sourceId: text('source_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const userBadges = pgTable(
+  'user_badges',
+  {
+    userId: uuid('user_id').notNull(),
+    badgeCode: text('badge_code').notNull(),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.badgeCode] })],
+);

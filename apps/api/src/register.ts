@@ -1,10 +1,12 @@
 import {
   animalStatusSchema,
+  claimVolunteerXpSchema,
   createPostSchema,
   feedQuerySchema,
   presignSchema,
   responseKindSchema,
   updateMeSchema,
+  volunteerSettingsSchema,
 } from '@patinha/shared';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { FastifyInstance } from 'fastify';
@@ -25,6 +27,7 @@ import { HttpError } from './http.js';
 import { presignUploads } from './media.js';
 import { enqueueRescueAlert, notifyStatusChange, type createQueue } from './notify.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
+import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
 
 type RescueQueue = ReturnType<typeof createQueue>;
 
@@ -75,6 +78,21 @@ export async function registerRoutes(
   });
 
   app.get('/me', async (request) => publicUser(requireUser(request.user)));
+
+  app.get('/volunteers/me', async (request) => {
+    const user = requireUser(request.user);
+    return volunteerStatus(pool, user.id);
+  });
+
+  app.put('/volunteers/settings', async (request) => {
+    const user = requireUser(request.user);
+    return saveVolunteerSettings(pool, user.id, parse(volunteerSettingsSchema, request.body));
+  });
+
+  app.post('/volunteers/actions/claim-xp', async (request) => {
+    const user = requireUser(request.user);
+    return claimVolunteerXp(pool, user.id, parse(claimVolunteerXpSchema, request.body));
+  });
 
   app.patch('/me', async (request) => {
     const user = requireUser(request.user);

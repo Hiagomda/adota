@@ -30,3 +30,17 @@ export {
   type Urgency,
   type UserRole,
 } from './domain.js';
+export {
+  badgesForAction,
+  claimVolunteerXpSchema,
+  fosterPetTypeSchema,
+  levelForXp,
+  pointsForVolunteerAction,
+  volunteerActionSchema,
+  volunteerBadgeCatalog,
+  volunteerSettingsSchema,
+  type ClaimVolunteerXpInput,
+  type VolunteerAction,
+  type VolunteerBadgeCode,
+  type VolunteerSettingsInput,
+} from './volunteer.js';
