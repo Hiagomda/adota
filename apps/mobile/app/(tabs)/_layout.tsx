@@ -8,6 +8,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
         tabBarShowLabel: false,
         tabBarActiveTintColor: theme.highlight,
         tabBarInactiveTintColor: theme.tabInactive,
@@ -16,25 +18,38 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ tabBarIcon: ({ color }) => <Feather name="home" color={color} size={24} /> }}
+        options={{
+          tabBarAccessibilityLabel: 'Início',
+          tabBarIcon: ({ color }) => <Feather name="home" color={color} size={24} />,
+        }}
       />
       <Tabs.Screen
         name="explore"
-        options={{ tabBarIcon: ({ color }) => <Feather name="map" color={color} size={24} /> }}
+        options={{
+          tabBarAccessibilityLabel: 'Mapa',
+          tabBarIcon: ({ color }) => <Feather name="map" color={color} size={24} />,
+        }}
       />
       <Tabs.Screen
         name="create"
         options={{
+          tabBarAccessibilityLabel: 'Criar resgate',
           tabBarIcon: ({ color }) => <Feather name="plus-circle" color={color} size={28} />,
         }}
       />
       <Tabs.Screen
         name="alerts"
-        options={{ tabBarIcon: ({ color }) => <Feather name="bell" color={color} size={24} /> }}
+        options={{
+          tabBarAccessibilityLabel: 'Notificações',
+          tabBarIcon: ({ color }) => <Feather name="bell" color={color} size={24} />,
+        }}
       />
       <Tabs.Screen
         name="profile"
-        options={{ tabBarIcon: ({ color }) => <Feather name="user" color={color} size={24} /> }}
+        options={{
+          tabBarAccessibilityLabel: 'Perfil',
+          tabBarIcon: ({ color }) => <Feather name="user" color={color} size={24} />,
+        }}
       />
     </Tabs>
   );

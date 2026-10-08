@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 import { isNewerNativeRelease, parsePublishedNativeApp } from './publishedVersion';
 
@@ -45,7 +46,12 @@ async function checkNativeRelease(): Promise<AppUpdateOffer | null> {
   return { kind: 'native', apkUrl: apkDownloadUrl(page) };
 }
 
+function otaUpdatesAvailable(): boolean {
+  return requireOptionalNativeModule('ExpoUpdates') != null;
+}
+
 async function checkOtaUpdate(): Promise<AppUpdateOffer | null> {
+  if (!otaUpdatesAvailable()) return null;
   const updates = await import('expo-updates');
   if (!updates.isEnabled) return null;
   const result = await updates.checkForUpdateAsync();
@@ -73,6 +79,9 @@ export async function checkForAppUpdate(): Promise<AppUpdateOffer | null> {
 }
 
 export async function applyOtaUpdate(): Promise<void> {
+  if (!otaUpdatesAvailable()) {
+    throw new Error('Update was not downloaded');
+  }
   const updates = await import('expo-updates');
   const fetched = await updates.fetchUpdateAsync();
   if (!fetched.isNew && !fetched.isRollBackToEmbedded) {

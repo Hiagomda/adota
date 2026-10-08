@@ -1,5 +1,5 @@
 import { Camera, FillLayer, MapView, ShapeSource, type CameraRef } from '@maplibre/maplibre-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
 import { palette } from '../theme';
@@ -29,8 +29,10 @@ export function PlacePicker({
     });
   }, [focus]);
 
-  const circle =
-    focus && accuracyM && accuracyM > 0 ? accuracyPolygon(focus, accuracyM) : null;
+  const circle = useMemo(
+    () => (focus && accuracyM && accuracyM > 0 ? accuracyPolygon(focus, accuracyM) : null),
+    [accuracyM, focus],
+  );
 
   return (
     <View

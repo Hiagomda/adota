@@ -42,11 +42,13 @@ function groupsOf(map: MapLibreMap, posts: Post[]) {
 export function MapCanvas({
   posts,
   selectedId,
+  tracking,
   onSelect,
   onBounds,
 }: {
   posts: Post[];
   selectedId: string | null;
+  tracking: boolean;
   onSelect: (post: Post) => void;
   onBounds?: (bounds: MapBounds) => void;
 }) {
@@ -57,12 +59,14 @@ export function MapCanvas({
   const selectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const onBoundsRef = useRef(onBounds);
+  const trackingRef = useRef(tracking);
 
   useEffect(() => {
     postsRef.current = posts;
     selectedRef.current = selectedId;
     onSelectRef.current = onSelect;
     onBoundsRef.current = onBounds;
+    trackingRef.current = tracking;
   });
 
   useEffect(() => {
@@ -79,6 +83,7 @@ export function MapCanvas({
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
     const reportBounds = () => {
+      if (!trackingRef.current) return;
       const bounds = map.getBounds();
       onBoundsRef.current?.({
         west: bounds.getWest(),
