@@ -8,7 +8,6 @@ const tokenKey = 'egua-token';
 const flagKey = 'egua-flags';
 
 interface Flags {
-  onboarded: boolean;
   permissionsSeen: boolean;
 }
 
@@ -18,7 +17,6 @@ interface SessionState extends Flags {
   user: Account | null;
   cupuPrompt: boolean;
   hydrate: () => Promise<void>;
-  finishWelcome: () => Promise<void>;
   finishPermissions: () => Promise<void>;
   login: (email: string) => Promise<void>;
   clearCupuPrompt: () => void;
@@ -44,8 +42,9 @@ async function writeToken(token: string | null): Promise<void> {
 async function readFlags(): Promise<Flags> {
   const raw =
     Platform.OS === 'web' ? localStorage.getItem(flagKey) : await SecureStore.getItemAsync(flagKey);
-  if (!raw) return { onboarded: false, permissionsSeen: false };
-  return JSON.parse(raw) as Flags;
+  if (!raw) return { permissionsSeen: false };
+  const parsed = JSON.parse(raw) as { permissionsSeen?: boolean };
+  return { permissionsSeen: parsed.permissionsSeen === true };
 }
 
 async function writeFlags(flags: Flags): Promise<void> {
@@ -54,25 +53,19 @@ async function writeFlags(flags: Flags): Promise<void> {
   else await SecureStore.setItemAsync(flagKey, raw);
 }
 
-export const useSession = create<SessionState>((set, get) => ({
+export const useSession = create<SessionState>((set) => ({
   ready: false,
   token: null,
   user: null,
   cupuPrompt: false,
-  onboarded: false,
   permissionsSeen: false,
   hydrate: async () => {
     const flags = await readFlags();
     const token = await readToken();
     set({ ready: true, token, ...flags });
   },
-  finishWelcome: async () => {
-    const flags = { onboarded: true, permissionsSeen: get().permissionsSeen };
-    await writeFlags(flags);
-    set(flags);
-  },
   finishPermissions: async () => {
-    const flags = { onboarded: true, permissionsSeen: true };
+    const flags = { permissionsSeen: true };
     await writeFlags(flags);
     set(flags);
   },

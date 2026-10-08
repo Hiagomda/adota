@@ -46,8 +46,6 @@ const steps: {
 export default function CupuOnboarding() {
   const { width } = useWindowDimensions();
   const ready = useSession((state) => state.ready);
-  const onboarded = useSession((state) => state.onboarded);
-  const permissionsSeen = useSession((state) => state.permissionsSeen);
   const cupuPrompt = useSession((state) => state.cupuPrompt);
   const clearCupuPrompt = useSession((state) => state.clearCupuPrompt);
   const userName = useSession((state) => state.user?.name);
@@ -67,19 +65,17 @@ export default function CupuOnboarding() {
   const step = pages[index] ?? pages[0];
 
   useEffect(() => {
-    if (!ready) return;
-    const inApp = onboarded && permissionsSeen;
-    if (!inApp && !cupuPrompt) return;
+    if (!ready || !cupuPrompt) return;
     let cancelled = false;
     void hasSeenCupuOnboarding().then((seen) => {
       if (cancelled) return;
       if (!seen) setVisible(true);
-      else if (cupuPrompt) clearCupuPrompt();
+      else clearCupuPrompt();
     });
     return () => {
       cancelled = true;
     };
-  }, [clearCupuPrompt, cupuPrompt, onboarded, permissionsSeen, ready]);
+  }, [clearCupuPrompt, cupuPrompt, ready]);
 
   async function advance() {
     if (index < pages.length - 1) {

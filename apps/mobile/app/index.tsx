@@ -7,7 +7,6 @@ import { useTheme } from '../src/theme';
 export default function Gate() {
   const theme = useTheme();
   const ready = useSession((state) => state.ready);
-  const onboarded = useSession((state) => state.onboarded);
   const permissionsSeen = useSession((state) => state.permissionsSeen);
 
   if (!ready) {
@@ -26,7 +25,6 @@ export default function Gate() {
       </View>
     );
   }
-  if (!onboarded) return <Redirect href="/welcome" />;
   if (!permissionsSeen) return <Redirect href="/permissions" />;
   return <Redirect href="/(tabs)" />;
 }
