@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 
 export interface MapPost {
   id: string;
@@ -53,7 +54,31 @@ export function CityMap({ posts }: { posts: MapPost[] }) {
             style: styleUrl,
             center: belem,
             zoom: 11,
+            attributionControl: false,
           });
+          map.setMinZoom(8.5);
+          map.setMaxBounds([
+            [serviceCamera.west, serviceCamera.south],
+            [serviceCamera.east, serviceCamera.north],
+          ]);
+          const paintLimit = () => {
+            if (!map.isStyleLoaded() || map.getSource('service-mask')) return;
+            map.addSource('service-mask', { type: 'geojson', data: serviceMask });
+            map.addLayer({
+              id: 'service-mask',
+              type: 'fill',
+              source: 'service-mask',
+              paint: { 'fill-color': '#E23B3B', 'fill-opacity': 0.45 },
+            });
+            map.addSource('service-outline', { type: 'geojson', data: serviceOutline });
+            map.addLayer({
+              id: 'service-outline',
+              type: 'line',
+              source: 'service-outline',
+              paint: { 'line-color': '#1F8F4E', 'line-width': 3 },
+            });
+          };
+          map.on('load', paintLimit);
           map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
           mapRef.current = map;
 
@@ -62,6 +87,10 @@ export function CityMap({ posts }: { posts: MapPost[] }) {
 
           function showPosition(position: GeolocationPosition) {
             const { longitude, latitude } = position.coords;
+            if (!insideServiceArea({ latitude, longitude })) {
+              setGpsMessage('Sua localização está fora de Belém. O mapa fica na região da cidade.');
+              return;
+            }
             if (!userMarker) {
               const dot = document.createElement('div');
               dot.className = 'map-me';

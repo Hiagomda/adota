@@ -1,7 +1,9 @@
 import {
   Camera,
   CircleLayer,
+  FillLayer,
   Images,
+  LineLayer,
   Logger,
   MapView,
   ShapeSource,
@@ -15,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState, type ComponentProps } from '
 import { Platform } from 'react-native';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type MapBounds } from './geo';
+import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 import { palette } from '../theme';
 
 const pawImages = {
@@ -58,7 +61,12 @@ export function MapCanvas({
         accuracy: Location.Accuracy.Balanced,
       });
       if (!active) return;
-      setCenter([position.coords.longitude, position.coords.latitude]);
+      const next = {
+        longitude: position.coords.longitude,
+        latitude: position.coords.latitude,
+      };
+      if (!insideServiceArea(next)) return;
+      setCenter([next.longitude, next.latitude]);
       setGpsReady(true);
     }
     void readGps();
@@ -121,8 +129,34 @@ export function MapCanvas({
   );
 
   return (
-    <MapView style={{ flex: 1 }} mapStyle={mapStyleUrl} onRegionDidChange={onRegionDidChange}>
-      <Camera centerCoordinate={center} zoomLevel={gpsReady ? 14 : 12} animationDuration={600} />
+    <MapView
+      style={{ flex: 1 }}
+      mapStyle={mapStyleUrl}
+      attributionEnabled={false}
+      onRegionDidChange={onRegionDidChange}
+    >
+      <Camera
+        centerCoordinate={center}
+        zoomLevel={gpsReady ? 14 : 12}
+        minZoomLevel={8.5}
+        maxBounds={{
+          ne: [serviceCamera.east, serviceCamera.north],
+          sw: [serviceCamera.west, serviceCamera.south],
+        }}
+        animationDuration={600}
+      />
+      <ShapeSource id="service-mask" shape={serviceMask}>
+        <FillLayer
+          id="service-mask-fill"
+          style={{ fillColor: '#E23B3B', fillOpacity: 0.45 }}
+        />
+      </ShapeSource>
+      <ShapeSource id="service-outline" shape={serviceOutline}>
+        <LineLayer
+          id="service-outline-line"
+          style={{ lineColor: '#1F8F4E', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
+        />
+      </ShapeSource>
       {gpsReady && tracking ? (
         // AnimatedPoint overwrites AnimatedNode._listeners (a Map) with a plain object.
         // RN 0.86 then crashes in callListeners: "undefined is not a function".

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type MapBounds } from './geo';
+import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { pawUri } from './paw';
 import { palette } from '../theme';
@@ -78,7 +79,10 @@ export function MapCanvas({
       style: mapStyleUrl,
       center: belem,
       zoom: 12,
+      attributionControl: false,
     });
+    limitMapToBelem(map);
+    showServiceLimit(map);
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 

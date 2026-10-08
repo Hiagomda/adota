@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
 import { belem, mapStyleUrl, type MapPoint } from '../map/geo';
 import { ensureMapCss } from '../map/mapCss';
+import { insideServiceArea } from '../map/serviceArea';
+import { limitMapToBelem, showServiceLimit } from '../map/serviceOverlay';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
 
@@ -11,15 +13,18 @@ export function PlacePicker({
   accuracyM,
   urgency,
   onChange,
+  onOutside,
 }: {
   focus: MapPoint | null;
   accuracyM: number | null;
   urgency: Urgency;
   onChange: (point: MapPoint, fromUser: boolean) => void;
+  onOutside?: () => void;
 }) {
   const host = useRef<HTMLElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onChangeRef = useRef(onChange);
+  const onOutsideRef = useRef(onOutside);
   const focusRef = useRef(focus);
   const accuracyRef = useRef(accuracyM);
   const paintCircleRef = useRef<() => void>(() => undefined);
@@ -28,6 +33,7 @@ export function PlacePicker({
 
   useEffect(() => {
     onChangeRef.current = onChange;
+    onOutsideRef.current = onOutside;
     focusRef.current = focus;
     accuracyRef.current = accuracyM;
     paintCircleRef.current();
@@ -42,17 +48,37 @@ export function PlacePicker({
       style: mapStyleUrl,
       center: belem,
       zoom: 17,
+      attributionControl: false,
     });
+    limitMapToBelem(map);
+    showServiceLimit(map);
     mapRef.current = map;
+    const lastInside = { latitude: belem[1], longitude: belem[0] };
+    let snapping = false;
     map.on('dragstart', () => {
       dragged.current = true;
     });
     map.on('moveend', () => {
+      if (snapping) {
+        snapping = false;
+        dragged.current = false;
+        return;
+      }
       const center = map.getCenter();
-      onChangeRef.current(
-        { latitude: center.lat, longitude: center.lng },
-        dragged.current,
-      );
+      const next = { latitude: center.lat, longitude: center.lng };
+      if (!insideServiceArea(next)) {
+        snapping = true;
+        if (dragged.current) onOutsideRef.current?.();
+        dragged.current = false;
+        map.easeTo({
+          center: [lastInside.longitude, lastInside.latitude],
+          duration: 300,
+        });
+        return;
+      }
+      lastInside.latitude = next.latitude;
+      lastInside.longitude = next.longitude;
+      onChangeRef.current(next, dragged.current);
       dragged.current = false;
     });
     const circle = document.createElement('div');
@@ -93,7 +119,7 @@ export function PlacePicker({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !focus) return;
+    if (!map || !focus || !insideServiceArea(focus)) return;
     map.easeTo({ center: [focus.longitude, focus.latitude], zoom: 17, duration: 600 });
   }, [focus]);
 

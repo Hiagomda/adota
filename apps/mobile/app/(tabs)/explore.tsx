@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../../src/api';
 import { formatWhen } from '../../src/format';
 import { MapCanvas } from '../../src/map/MapCanvas';
+import { Mascot } from '../../src/mascot';
 import type { MapBounds } from '../../src/map/geo';
 import { useSession } from '../../src/session';
 import { palette, statusLabel, useTheme } from '../../src/theme';
@@ -77,15 +78,37 @@ export default function ExploreScreen() {
         onSelect={setSelected}
         onBounds={onBounds}
       />
+      {!selected ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Animais perdidos"
+          style={[styles.lost, { top: insets.top + 12, backgroundColor: theme.surface }]}
+          onPress={() => router.push('/lost')}
+        >
+          <Text style={{ color: theme.text, fontWeight: '700' }}>Animais perdidos</Text>
+        </Pressable>
+      ) : null}
       {bounds && !selected && (feed.isError || posts.length === 0) ? (
-        <View style={[styles.banner, { top: insets.top + 12, backgroundColor: theme.surface }]}>
-          <Text style={{ color: theme.text }}>
+        <View style={[styles.banner, { top: insets.top + 64, backgroundColor: theme.surface }]}>
+          {feed.isFetching ? null : <Mascot pose={feed.isError ? 'sad' : 'search'} size={64} />}
+          <Text style={{ color: theme.text, flex: 1 }}>
             {feed.isError
               ? messageFrom(feed.error)
               : feed.isFetching
                 ? 'Buscando resgates nesta área...'
                 : 'Nenhum resgate aberto nesta área do mapa.'}
           </Text>
+        </View>
+      ) : null}
+      {!selected ? (
+        <View
+          style={[styles.legend, { bottom: insets.bottom + 16, backgroundColor: theme.surface }]}
+          accessibilityLabel="Área verde: Belém e distritos, até Mosqueiro e Benevides. Vermelho: bloqueado."
+        >
+          <View style={[styles.swatch, { backgroundColor: '#1F8F4E' }]} />
+          <Text style={{ color: theme.text, fontSize: 12 }}>Até Mosqueiro e Benevides</Text>
+          <View style={[styles.swatch, { backgroundColor: '#E23B3B' }]} />
+          <Text style={{ color: theme.text, fontSize: 12 }}>Bloqueado</Text>
         </View>
       ) : null}
       {selected ? (
@@ -121,6 +144,26 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
+  lost: {
+    position: 'absolute',
+    left: 16,
+    minHeight: 44,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legend: {
+    position: 'absolute',
+    left: 16,
+    minHeight: 36,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  swatch: { width: 10, height: 10, borderRadius: 5 },
   banner: {
     position: 'absolute',
     left: 16,
@@ -128,6 +171,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   card: {
     position: 'absolute',

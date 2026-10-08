@@ -1,7 +1,15 @@
-import { Camera, FillLayer, MapView, ShapeSource, type CameraRef } from '@maplibre/maplibre-react-native';
+import {
+  Camera,
+  FillLayer,
+  LineLayer,
+  MapView,
+  ShapeSource,
+  type CameraRef,
+} from '@maplibre/maplibre-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
+import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from '../map/serviceArea';
 import { palette } from '../theme';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
@@ -11,17 +19,22 @@ export function PlacePicker({
   accuracyM,
   urgency,
   onChange,
+  onOutside,
 }: {
   focus: MapPoint | null;
   accuracyM: number | null;
   urgency: Urgency;
   onChange: (point: MapPoint, fromUser: boolean) => void;
+  onOutside?: () => void;
 }) {
   const camera = useRef<CameraRef>(null);
+  const lastInside = useRef<MapPoint>({ latitude: belem[1], longitude: belem[0] });
+  const snapping = useRef(false);
   const [mapHeight, setMapHeight] = useState(240);
 
   useEffect(() => {
-    if (!focus) return;
+    if (!focus || !insideServiceArea(focus)) return;
+    lastInside.current = focus;
     camera.current?.setCamera({
       centerCoordinate: [focus.longitude, focus.latitude],
       zoomLevel: 17,
@@ -45,13 +58,44 @@ export function PlacePicker({
       <MapView
         style={styles.map}
         mapStyle={mapStyleUrl}
+        attributionEnabled={false}
         onRegionDidChange={(event) => {
           const [longitude, latitude] = event.geometry.coordinates;
           if (longitude === undefined || latitude === undefined) return;
-          onChange({ latitude, longitude }, event.properties.isUserInteraction);
+          const next = { latitude, longitude };
+          if (!insideServiceArea(next)) {
+            if (snapping.current) return;
+            snapping.current = true;
+            if (event.properties.isUserInteraction) onOutside?.();
+            camera.current?.setCamera({
+              centerCoordinate: [lastInside.current.longitude, lastInside.current.latitude],
+              animationDuration: 300,
+            });
+            return;
+          }
+          snapping.current = false;
+          lastInside.current = next;
+          onChange(next, event.properties.isUserInteraction);
         }}
       >
-        <Camera ref={camera} defaultSettings={{ centerCoordinate: belem, zoomLevel: 17 }} />
+        <Camera
+          ref={camera}
+          minZoomLevel={8.5}
+          maxBounds={{
+            ne: [serviceCamera.east, serviceCamera.north],
+            sw: [serviceCamera.west, serviceCamera.south],
+          }}
+          defaultSettings={{ centerCoordinate: belem, zoomLevel: 17 }}
+        />
+        <ShapeSource id="service-mask" shape={serviceMask}>
+          <FillLayer id="service-mask-fill" style={{ fillColor: '#E23B3B', fillOpacity: 0.45 }} />
+        </ShapeSource>
+        <ShapeSource id="service-outline" shape={serviceOutline}>
+          <LineLayer
+            id="service-outline-line"
+            style={{ lineColor: '#1F8F4E', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
+          />
+        </ShapeSource>
         {circle ? (
           <ShapeSource id="accuracy" shape={circle}>
             <FillLayer
