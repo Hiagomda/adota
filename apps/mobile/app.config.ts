@@ -36,7 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'app.egua.adota',
-    versionCode: 1,
+    versionCode: 2,
     ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
