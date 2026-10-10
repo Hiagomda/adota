@@ -1,7 +1,9 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 15,
+  "androidVersionCode": 16,
   "notes": [
+    "A patinha do mapa aparece em qualquer zoom.",
+    "Ao excluir o resgate, ele some do mapa na hora.",
     "Dá para editar e excluir o próprio resgate.",
     "Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.",
     "A patinha no mapa ficou mais fácil de tocar.",
@@ -11,8 +13,6 @@
     "Animais perdidos saíram do mapa de resgate e ficam na lista própria.",
     "Os resgates abertos aparecem no mapa com a patinha.",
     "Dá para mudar foto, nome e @. Nome e @ não repetem.",
-    "A carona com o animal saiu do app.",
-    "O nível fica só no seu perfil.",
     "Dá para sair da conta nos Ajustes e no perfil."
   ]
 }

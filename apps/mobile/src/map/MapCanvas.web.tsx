@@ -6,39 +6,6 @@ import { belem, mapStyleUrl, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { pawUri } from './paw';
-import { mapColors } from './layerColors';
-
-const clusterRadiusPx = 48;
-
-// O worker de GeoJSON do MapLibre não sobe no Metro, então o agrupamento é feito aqui.
-
-function groupsOf(map: MapLibreMap, posts: Post[]) {
-  if (map.getZoom() >= 15) {
-    return posts.map((post) => ({
-      posts: [post],
-      longitude: post.location.longitude,
-      latitude: post.location.latitude,
-    }));
-  }
-  const groups: { posts: Post[]; longitude: number; latitude: number }[] = [];
-  for (const post of posts) {
-    const point = map.project([post.location.longitude, post.location.latitude]);
-    const group = groups.find((item) => {
-      const origin = map.project([item.longitude, item.latitude]);
-      return Math.hypot(origin.x - point.x, origin.y - point.y) < clusterRadiusPx;
-    });
-    if (!group) {
-      groups.push({
-        posts: [post],
-        longitude: post.location.longitude,
-        latitude: post.location.latitude,
-      });
-      continue;
-    }
-    group.posts.push(post);
-  }
-  return groups;
-}
 
 export function MapCanvas({
   posts,
@@ -103,52 +70,30 @@ export function MapCanvas({
     const draw = () => {
       if (!map.isStyleLoaded()) return;
       markers.current.forEach((marker) => marker.remove());
-      markers.current = groupsOf(map, postsRef.current).map((group) => {
+      markers.current = postsRef.current.map((post) => {
+        const selected = post.id === selectedRef.current;
+        const size = selected ? 72 : 64;
         const element = document.createElement('button');
         element.type = 'button';
-        element.style.border = `2px solid ${mapColors.clusterText}`;
+        element.setAttribute('aria-label', post.approxLabel);
+        element.style.width = `${size}px`;
+        element.style.height = `${size}px`;
         element.style.padding = '0';
+        element.style.border = 'none';
+        element.style.background = 'transparent';
         element.style.cursor = 'pointer';
-        element.style.color = mapColors.clusterText;
-        element.style.fontWeight = '700';
-        if (group.posts.length > 1) {
-          element.textContent = String(group.posts.length);
-          element.style.width = '36px';
-          element.style.height = '36px';
-          element.style.borderRadius = '18px';
-          element.style.background = mapColors.cluster;
-          element.onclick = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            // Um toque abre o grupo até o nível da rua, onde os pinos se separam.
-            map.jumpTo({
-              center: [group.longitude, group.latitude],
-              zoom: Math.min(Math.max(map.getZoom() + 2, 16), 18),
-            });
-          };
-        } else {
-          const post = group.posts[0];
-          if (!post) return new maplibregl.Marker({ element }).setLngLat([0, 0]);
-          const selected = post.id === selectedRef.current;
-          const size = selected ? 72 : 64;
-          element.setAttribute('aria-label', post.approxLabel);
-          element.style.width = `${size}px`;
-          element.style.height = `${size}px`;
-          element.style.border = 'none';
-          element.style.background = 'transparent';
-          const image = document.createElement('img');
-          image.src = pawUri(post.urgency);
-          image.alt = '';
-          image.draggable = false;
-          image.width = size;
-          image.height = size;
-          image.style.display = 'block';
-          image.style.pointerEvents = 'none';
-          element.replaceChildren(image);
-          element.onclick = () => onSelectRef.current(post);
-        }
+        const image = document.createElement('img');
+        image.src = pawUri(post.urgency);
+        image.alt = '';
+        image.draggable = false;
+        image.width = size;
+        image.height = size;
+        image.style.display = 'block';
+        image.style.pointerEvents = 'none';
+        element.replaceChildren(image);
+        element.onclick = () => onSelectRef.current(post);
         return new maplibregl.Marker({ element, anchor: 'center' })
-          .setLngLat([group.longitude, group.latitude])
+          .setLngLat([post.location.longitude, post.location.latitude])
           .addTo(map);
       });
     };

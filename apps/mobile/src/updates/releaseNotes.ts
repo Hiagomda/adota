@@ -1,5 +1,7 @@
 /** Plain-language notes for this alpha. Shown in Ajustes and in the update dialog. */
 export const currentReleaseNotes = [
+  'A patinha do mapa aparece em qualquer zoom.',
+  'Ao excluir o resgate, ele some do mapa na hora.',
   'Dá para editar e excluir o próprio resgate.',
   'Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.',
   'A patinha no mapa ficou mais fácil de tocar.',
@@ -9,7 +11,5 @@ export const currentReleaseNotes = [
   'Animais perdidos saíram do mapa de resgate e ficam na lista própria.',
   'Os resgates abertos aparecem no mapa com a patinha.',
   'Dá para mudar foto, nome e @. Nome e @ não repetem.',
-  'A carona com o animal saiu do app.',
-  'O nível fica só no seu perfil.',
   'Dá para sair da conta nos Ajustes e no perfil.',
 ];

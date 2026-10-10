@@ -355,35 +355,13 @@ export function MapCanvas({
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         <Images images={pawImages} />
         <ShapeSource
+          key={posts.map((post) => post.id).join(',')}
           id="alerts"
           shape={shape}
-          cluster
-          clusterRadius={48}
-          clusterMaxZoomLevel={15}
           onPress={onPinPress}
         >
           <CircleLayer
-            id="clusters"
-            filter={['has', 'point_count']}
-            style={{
-              circleColor: mapColors.cluster,
-              circleRadius: 18,
-              circleStrokeWidth: 2,
-              circleStrokeColor: mapColors.clusterText,
-            }}
-          />
-          <SymbolLayer
-            id="cluster-count"
-            filter={['has', 'point_count']}
-            style={{
-              textField: ['get', 'point_count'],
-              textSize: 13,
-              textColor: mapColors.clusterText,
-            }}
-          />
-          <CircleLayer
             id="pin-hit"
-            filter={['!', ['has', 'point_count']]}
             style={{
               circleRadius: 36,
               circleColor: '#000000',
@@ -392,7 +370,6 @@ export function MapCanvas({
           />
           <SymbolLayer
             id="pins"
-            filter={['!', ['has', 'point_count']]}
             style={{
               iconImage: [
                 'match',

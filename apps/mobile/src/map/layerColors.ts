@@ -1,4 +1,4 @@
-import { lightColors, scale } from '../theme';
+import { lightColors } from '../theme';
 
 /**
  * Colors of the map layers. The native renderer draws them outside React,
@@ -8,6 +8,4 @@ export const mapColors = {
   outsideArea: '#1B2B2B',
   areaOutline: lightColors.success,
   accuracy: lightColors.secondary,
-  cluster: scale.turquoise[700],
-  clusterText: lightColors.background,
 } as const;

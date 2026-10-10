@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -12,7 +12,6 @@ import { belemBounds, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
-import type { Post } from '../../src/types';
 
 const speciesLabel: Record<string, string> = {
   dog: 'Cachorro',
@@ -33,13 +32,15 @@ export default function ExploreScreen() {
   const focused = useIsFocused();
   const token = useSession((state) => state.token);
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
-  const [selected, setSelected] = useState<Post | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const search = `?status=open&limit=100&west=${bounds.west}&south=${bounds.south}&east=${bounds.east}&north=${bounds.north}`;
   const feed = useQuery({
     queryKey: ['map', token, search],
     queryFn: () => loadFeed(token, search),
+    placeholderData: keepPreviousData,
   });
   const posts = (feed.data?.posts ?? []).filter((post) => post.type !== 'lost');
+  const selected = posts.find((post) => post.id === selectedId) ?? null;
   const openPost = useCallback(
     (id: string) => {
       router.push(`/post/${id}`);
@@ -62,7 +63,7 @@ export default function ExploreScreen() {
         selectedId={selected?.id ?? null}
         tracking={focused}
         controlsBottom={controlsBottom}
-        onSelect={setSelected}
+        onSelect={(post) => setSelectedId(post.id)}
         onCommitBounds={setBounds}
       />
       {!selected && (feed.isError || posts.length === 0) ? (
