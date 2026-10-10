@@ -1,11 +1,34 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
-import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const googleServicesAndroid = path.join(appDir, 'google-services.json');
 const googleServicesIos = path.join(appDir, 'GoogleService-Info.plist');
+
+// Single source of truth for the version. `pnpm version:bump` raises `build` before every APK.
+const release = JSON.parse(readFileSync(path.join(appDir, 'version.json'), 'utf8')) as {
+  version: string;
+  build: number;
+};
+
+// Recorded when the config is evaluated, which happens on every native build (expo-constants
+// regenerates app.config at Gradle preBuild) and on every `expo export`.
+function gitCommit(): string | null {
+  const fromEnv = process.env.EXPO_PUBLIC_GIT_SHA;
+  if (fromEnv) return fromEnv.slice(0, 12);
+  try {
+    return execSync('git rev-parse --short=12 HEAD', { cwd: appDir, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    // Not a git checkout (CI tarball, Docker context): the panel shows "desconhecido".
+    return null;
+  }
+}
+const buildInfo = { commit: gitCommit(), builtAt: new Date().toISOString() };
 // Expo's Android config type omits this field. The test API is plain HTTP.
 const androidCleartext = { usesCleartextTraffic: true };
 // Crash reports. The DSN is public and lives in EXPO_PUBLIC_SENTRY_DSN; the upload token for
@@ -21,7 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Égua, adota!',
   slug: 'egua',
   scheme: 'egua',
-  version: '1.0.0',
+  version: release.version,
   runtimeVersion: {
     policy: 'appVersion',
   },
@@ -30,6 +53,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'app.egua.adota',
+    buildNumber: String(release.build),
     supportsTablet: true,
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
@@ -43,7 +67,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'app.egua.adota',
-    versionCode: 4,
+    versionCode: release.build,
     ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -70,6 +94,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     downloadPageUrl:
       process.env.EXPO_PUBLIC_DOWNLOAD_URL ??
       'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io',
+    build: buildInfo,
     eas: {
       projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
     },

@@ -10,7 +10,10 @@
     "android": "expo start --android --dev-client",
     "ios": "expo start --ios --dev-client",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "version:bump": "node scripts/bump-build.mjs",
+    "version:sync": "node scripts/bump-build.mjs --sync",
+    "version:publish": "node scripts/bump-build.mjs --sync --publish"
   },
   "dependencies": {
     "@expo-google-fonts/baloo-2": "^0.4.2",
@@ -53,6 +56,7 @@
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
+    "zod": "^3.25.76",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
