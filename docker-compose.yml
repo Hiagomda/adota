@@ -62,6 +62,7 @@ services:
       AWS_SECRET_ACCESS_KEY: patinha-secret
       IMGPROXY_DEVELOPMENT_ERRORS_MODE: 'true'
       IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: 'true'
+      IMGPROXY_STRIP_METADATA: 'true'
     depends_on:
       minio:
         condition: service_healthy

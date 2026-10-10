@@ -1,18 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadPost, messageFrom } from '../../src/api';
+import { AppText, Button, IconButton } from '../../src/components/ui';
 import { useSession } from '../../src/session';
-import { palette } from '../../src/theme';
+import { motion, radius, spacing, useTheme } from '../../src/theme';
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const token = useSession((state) => state.token);
   const post = useQuery({ queryKey: ['story-post', id], queryFn: () => loadPost(id, token) });
   const [{ progress, barWidth }] = useState(() => {
@@ -54,66 +55,97 @@ export default function StoryScreen() {
   const photo = post.data?.media[0]?.url;
   return (
     <Pressable
-      style={styles.screen}
+      accessibilityLabel="Segure para pausar o resgate"
+      style={[styles.screen, { backgroundColor: colors.mediaBackground }]}
       onPressIn={() => setPaused(true)}
       onPressOut={() => setPaused(false)}
     >
       {photo ? (
-        <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image
+          source={{ uri: photo }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={motion.base}
+          accessibilityLabel="Foto do animal"
+        />
       ) : null}
-      <View style={[styles.progress, { marginTop: insets.top + 8 }]}>
-        <Animated.View style={[styles.progressFill, { width: barWidth }]} />
+      <View
+        accessibilityRole="progressbar"
+        accessibilityLabel="Tempo restante do resgate"
+        style={[
+          styles.progress,
+          { marginTop: insets.top + spacing.sm, backgroundColor: colors.onMediaMuted },
+        ]}
+      >
+        <Animated.View
+          style={[styles.progressFill, { width: barWidth, backgroundColor: colors.onMedia }]}
+        />
       </View>
       <View style={styles.zones}>
-        <Pressable style={styles.zone} onPress={() => seek(-0.2)} />
-        <Pressable style={styles.zone} onPress={() => seek(0.2)} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Voltar um pouco"
+          style={styles.zone}
+          onPress={() => seek(-0.2)}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Avançar um pouco"
+          style={styles.zone}
+          onPress={() => seek(0.2)}
+        />
       </View>
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
-        <Text style={styles.title}>
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: insets.bottom + spacing.xl, backgroundColor: colors.mediaScrim },
+        ]}
+      >
+        <AppText variant="h3" style={{ color: colors.onMedia }}>
           {post.isError
             ? messageFrom(post.error)
             : (post.data?.approxLabel ?? 'Carregando o resgate...')}
-        </Text>
+        </AppText>
         {post.data?.description ? (
-          <Text numberOfLines={2} style={styles.body}>
+          <AppText numberOfLines={2} style={{ color: colors.onMedia }}>
             {post.data.description}
-          </Text>
+          </AppText>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Eu vou ajudar"
-          style={styles.help}
-          onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
-            router.push(`/post/${id}`);
-          }}
-        >
-          <Text style={styles.helpText}>Eu vou ajudar</Text>
-        </Pressable>
-        <Pressable style={styles.close} onPress={() => router.back()}>
-          <Text style={styles.title}>Fechar</Text>
-        </Pressable>
+        <Button
+          title="Eu vou ajudar"
+          icon="heart"
+          variant="secondary"
+          size="lg"
+          fullWidth
+          onPress={() => router.push(`/post/${id}`)}
+        />
+        <View style={styles.close}>
+          <IconButton
+            icon="x"
+            variant="filled"
+            accessibilityLabel="Fechar"
+            onPress={() => router.back()}
+          />
+        </View>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
-  progress: { height: 3, margin: 12, backgroundColor: 'rgba(255,255,255,0.3)' },
-  progressFill: { height: 3, backgroundColor: '#fff' },
+  screen: { flex: 1 },
+  progress: {
+    height: 3,
+    marginHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  progressFill: { height: 3, borderRadius: radius.pill },
   zones: { flex: 1, flexDirection: 'row' },
   zone: { flex: 1 },
-  footer: { padding: 20, gap: 12 },
-  title: { color: '#fff', fontWeight: '700', fontSize: 18 },
-  body: { color: '#fff', fontSize: 15, lineHeight: 20 },
-  close: { minHeight: 44, justifyContent: 'center' },
-  help: {
-    minHeight: 48,
-    borderRadius: 999,
-    backgroundColor: palette.caju,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpText: { color: palette.acai, fontWeight: '700' },
+  footer: { padding: spacing.xl, gap: spacing.md },
+  close: { alignItems: 'center' },
 });
+
+// One broken screen must not take the whole app down.
+export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';

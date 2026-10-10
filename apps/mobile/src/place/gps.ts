@@ -1,26 +1,32 @@
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import { reportError } from '../crash/reporter';
 import type { MapPoint } from '../map/geo';
+import { openAppSettings, permissionOutcome } from '../permissions';
 
-export type GpsStatus = 'loading' | 'ready' | 'denied' | 'disabled' | 'timeout' | 'weak';
+export type GpsStatus = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout' | 'weak';
 
 export interface GpsFix extends MapPoint {
   accuracy: number;
 }
 
+/** What the screen can offer the user to get out of the current state. */
+export type GpsFixAction = { label: string; run: () => Promise<void> } | null;
+
 const timeoutMs = 12_000;
 const weakAccuracyM = 50;
+
+const searching = 'Buscando sua localização para indicar onde o animal está.';
 
 export function useAnimalGps() {
   const [status, setStatus] = useState<GpsStatus>('loading');
   const [fix, setFix] = useState<GpsFix | null>(null);
-  const [message, setMessage] = useState(
-    'Buscando sua localização para indicar onde o animal está.',
-  );
+  const [message, setMessage] = useState(searching);
 
   const read = useCallback(async () => {
     setStatus('loading');
-    setMessage('Buscando sua localização para indicar onde o animal está.');
+    setMessage(searching);
     try {
       const servicesOn = await Location.hasServicesEnabledAsync();
       if (!servicesOn) {
@@ -28,8 +34,15 @@ export function useAnimalGps() {
         setMessage('O GPS está desligado. Ligue a localização ou escolha o ponto no mapa.');
         return;
       }
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
+      const outcome = permissionOutcome(await Location.requestForegroundPermissionsAsync());
+      if (outcome === 'blocked') {
+        setStatus('blocked');
+        setMessage(
+          'A localização está bloqueada para o app. Libere nas configurações ou mova o mapa até o animal.',
+        );
+        return;
+      }
+      if (outcome === 'denied') {
         setStatus('denied');
         setMessage('Permissão negada. Mova o mapa até o local do animal.');
         return;
@@ -62,7 +75,7 @@ export function useAnimalGps() {
           ? Number((error as { code: unknown }).code)
           : 0;
       const text = error instanceof Error ? error.message.toLowerCase() : '';
-      // Códigos do GeolocationPositionError: 1 negado, 2 sem sinal, 3 tempo esgotado.
+      // GeolocationPositionError codes: 1 denied, 2 unavailable, 3 timeout.
       if (code === 1 || text.includes('denied') || text.includes('permission')) {
         setStatus('denied');
         setMessage('Permissão negada. Mova o mapa até o local do animal.');
@@ -78,6 +91,8 @@ export function useAnimalGps() {
         setMessage('O GPS está desligado. Ligue a localização ou escolha o ponto no mapa.');
         return;
       }
+      // Anything else is not one of the known GPS outcomes: record it so it can be understood.
+      reportError(error, { source: 'handled', where: 'gps:read' });
       setStatus('disabled');
       setMessage('Não consegui ler o GPS. Escolha o ponto no mapa.');
     }
@@ -88,5 +103,22 @@ export function useAnimalGps() {
     return () => clearTimeout(handle);
   }, [read]);
 
-  return { status, fix, message, retry: read };
+  const action: GpsFixAction =
+    status === 'blocked'
+      ? { label: 'Liberar nas configurações', run: openAppSettings }
+      : status === 'disabled'
+        ? { label: 'Ligar o GPS', run: () => enableLocationServices().then(read) }
+        : null;
+
+  return { status, fix, message, retry: read, action };
+}
+
+/** Android shows the system "turn on location" dialog; iOS only has the settings app. */
+async function enableLocationServices(): Promise<void> {
+  if (Platform.OS !== 'android') return openAppSettings();
+  try {
+    await Location.enableNetworkProviderAsync();
+  } catch {
+    // The user dismissed the system dialog; `read` runs next and reports "disabled" again.
+  }
 }

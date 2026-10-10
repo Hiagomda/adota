@@ -1,20 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, messageFrom } from '../src/api';
+import {
+  AppText,
+  Badge,
+  Card,
+  Chip,
+  Header,
+  Notice,
+  ProgressBar,
+  SectionHeader,
+  Switch,
+} from '../src/components/ui';
 import { useSession } from '../src/session';
-import { palette, screenColumn, useTheme } from '../src/theme';
+import { screenColumn, spacing, useTheme } from '../src/theme';
 import { Mascot } from '../src/mascot';
 import { useVolunteerAvailability } from '../src/volunteer/availability';
-import {
-  HeroiLocalBadge,
-  OlheiroVizinhancaBadge,
-  PadrinhoNota10Badge,
-  PilotoDoBemBadge,
-  PortasAbertasBadge,
-} from '../src/volunteer/badges/index';
+import { badgeArt } from '../src/volunteer/badgeArt';
 import type { VolunteerBadge, VolunteerSettings, VolunteerStatus } from '../src/volunteer/types';
 
 const petChoices = [
@@ -26,16 +31,12 @@ const petChoices = [
 const dayChoices = [3, 7, 15, 30];
 const radiusChoices = [5, 10, 20];
 
-const badgeArt: Record<VolunteerBadge['code'], typeof HeroiLocalBadge> = {
-  local_hero: HeroiLocalBadge,
-  good_pilot: PilotoDoBemBadge,
-  open_doors: PortasAbertasBadge,
-  top_sponsor: PadrinhoNota10Badge,
-  neighborhood_scout: OlheiroVizinhancaBadge,
-};
+const ROW_MASCOT = 64;
+// Three seals per row, leaving room for the gaps.
+const SEAL_COLUMN_WIDTH = '29%';
 
 export default function VolunteerScreen() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const token = useSession((state) => state.token);
   const client = useQueryClient();
@@ -96,144 +97,137 @@ export default function VolunteerScreen() {
   const level = status.data?.level;
   const xp = status.data?.xp ?? 0;
   const remaining = level && level.ceiling !== null ? Math.max(level.ceiling - xp, 0) : null;
+  const xpCaption = `${xp} XP${level && remaining === null ? ' · você chegou no topo' : ''}${
+    remaining !== null ? ` · faltam ${remaining} para o próximo` : ''
+  }`;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.screen}>
+    <SafeAreaView
+      style={[styles.screen, { backgroundColor: colors.background }]}
+      edges={['top', 'bottom']}
+    >
+      <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.column}>
-          <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-            <Text style={{ color: theme.text, fontSize: 16 }}>Voltar</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: theme.text }]}>Sua rede</Text>
-          <Text style={[styles.note, { color: theme.muted }]}>
-            Cada ajuda na rua fica marcada aqui. Sem pressa, no seu ritmo.
-          </Text>
-          {!token ? (
-            <Text style={[styles.note, { color: theme.muted }]}>
-              Entre na sua conta para guardar o que você já fez.
-            </Text>
-          ) : null}
-          {status.isError ? (
-            <Text style={[styles.note, { color: theme.muted }]}>{messageFrom(status.error)}</Text>
-          ) : null}
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.level, { color: theme.text }]}>{level?.name ?? 'Olheiro'}</Text>
-            <Text style={{ color: theme.muted }}>
-              {xp} XP
-              {level && remaining === null ? ' · você chegou no topo' : ''}
-              {remaining !== null ? ` · faltam ${remaining} para o próximo` : ''}
-            </Text>
-            <View style={[styles.track, { backgroundColor: theme.line }]}>
-              <View style={[styles.fill, { width: `${Math.round((level?.progress ?? 0) * 100)}%` }]} />
-            </View>
-          </View>
-          <View style={[styles.row, { backgroundColor: theme.surface }]}>
-            <Mascot pose="drive" size={64} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Oferecer transporte</Text>
-              <Text style={{ color: theme.muted }}>Levar um animal, no estilo Uber Pet.</Text>
-            </View>
-            <Switch
-              accessibilityLabel="Oferecer transporte"
-              value={transport}
-              onValueChange={(value) => update({ isTransportAvailable: value })}
-              trackColor={{ false: theme.line, true: palette.caju }}
-              thumbColor={palette.white}
-            />
-          </View>
-          <View style={[styles.row, { backgroundColor: theme.surface }]}>
-            <Mascot pose="home" size={64} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Oferecer lar temporário</Text>
-              <Text style={{ color: theme.muted }}>Um canto em casa por alguns dias.</Text>
-            </View>
-            <Switch
-              accessibilityLabel="Oferecer lar temporário"
-              value={foster}
-              onValueChange={(value) =>
-                update({
-                  isFosterAvailable: value,
-                  fosterPetTypes: currentSettings().fosterPetTypes.length
-                    ? currentSettings().fosterPetTypes
-                    : ['dog'],
-                  fosterMaxDays: currentSettings().fosterMaxDays ?? 7,
-                })
-              }
-              trackColor={{ false: theme.line, true: palette.caju }}
-              thumbColor={palette.white}
-            />
-          </View>
-          {transport || foster ? (
-            <View style={styles.block}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Até onde você chega</Text>
-              <View style={styles.chips}>
-                {radiusChoices.map((km) => {
-                  const selected = currentSettings().serviceRadiusKm === km;
-                  return (
-                    <Pressable
+          <Header title="Sua rede" large onBack={() => router.back()} />
+          <View style={styles.body}>
+            <AppText color="textSecondary">
+              Cada ajuda na rua fica marcada aqui. Sem pressa, no seu ritmo.
+            </AppText>
+            {!token ? <Notice message="Entre na sua conta para guardar o que você já fez." /> : null}
+            {status.isError ? <Notice tone="error" message={messageFrom(status.error)} /> : null}
+            <Card elevation="md">
+              <View style={styles.levelBox}>
+                <AppText variant="h2">{level?.name ?? 'Olheiro'}</AppText>
+                <ProgressBar
+                  value={level?.progress ?? 0}
+                  label="Seu nível"
+                  caption={xpCaption}
+                  tone="secondary"
+                />
+              </View>
+            </Card>
+            <Card>
+              <View style={styles.row}>
+                <Mascot pose="drive" size={ROW_MASCOT} />
+                <View style={styles.rowText}>
+                  <Switch
+                    label="Oferecer transporte"
+                    description="Levar um animal, no estilo Uber Pet."
+                    value={transport}
+                    onValueChange={(value) => update({ isTransportAvailable: value })}
+                  />
+                </View>
+              </View>
+            </Card>
+            <Card>
+              <View style={styles.row}>
+                <Mascot pose="home" size={ROW_MASCOT} />
+                <View style={styles.rowText}>
+                  <Switch
+                    label="Oferecer lar temporário"
+                    description="Um canto em casa por alguns dias."
+                    value={foster}
+                    onValueChange={(value) =>
+                      update({
+                        isFosterAvailable: value,
+                        fosterPetTypes: currentSettings().fosterPetTypes.length
+                          ? currentSettings().fosterPetTypes
+                          : ['dog'],
+                        fosterMaxDays: currentSettings().fosterMaxDays ?? 7,
+                      })
+                    }
+                  />
+                </View>
+              </View>
+            </Card>
+            {transport || foster ? (
+              <View style={styles.block}>
+                <AppText variant="h3">Até onde você chega</AppText>
+                <View style={styles.chips}>
+                  {radiusChoices.map((km) => (
+                    <Chip
                       key={km}
-                      accessibilityRole="button"
+                      label={`${km} km`}
+                      selected={currentSettings().serviceRadiusKm === km}
                       onPress={() => update({ serviceRadiusKm: km })}
-                      style={[styles.chip, selected ? styles.chipOn : { backgroundColor: theme.surface }]}
-                    >
-                      <Text style={{ color: selected ? palette.acai : theme.text }}>{km} km</Text>
-                    </Pressable>
-                  );
-                })}
+                    />
+                  ))}
+                </View>
               </View>
-            </View>
-          ) : null}
-          {foster ? (
-            <View style={styles.block}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Quem você acolhe</Text>
-              <View style={styles.chips}>
-                {petChoices.map((pet) => {
-                  const selected = currentSettings().fosterPetTypes.includes(pet.id);
-                  return (
-                    <Pressable
-                      key={pet.id}
-                      accessibilityRole="button"
-                      onPress={() => togglePet(pet.id)}
-                      style={[styles.chip, selected ? styles.chipOn : { backgroundColor: theme.surface }]}
-                    >
-                      <Text style={{ color: selected ? palette.acai : theme.text }}>{pet.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Por quantos dias</Text>
-              <View style={styles.chips}>
-                {dayChoices.map((days) => {
-                  const selected = currentSettings().fosterMaxDays === days;
-                  return (
-                    <Pressable
-                      key={days}
-                      accessibilityRole="button"
-                      onPress={() => update({ fosterMaxDays: days })}
-                      style={[styles.chip, selected ? styles.chipOn : { backgroundColor: theme.surface }]}
-                    >
-                      <Text style={{ color: selected ? palette.acai : theme.text }}>{days} dias</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
-          {save.isError ? (
-            <Text style={[styles.note, { color: theme.muted }]}>{messageFrom(save.error)}</Text>
-          ) : null}
-          <Text style={[styles.level, { color: theme.text }]}>Selos</Text>
+            ) : null}
+            {foster ? (
+              <>
+                <View style={styles.block}>
+                  <AppText variant="h3">Quem você acolhe</AppText>
+                  <View style={styles.chips}>
+                    {petChoices.map((pet) => (
+                      <Chip
+                        key={pet.id}
+                        label={pet.label}
+                        selected={currentSettings().fosterPetTypes.includes(pet.id)}
+                        onPress={() => togglePet(pet.id)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.block}>
+                  <AppText variant="h3">Por quantos dias</AppText>
+                  <View style={styles.chips}>
+                    {dayChoices.map((days) => (
+                      <Chip
+                        key={days}
+                        label={`${days} dias`}
+                        selected={currentSettings().fosterMaxDays === days}
+                        onPress={() => update({ fosterMaxDays: days })}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </>
+            ) : null}
+            {save.isError ? <Notice tone="error" message={messageFrom(save.error)} /> : null}
+          </View>
+          <SectionHeader title="Selos" />
           <View style={styles.grid}>
             {(status.data?.badges ?? fallbackBadges).map((badge) => {
               const Art = badgeArt[badge.code];
               const unlocked = badge.unlockedAt !== null;
               return (
-                <View key={badge.code} style={styles.seal}>
+                <View
+                  key={badge.code}
+                  accessible
+                  accessibilityLabel={`${badge.name}, ${unlocked ? 'conquistado' : 'ainda não conquistado'}`}
+                  style={styles.seal}
+                >
                   <Art unlocked={unlocked} />
-                  <Text style={[styles.sealName, { color: theme.text }]}>{badge.name}</Text>
-                  <Text style={{ color: theme.muted, fontSize: 12 }}>
-                    {unlocked ? 'Seu' : 'Ainda não'}
-                  </Text>
+                  <AppText variant="caption" style={styles.sealName}>
+                    {badge.name}
+                  </AppText>
+                  <Badge
+                    kind="label"
+                    label={unlocked ? 'Seu' : 'Ainda não'}
+                    tone={unlocked ? 'success' : 'neutral'}
+                  />
                 </View>
               );
             })}
@@ -253,36 +247,19 @@ const fallbackBadges: VolunteerBadge[] = [
 ];
 
 const styles = StyleSheet.create({
-  screen: { paddingBottom: 32 },
-  column: { ...screenColumn, padding: 16, gap: 14 },
-  back: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '700' },
-  note: { fontSize: 15, lineHeight: 22 },
-  card: { borderRadius: 16, padding: 16, gap: 8 },
-  level: { fontSize: 20, fontWeight: '700' },
-  track: { height: 8, borderRadius: 999, overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 999, backgroundColor: palette.caju },
-  row: {
-    minHeight: 72,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rowTitle: { fontSize: 16, fontWeight: '700' },
-  block: { gap: 8 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: palette.caju },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  seal: { width: '30%', alignItems: 'center', gap: 6 },
-  sealName: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  screen: { flex: 1 },
+  scroll: { paddingBottom: spacing.xxxl },
+  column: screenColumn,
+  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  levelBox: { gap: spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  rowText: { flex: 1 },
+  block: { gap: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, paddingHorizontal: spacing.lg },
+  seal: { width: SEAL_COLUMN_WIDTH, alignItems: 'center', gap: spacing.xs },
+  sealName: { textAlign: 'center' },
 });
+
+// One broken screen must not take the whole app down.
+export { RouteErrorBoundary as ErrorBoundary } from '../src/crash/RouteErrorBoundary';

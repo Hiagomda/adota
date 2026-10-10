@@ -6,6 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await listPosts();
   return [
     { url: site, changeFrequency: 'hourly', priority: 1 },
+    { url: `${site}/adocao-responsavel`, changeFrequency: 'monthly', priority: 0.6 },
     ...posts.map((post) => ({
       url: `${site}/p/${post.id}`,
       lastModified: post.createdAt,

@@ -21,6 +21,8 @@ const envSchema = z.object({
   IMGPROXY_KEY: z.string().default(''),
   IMGPROXY_SALT: z.string().default(''),
   WEB_ORIGIN: z.string().min(1).default('http://localhost:3000'),
+  /** How many reverse proxies sit in front of the API. 1 is Caddy or Coolify. */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
 });
 
 export type Env = z.infer<typeof envSchema> & { authDevMode: boolean };

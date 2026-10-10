@@ -118,6 +118,7 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
     throw invalidResponse(path, response.status, 'body is not JSON');
   }
   if (!response.ok) {
+    if (response.status === 401 && init.token) onUnauthorized?.();
     const message = (payload as { message?: unknown } | null)?.message;
     throw new ApiError(
       response.status,
@@ -159,6 +160,13 @@ function messageForStatus(status: number): string {
   if (status === 429) return 'Muitas tentativas agora. Espere um pouco e tente de novo.';
   if (status >= 500) return 'O servidor está com problema. Tente de novo em instantes.';
   return 'Algo deu errado. Tente de novo.';
+}
+
+let onUnauthorized: (() => void) | null = null;
+
+/** Called when a request that sent a session token is rejected as expired or invalid. */
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
 }
 
 export function messageFrom(error: unknown): string {

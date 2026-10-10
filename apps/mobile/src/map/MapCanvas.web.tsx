@@ -6,7 +6,7 @@ import { belem, mapStyleUrl, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { pawUri } from './paw';
-import { palette } from '../theme';
+import { mapColors } from './layerColors';
 
 const clusterRadiusPx = 48;
 
@@ -45,13 +45,15 @@ export function MapCanvas({
   selectedId,
   tracking,
   onSelect,
-  onBounds,
+  onCommitBounds,
 }: {
   posts: Post[];
   selectedId: string | null;
   tracking: boolean;
+  /** Native map uses this to clear the tab bar. The web preview has no floating locate button. */
+  controlsBottom?: number;
   onSelect: (post: Post) => void;
-  onBounds?: (bounds: MapBounds) => void;
+  onCommitBounds?: (bounds: MapBounds) => void;
 }) {
   const host = useRef<HTMLElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -59,14 +61,14 @@ export function MapCanvas({
   const postsRef = useRef(posts);
   const selectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
-  const onBoundsRef = useRef(onBounds);
+  const onBoundsRef = useRef(onCommitBounds);
   const trackingRef = useRef(tracking);
 
   useEffect(() => {
     postsRef.current = posts;
     selectedRef.current = selectedId;
     onSelectRef.current = onSelect;
-    onBoundsRef.current = onBounds;
+    onBoundsRef.current = onCommitBounds;
     trackingRef.current = tracking;
   });
 
@@ -104,17 +106,17 @@ export function MapCanvas({
       markers.current = groupsOf(map, postsRef.current).map((group) => {
         const element = document.createElement('button');
         element.type = 'button';
-        element.style.border = `2px solid ${palette.areia}`;
+        element.style.border = `2px solid ${mapColors.clusterText}`;
         element.style.padding = '0';
         element.style.cursor = 'pointer';
-        element.style.color = palette.areia;
+        element.style.color = mapColors.clusterText;
         element.style.fontWeight = '700';
         if (group.posts.length > 1) {
           element.textContent = String(group.posts.length);
           element.style.width = '36px';
           element.style.height = '36px';
           element.style.borderRadius = '18px';
-          element.style.background = palette.acai;
+          element.style.background = mapColors.cluster;
           element.onclick = (event) => {
             event.preventDefault();
             event.stopPropagation();

@@ -1,33 +1,40 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, api } from '../../src/api';
+import { reportError } from '../../src/crash/reporter';
+import {
+  AppText,
+  Button,
+  Chip,
+  Icon,
+  Input,
+  Notice,
+  Segmented,
+  Touchable,
+} from '../../src/components/ui';
 import type { MapPoint } from '../../src/map/geo';
 import { insideServiceArea } from '../../src/map/serviceArea';
 import { useAddress, placeLabel } from '../../src/place/address';
 import { useAnimalGps } from '../../src/place/gps';
-import { openCreateCamera, setCreatePhotoCount, watchCreateCamera } from '../../src/createCamera';
+import {
+  openCreateCamera,
+  peekInitialCreateShot,
+  setCreatePhotoCount,
+  watchCreateCamera,
+} from '../../src/createCamera';
 import { Mascot } from '../../src/mascot';
 import { enqueueAlert } from '../../src/place/outbox';
+import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src/permissions';
 import { PlacePicker } from '../../src/place/PlacePicker';
 import { isOfflineError, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
-import { palette, screenColumn, useTheme } from '../../src/theme';
+import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 
 const suggestions = [
   'Está na rua e precisa de resgate agora.',
@@ -36,23 +43,58 @@ const suggestions = [
   'Filhotes sozinhos, sem a mãe por perto.',
 ];
 
+const kindOptions = [
+  { value: 'rescue_alert', label: 'Resgate' },
+  { value: 'lost', label: 'Perdido' },
+] as const;
+
+const speciesOptions = [
+  { value: 'dog', label: 'Cachorro' },
+  { value: 'cat', label: 'Gato' },
+  { value: 'other', label: 'Outro' },
+] as const;
+
+const urgencyOptions = [
+  { value: 'high', label: 'Urgente' },
+  { value: 'medium', label: 'Atenção' },
+  { value: 'low', label: 'Pode esperar' },
+] as const;
+
+const MAX_PHOTOS = 5;
+const MIN_COLUMN_WIDTH = 280;
+const INTRO_MASCOT = 72;
+const THUMB_RATIO = 1.25;
+const EMPTY_PHOTO_MIN = 180;
+const EMPTY_PHOTO_MAX = 240;
+const EMPTY_PHOTO_RATIO = 0.62;
+const BOTTOM_SPACE = spacing.giant * 2;
+
 export default function CreateScreen() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ kind?: string | string[] }>();
   const askedKind = Array.isArray(params.kind) ? params.kind[0] : params.kind;
   const insets = useSafeAreaInsets();
   const [columnWidth, setColumnWidth] = useState(0);
-  const contentWidth = Math.max(columnWidth, 280);
-  const thumb = Math.floor((contentWidth - 16) / 3);
+  const contentWidth = Math.max(columnWidth, MIN_COLUMN_WIDTH);
+  const thumb = Math.floor((contentWidth - spacing.sm * 2) / 3);
   const token = useSession((state) => state.token);
   const client = useQueryClient();
   const gps = useAnimalGps();
-  const [photos, setPhotos] = useState<string[]>([]);
-  const photosRef = useRef<string[]>([]);
+  const [bootShot] = useState(peekInitialCreateShot);
+  const [photos, setPhotos] = useState<string[]>(() =>
+    bootShot && 'uri' in bootShot ? [bootShot.uri] : [],
+  );
+  const photosRef = useRef<string[]>(photos);
   useEffect(() => {
     setCreatePhotoCount(photos.length);
   }, [photos]);
+  useLayoutEffect(() => {
+    setCreatePhotoCount(photosRef.current.length);
+    if (photosRef.current.length > 0) return;
+    if (bootShot && 'error' in bootShot) return;
+    openCreateCamera();
+  }, [bootShot]);
   const [description, setDescription] = useState('');
   const [reference, setReference] = useState('');
   const [kind, setKind] = useState<'rescue_alert' | 'lost'>(
@@ -67,14 +109,23 @@ export default function CreateScreen() {
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>('high');
   const [manual, setManual] = useState<MapPoint | null>(null);
   const [moved, setMoved] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessageState] = useState<{ text: string; settings: boolean } | null>(() =>
+    bootShot && 'error' in bootShot
+      ? { text: bootShot.error, settings: bootShot.blocked === true }
+      : null,
+  );
+  // `settings` adds the "open settings" action, the only way out of a blocked permission.
+  const setMessage = useCallback((text: string | null, settings = false) => {
+    setMessageState(text ? { text, settings } : null);
+  }, []);
+  const settingsAction = { label: openSettingsLabel, onPress: () => void openAppSettings() };
   const [pending, setPending] = useState(false);
   const located = gps.fix && insideServiceArea(gps.fix) ? gps.fix : null;
   const point = moved ? manual : located;
   const { address, looking } = useAddress(point);
 
   const addPhoto = useCallback((uri: string) => {
-    if (photosRef.current.length >= 5 || photosRef.current.includes(uri)) return;
+    if (photosRef.current.length >= MAX_PHOTOS || photosRef.current.includes(uri)) return;
     const next = [...photosRef.current, uri];
     photosRef.current = next;
     setCreatePhotoCount(next.length);
@@ -85,17 +136,28 @@ export default function CreateScreen() {
     openCreateCamera(true);
   }, []);
 
-  useEffect(() => watchCreateCamera((shot) => {
-    if ('uri' in shot) addPhoto(shot.uri);
-    else if ('error' in shot) setMessage(shot.error);
-  }), [addPhoto]);
+  useEffect(
+    () =>
+      watchCreateCamera((shot) => {
+        if ('uri' in shot) addPhoto(shot.uri);
+        else if ('error' in shot) setMessage(shot.error, shot.blocked === true);
+      }),
+    [addPhoto, setMessage],
+  );
 
   const pickFromLibrary = useCallback(() => {
-    if (photosRef.current.length >= 5) return;
+    if (photosRef.current.length >= MAX_PHOTOS) return;
     void (async () => {
       if (Platform.OS !== 'web') {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
+        const outcome = permissionOutcome(await ImagePicker.requestMediaLibraryPermissionsAsync());
+        if (outcome === 'blocked') {
+          setMessage(
+            'O acesso à galeria está bloqueado para o app. Libere nas configurações.',
+            true,
+          );
+          return;
+        }
+        if (outcome === 'denied') {
           setMessage('Preciso da galeria para anexar a foto do animal.');
           return;
         }
@@ -107,12 +169,16 @@ export default function CreateScreen() {
       const uri = result.canceled ? undefined : result.assets?.[0]?.uri;
       if (!uri) return;
       addPhoto(uri);
-    })();
-  }, [addPhoto]);
+    })().catch((error: unknown) => {
+      // The picker can fail when another activity is already open or storage is unavailable.
+      reportError(error, { source: 'handled', where: 'create:gallery' });
+      setMessage('Não consegui abrir a galeria. Tente de novo.');
+    });
+  }, [addPhoto, setMessage]);
 
   async function publish() {
     if (!token) {
-      setMessage('Entre numa conta para publicar o resgate.');
+      router.push({ pathname: '/login', params: { returnTo: '/create' } });
       return;
     }
     if (photos.length === 0 || description.trim().length === 0) {
@@ -156,11 +222,15 @@ export default function CreateScreen() {
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       if (created.reviewStatus === 'pending') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+          () => undefined,
+        );
         setMessage('Seu texto foi para revisão antes de aparecer para as outras pessoas.');
         return;
       }
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => undefined,
+      );
       router.push(`/post/${created.id}`);
     } catch (error) {
       if (isOfflineError(error)) {
@@ -170,11 +240,17 @@ export default function CreateScreen() {
         setPhotos([]);
         setDescription('');
         setReference('');
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
-        setMessage('Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.');
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+          () => undefined,
+        );
+        setMessage(
+          'Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.',
+        );
         return;
       }
-      setMessage(error instanceof ApiError ? error.message : 'Não consegui publicar. Tente de novo.');
+      setMessage(
+        error instanceof ApiError ? error.message : 'Não consegui publicar. Tente de novo.',
+      );
     } finally {
       setPending(false);
     }
@@ -183,11 +259,12 @@ export default function CreateScreen() {
   const coordinates = point
     ? `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`
     : 'Ponto ainda não definido';
+  const thumbSize = { width: thumb, height: Math.round(thumb * THUMB_RATIO) };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + BOTTOM_SPACE }]}
         keyboardShouldPersistTaps="handled"
       >
         <View
@@ -197,210 +274,228 @@ export default function CreateScreen() {
             setColumnWidth((current) => (current === next ? current : next));
           }}
         >
-        <View style={styles.intro}>
-          <Mascot pose={kind === 'lost' ? 'search' : 'sit'} size={72} />
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>
-            {photos.length === 0 ? 'Fotografar o animal' : 'Sobre o animal'}
-          </Text>
-        </View>
-        {photos.length === 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir a câmera"
-            style={[
-              styles.photoEmpty,
-              { height: Math.max(180, Math.min(240, Math.round(contentWidth * 0.62))), backgroundColor: theme.surface, borderColor: theme.line },
-            ]}
-            onPress={takePhoto}
-          >
-            <Feather name="camera" size={32} color={theme.text} />
-            <Text style={[styles.note, { color: theme.text }]}>Abrir a câmera</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.row}>
-            {photos.map((photo) => (
-              <Image
-                key={photo}
-                source={{ uri: photo }}
-                style={{ width: thumb, height: Math.round(thumb * 1.25), borderRadius: 12 }}
-              />
-            ))}
-            {photos.length < 5 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Tirar outra foto"
-                style={[
-                  styles.add,
-                  {
-                    width: thumb,
-                    height: Math.round(thumb * 1.25),
-                    backgroundColor: theme.surface,
-                    borderColor: theme.line,
-                  },
-                ]}
-                onPress={takePhoto}
-              >
-                <Feather name="camera" size={26} color={theme.text} />
-              </Pressable>
-            ) : null}
+          <View style={styles.intro}>
+            <Mascot pose={kind === 'lost' ? 'search' : 'sit'} size={INTRO_MASCOT} />
+            <AppText variant="h1" style={styles.introTitle}>
+              {photos.length === 0 ? 'Fotografar o animal' : 'Sobre o animal'}
+            </AppText>
           </View>
-        )}
-        <Pressable accessibilityRole="button" onPress={pickFromLibrary}>
-          <Text style={[styles.note, { color: theme.muted }]}>Escolher da galeria</Text>
-        </Pressable>
-        {photos.length === 0 ? (
-          <>
-            <Text style={[styles.note, { color: theme.muted }]}>
-              A foto vem primeiro. Espécie, urgência e o lugar entram depois.
-            </Text>
-            {message ? <Text style={[styles.note, { color: theme.muted }]}>{message}</Text> : null}
-          </>
-        ) : (
-          <>
-        <View style={styles.row}>
-          {(['rescue_alert', 'lost'] as const).map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.choice, kind === item ? styles.choiceOn : { backgroundColor: theme.surface }]}
-              onPress={() => setKind(item)}
+          {photos.length === 0 ? (
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir a câmera"
+              haptic="light"
+              pressedScale={0.98}
+              onPress={takePhoto}
+              style={[
+                styles.photoEmpty,
+                {
+                  height: Math.max(
+                    EMPTY_PHOTO_MIN,
+                    Math.min(EMPTY_PHOTO_MAX, Math.round(contentWidth * EMPTY_PHOTO_RATIO)),
+                  ),
+                  backgroundColor: colors.primarySoft,
+                  borderColor: colors.primary,
+                },
+              ]}
             >
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[styles.choiceText, { color: kind === item ? palette.acai : theme.muted }]}
-              >
-                {item === 'lost' ? 'Perdido' : 'Resgate'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.row}>
-          {(['dog', 'cat', 'other'] as const).map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.choice, species === item ? styles.choiceOn : { backgroundColor: theme.surface }]}
-              onPress={() => setSpecies(item)}
-            >
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[styles.choiceText, { color: species === item ? palette.acai : theme.muted }]}
-              >
-                {item === 'dog' ? 'Cachorro' : item === 'cat' ? 'Gato' : 'Outro'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.row}>
-          {(['high', 'medium', 'low'] as const).map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.choice, urgency === item ? styles.choiceOn : { backgroundColor: theme.surface }]}
-              onPress={() => setUrgency(item)}
-            >
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-                style={[styles.choiceText, { color: urgency === item ? palette.acai : theme.muted }]}
-              >
-                {item === 'high' ? 'Urgente' : item === 'medium' ? 'Atenção' : 'Pode esperar'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.suggestions}>
-          <Text style={[styles.note, { color: theme.muted }]}>Sugestões para a descrição</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionRow}>
-            {suggestions.map((text) => {
-              const selected = description === text;
-              return (
-                <Pressable
-                  key={text}
+              <Icon name="camera" size="xl" color={colors.onPrimarySoft} />
+              <AppText variant="button" style={{ color: colors.onPrimarySoft }}>
+                Abrir a câmera
+              </AppText>
+            </Touchable>
+          ) : (
+            <View style={styles.grid}>
+              {photos.map((photo) => (
+                <Image
+                  key={photo}
+                  source={{ uri: photo }}
+                  style={[styles.thumb, thumbSize]}
+                  contentFit="cover"
+                  accessibilityLabel="Foto do animal"
+                />
+              ))}
+              {photos.length < MAX_PHOTOS ? (
+                <Touchable
                   accessibilityRole="button"
-                  style={[styles.suggestion, selected ? styles.choiceOn : { backgroundColor: theme.surface }]}
-                  onPress={() => {
-                    void Haptics.selectionAsync().catch(() => undefined);
-                    setDescription(text);
-                  }}
+                  accessibilityLabel="Tirar outra foto"
+                  pressedScale={0.96}
+                  onPress={takePhoto}
+                  style={[
+                    styles.add,
+                    thumbSize,
+                    { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+                  ]}
                 >
-                  <Text
-                    style={[styles.suggestionText, { color: selected ? palette.acai : theme.text }]}
-                  >
-                    {text}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-        <TextInput
-          multiline
-          value={description}
-          onChangeText={setDescription}
-          placeholder="O que você viu e como o animal está"
-          placeholderTextColor={theme.muted}
-          style={[styles.input, { color: theme.text, borderColor: theme.line, backgroundColor: theme.surface }]}
-        />
-        <Text style={[styles.note, { color: theme.muted }]}>
-          {gps.fix && !located
-            ? 'Sua localização está fora de Belém. Mova o mapa até a área verde.'
-            : gps.message}
-        </Text>
-        <View>
-          <PlacePicker
-            focus={moved ? null : located}
-            accuracyM={moved ? null : (located?.accuracy ?? null)}
-            urgency={urgency}
-            onOutside={() => {
-              setMessage('Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.');
-            }}
-            onChange={(next, fromUser) => {
-              if (!fromUser || !insideServiceArea(next)) return;
-              setMoved(true);
-              setManual(next);
-              setMessage(null);
-            }}
-          />
-          {gps.status === 'loading' ? (
-            <View style={styles.loading}>
-              <ActivityIndicator color={palette.areia} />
-              <Text style={styles.loadingText}>Buscando o GPS...</Text>
+                  <Icon name="camera" size="lg" color={colors.onPrimarySoft} />
+                </Touchable>
+              ) : null}
             </View>
-          ) : null}
-        </View>
-        <Pressable
-          style={[styles.location, { borderColor: theme.text }]}
-          onPress={() => {
-            setMoved(false);
-            void gps.retry();
-          }}
-        >
-          <Text style={[styles.locationText, { color: theme.text }]}>Usar minha localização atual</Text>
-        </Pressable>
-        <Text style={[styles.address, { color: theme.text }]}>
-          {looking ? 'Buscando o endereço...' : (address ?? coordinates)}
-        </Text>
-        <TextInput
-          value={reference}
-          onChangeText={setReference}
-          placeholder="Ponto de referência, se quiser. Ex.: em frente à padaria"
-          placeholderTextColor={theme.muted}
-          style={[styles.reference, { color: theme.text, borderColor: theme.line, backgroundColor: theme.surface }]}
-        />
-        {gps.fix ? (
-          <Text style={[styles.note, { color: theme.muted }]}>
-            Precisão do GPS: {Math.round(gps.fix.accuracy)} m
-          </Text>
-        ) : null}
-        {message ? <Text style={[styles.note, { color: theme.muted }]}>{message}</Text> : null}
-        <Pressable style={styles.button} disabled={pending} onPress={() => void publish()}>
-          <Text style={styles.buttonText}>{pending ? 'Publicando...' : 'Publicar'}</Text>
-        </Pressable>
-          </>
-        )}
+          )}
+          <Button
+            title="Escolher da galeria"
+            icon="image"
+            variant="ghost"
+            onPress={pickFromLibrary}
+          />
+          {photos.length === 0 ? (
+            <>
+              <AppText variant="bodySmall" color="textSecondary">
+                A foto vem primeiro. Espécie, urgência e o lugar entram depois.
+              </AppText>
+              {message ? (
+                <Notice
+                  message={message.text}
+                  action={message.settings ? settingsAction : undefined}
+                />
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Segmented
+                accessibilityLabel="Tipo de publicação"
+                options={kindOptions}
+                value={kind}
+                onChange={setKind}
+              />
+              <View style={styles.group}>
+                <AppText variant="bodyStrong">Espécie</AppText>
+                <View style={styles.chips}>
+                  {speciesOptions.map((option) => (
+                    <Chip
+                      key={option.value}
+                      label={option.label}
+                      selected={species === option.value}
+                      onPress={() => setSpecies(option.value)}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.group}>
+                <AppText variant="bodyStrong">Urgência</AppText>
+                <View style={styles.chips}>
+                  {urgencyOptions.map((option) => (
+                    <Chip
+                      key={option.value}
+                      label={option.label}
+                      selected={urgency === option.value}
+                      onPress={() => setUrgency(option.value)}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.group}>
+                <AppText variant="bodySmall" color="textSecondary">
+                  Sugestões para a descrição
+                </AppText>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.suggestionRow}
+                >
+                  {suggestions.map((text) => (
+                    <Chip
+                      key={text}
+                      label={text}
+                      multiline
+                      selected={description === text}
+                      onPress={() => {
+                        void Haptics.selectionAsync().catch(() => undefined);
+                        setDescription(text);
+                      }}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+              <Input
+                label="Descrição"
+                multiline
+                value={description}
+                onChangeText={setDescription}
+                placeholder="O que você viu e como o animal está"
+              />
+              <AppText variant="bodySmall" color="textSecondary">
+                {gps.fix && !located
+                  ? 'Sua localização está fora de Belém. Mova o mapa até a área verde.'
+                  : gps.message}
+              </AppText>
+              {gps.action ? (
+                <Button
+                  title={gps.action.label}
+                  icon="settings"
+                  variant="ghost"
+                  onPress={() => void gps.action?.run()}
+                />
+              ) : null}
+              <View style={styles.map}>
+                <PlacePicker
+                  focus={moved ? null : located}
+                  accuracyM={moved ? null : (located?.accuracy ?? null)}
+                  urgency={urgency}
+                  onOutside={() => {
+                    setMessage(
+                      'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
+                    );
+                  }}
+                  onChange={(next, fromUser) => {
+                    if (!fromUser || !insideServiceArea(next)) return;
+                    setMoved(true);
+                    setManual(next);
+                    setMessage(null);
+                  }}
+                />
+                {gps.status === 'loading' ? (
+                  <View style={[styles.loading, { backgroundColor: colors.overlay }]}>
+                    <ActivityIndicator color={colors.onMedia} />
+                    <AppText variant="bodyStrong" style={{ color: colors.onMedia }}>
+                      Buscando o GPS...
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
+              <Button
+                title="Usar minha localização atual"
+                icon="crosshair"
+                variant="outline"
+                fullWidth
+                onPress={() => {
+                  setMoved(false);
+                  void gps.retry();
+                }}
+              />
+              <View style={styles.address}>
+                <Icon name="map-pin" color={colors.primary} />
+                <AppText variant="bodyStrong" style={styles.addressText}>
+                  {looking ? 'Buscando o endereço...' : (address ?? coordinates)}
+                </AppText>
+              </View>
+              <Input
+                label="Ponto de referência"
+                value={reference}
+                onChangeText={setReference}
+                placeholder="Se quiser. Ex.: em frente à padaria"
+              />
+              {gps.fix ? (
+                <AppText variant="caption" color="textSecondary">
+                  Precisão do GPS: {Math.round(gps.fix.accuracy)} m
+                </AppText>
+              ) : null}
+              {message ? (
+                <Notice
+                  message={message.text}
+                  action={message.settings ? settingsAction : undefined}
+                />
+              ) : null}
+              <Button
+                title={pending ? 'Publicando...' : 'Publicar'}
+                icon="send"
+                size="lg"
+                loading={pending}
+                fullWidth
+                onPress={() => void publish()}
+              />
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -408,88 +503,42 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 16 },
-  column: { ...screenColumn, gap: 16 },
-  intro: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { fontSize: 28, fontWeight: '700' },
-  note: { fontSize: 14, lineHeight: 20 },
-  address: { fontSize: 15, lineHeight: 21 },
-  row: { flexDirection: 'row', gap: 8 },
+  screen: { flex: 1 },
+  content: { padding: spacing.lg, gap: spacing.lg },
+  column: { ...screenColumn, gap: spacing.lg },
+  intro: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  introTitle: { flex: 1 },
   photoEmpty: {
     width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  thumb: { borderRadius: radius.md },
   add: {
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  input: {
-    minHeight: 120,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    fontSize: 16,
-    textAlignVertical: 'top',
-  },
-  reference: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    fontSize: 16,
-  },
-  suggestions: { gap: 8 },
-  suggestionRow: { gap: 8, paddingRight: 8 },
-  suggestion: {
-    maxWidth: 220,
-    minHeight: 44,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    justifyContent: 'center',
-  },
-  suggestionText: { fontSize: 14, lineHeight: 18 },
-  choice: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  choiceOn: { backgroundColor: palette.caju },
-  choiceText: { fontWeight: '700', textAlign: 'center' },
-  location: {
-    minHeight: 52,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  locationText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  button: {
-    minHeight: 52,
-    borderRadius: 999,
-    backgroundColor: palette.caju,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  buttonText: { color: palette.acai, fontSize: 17, fontWeight: '700' },
+  group: { gap: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  suggestionRow: { gap: spacing.sm, paddingRight: spacing.sm },
+  map: { borderRadius: radius.lg, overflow: 'hidden' },
   loading: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(23, 59, 63, 0.45)',
-    borderRadius: 16,
-    gap: 8,
+    gap: spacing.sm,
   },
-  loadingText: { color: palette.areia, fontWeight: '700' },
+  address: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  addressText: { flex: 1 },
 });
+
+// One broken screen must not take the whole app down.
+export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';

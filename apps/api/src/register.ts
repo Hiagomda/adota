@@ -20,19 +20,28 @@ import {
   profileByHandle,
   updateProfile,
 } from './accounts.js';
+import { requireAdmin, requireUser } from './authz.js';
 import type { Env } from './config.js';
 import { addResponse, changeStatus, createPost, getPost, listPosts } from './feed.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
-import { presignUploads } from './media.js';
-import { enqueueRescueAlert, notifyStatusChange, type createQueue } from './notify.js';
+import { presignUploads, verifyUploadedImages } from './media.js';
+import {
+  enqueueRescueAlert,
+  notifyDiaryNote,
+  notifyStatusChange,
+  type createQueue,
+} from './notify.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
+import { stripControls } from './text.js';
 
 type RescueQueue = ReturnType<typeof createQueue>;
 
 const devLoginSchema = z.object({ email: z.string().trim().email() });
-const commentSchema = z.object({ body: z.string().trim().min(1).max(500) });
+const commentSchema = z.object({
+  body: z.string().trim().min(1).max(500).transform(stripControls),
+});
 const reportSchema = z.object({
   targetType: z.enum(['post', 'comment', 'user']),
   targetId: z.string().uuid(),
@@ -69,13 +78,17 @@ export async function registerRoutes(
     firebase: Boolean(env.FIREBASE_PROJECT_ID),
   }));
 
-  app.post('/auth/dev-login', async (request) => {
-    if (!env.authDevMode) throw new HttpError(404, 'Esse acesso não está disponível.');
-    const { email } = parse(devLoginSchema, request.body);
-    const existing = await findUserByFirebaseUid(pool, `dev:${email}`);
-    const user = existing ?? (await createDevUser(pool, email));
-    return { token: `dev:${email}`, user: publicUser(user) };
-  });
+  app.post(
+    '/auth/dev-login',
+    { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request) => {
+      if (!env.authDevMode) throw new HttpError(404, 'Esse acesso não está disponível.');
+      const { email } = parse(devLoginSchema, request.body);
+      const existing = await findUserByFirebaseUid(pool, `dev:${email}`);
+      const user = existing ?? (await createDevUser(pool, email));
+      return { token: `dev:${email}`, user: publicUser(user) };
+    },
+  );
 
   app.get('/me', async (request) => publicUser(requireUser(request.user)));
 
@@ -131,13 +144,16 @@ export async function registerRoutes(
   });
 
   app.get('/users/:handle', async (request) => {
-    const { handle } = request.params as { handle: string };
+    const { handle } = parse(
+      z.object({ handle: z.string().trim().min(1).max(40) }),
+      request.params,
+    );
     return profileByHandle(db, pool, handle, request.user?.id ?? null);
   });
 
   app.post('/users/:id/follow', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode seguir a própria conta.');
     await pool.query(
       `INSERT INTO follows (follower_id, followed_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -148,7 +164,7 @@ export async function registerRoutes(
 
   app.delete('/users/:id/follow', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     await pool.query(`DELETE FROM follows WHERE follower_id = $1 AND followed_id = $2`, [
       user.id,
       id,
@@ -158,7 +174,7 @@ export async function registerRoutes(
 
   app.post('/users/:id/block', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode bloquear a própria conta.');
     await pool.query(
       `INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -173,7 +189,7 @@ export async function registerRoutes(
 
   app.delete('/users/:id/block', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     await pool.query(`DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, [user.id, id]);
     return { blocked: false };
   });
@@ -188,21 +204,25 @@ export async function registerRoutes(
     },
   );
 
-  app.get('/geocode/reverse', async (request) => {
-    const query = parse(
-      z.object({
-        latitude: z.coerce.number().gte(-90).lte(90),
-        longitude: z.coerce.number().gte(-180).lte(180),
-      }),
-      request.query,
-    );
-    try {
-      const address = await reverseAddress(query.latitude, query.longitude);
-      return { address };
-    } catch {
-      return { address: null };
-    }
-  });
+  app.get(
+    '/geocode/reverse',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request) => {
+      const query = parse(
+        z.object({
+          latitude: z.coerce.number().gte(-90).lte(90),
+          longitude: z.coerce.number().gte(-180).lte(180),
+        }),
+        request.query,
+      );
+      try {
+        const address = await reverseAddress(query.latitude, query.longitude);
+        return { address };
+      } catch {
+        return { address: null };
+      }
+    },
+  );
 
   app.get('/posts', async (request) => {
     const query = parse(feedQuerySchema, request.query);
@@ -233,7 +253,7 @@ export async function registerRoutes(
   });
 
   app.get('/posts/:id', async (request) => {
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     return getPost(pool, env, id, request.user);
   });
 
@@ -243,6 +263,14 @@ export async function registerRoutes(
     async (request, reply) => {
       const user = requireUser(request.user);
       const body = parse(createPostSchema, request.body);
+      if (!body.parentPostId) {
+        await verifyUploadedImages(
+          env,
+          storage,
+          user.id,
+          body.media.map((item) => item.url),
+        );
+      }
       const created = await createPost(pool, env, user, body);
       if (
         body.type === 'rescue_alert' &&
@@ -251,13 +279,22 @@ export async function registerRoutes(
       ) {
         await enqueueRescueAlert(queue, created.id, body.urgency).catch(() => undefined);
       }
+      if (body.parentPostId && created.reviewStatus === 'published') {
+        await notifyDiaryNote(
+          pool,
+          env,
+          body.parentPostId,
+          user.id,
+          stripControls(body.description),
+        ).catch(() => undefined);
+      }
       return reply.code(201).send(created);
     },
   );
 
   app.patch('/posts/:id/status', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(z.object({ status: animalStatusSchema }), request.body);
     await changeStatus(pool, id, user, body.status);
     await notifyStatusChange(pool, env, id, body.status).catch(() => undefined);
@@ -269,7 +306,7 @@ export async function registerRoutes(
     { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const user = requireUser(request.user);
-      const { id } = request.params as { id: string };
+      const id = resourceId(request.params);
       const body = parse(
         z.object({ kind: responseKindSchema, note: z.string().max(300).optional() }),
         request.body,
@@ -280,13 +317,28 @@ export async function registerRoutes(
   );
 
   app.get('/posts/:id/comments', async (request) => {
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const result = await pool.query(
       `SELECT c.id, c.body, c.created_at, u.id AS user_id, u.name, u.handle, u.avatar_url
-       FROM comments c JOIN users u ON u.id = c.user_id
-       WHERE c.post_id = $1 AND c.hidden = false
+       FROM comments c
+       JOIN users u ON u.id = c.user_id
+       JOIN posts p ON p.id = c.post_id
+       WHERE c.post_id = $1
+         AND c.hidden = false
+         AND p.hidden = false
+         AND p.review_status = 'published'
+         AND u.deleted_at IS NULL
+         AND u.suspended = false
+         AND (
+           $2::uuid IS NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = $2 AND b.blocked_id = c.user_id)
+                OR (b.blocker_id = c.user_id AND b.blocked_id = $2)
+           )
+         )
        ORDER BY c.created_at ASC`,
-      [id],
+      [id, request.user?.id ?? null],
     );
     return {
       comments: rowsOf<{
@@ -316,7 +368,7 @@ export async function registerRoutes(
     { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const user = requireUser(request.user);
-      const { id } = request.params as { id: string };
+      const id = resourceId(request.params);
       const body = parse(commentSchema, request.body);
       const inserted = await pool.query<{ id: string }>(
         `INSERT INTO comments (post_id, user_id, body) VALUES ($1, $2, $3) RETURNING id`,
@@ -331,7 +383,7 @@ export async function registerRoutes(
 
   app.post('/posts/:id/follow', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     await pool.query(
       `INSERT INTO post_follows (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [user.id, id],
@@ -341,14 +393,14 @@ export async function registerRoutes(
 
   app.delete('/posts/:id/follow', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     await pool.query(`DELETE FROM post_follows WHERE user_id = $1 AND post_id = $2`, [user.id, id]);
     return { following: false };
   });
 
   app.post('/posts/:id/story-view', async (request) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     await pool.query(
       `INSERT INTO story_views (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [user.id, id],
@@ -357,7 +409,7 @@ export async function registerRoutes(
   });
 
   app.get('/posts/:id/fosters', async (request) => {
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const result = await pool.query(
       `SELECT u.id, u.name, u.handle, u.verified, f.capacity,
               ST_Distance(f.location, p.location) AS meters
@@ -417,7 +469,7 @@ export async function registerRoutes(
 
   app.post('/posts/:id/adoption-term', async (request, reply) => {
     const user = requireUser(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(adoptionSchema, request.body);
     const post = await pool.query<{ status: string }>(`SELECT status FROM posts WHERE id = $1`, [
       id,
@@ -491,7 +543,7 @@ export async function registerRoutes(
 
   app.post('/admin/reports/:id', async (request) => {
     requireAdmin(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['hide', 'dismiss']) }), request.body);
     const report = await pool.query<{ target_type: string; target_id: string }>(
       `SELECT target_type, target_id FROM reports WHERE id = $1`,
@@ -529,7 +581,7 @@ export async function registerRoutes(
 
   app.post('/admin/verifications/:id', async (request) => {
     requireAdmin(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(
       z.object({
         action: z.enum(['approve', 'reject']),
@@ -558,7 +610,7 @@ export async function registerRoutes(
 
   app.post('/admin/posts/:id/review', async (request) => {
     requireAdmin(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['approve', 'reject']) }), request.body);
     const status = body.action === 'approve' ? 'published' : 'rejected';
     const updated = await pool.query<{ type: string; urgency: 'high' | 'medium' | 'low' }>(
@@ -575,7 +627,7 @@ export async function registerRoutes(
 
   app.post('/admin/users/:id/suspend', async (request) => {
     requireAdmin(request.user);
-    const { id } = request.params as { id: string };
+    const id = resourceId(request.params);
     const body = parse(z.object({ suspended: z.boolean() }), request.body);
     await pool.query(`UPDATE users SET suspended = $2 WHERE id = $1`, [id, body.suspended]);
     return { suspended: body.suspended };
@@ -610,7 +662,7 @@ async function toggle(
   request: { user: SessionUser | null; params: unknown },
 ) {
   const user = requireUser(request.user);
-  const { id } = request.params as { id: string };
+  const id = resourceId(request.params);
   const existing = await pool.query(`SELECT 1 FROM ${table} WHERE user_id = $1 AND post_id = $2`, [
     user.id,
     id,
@@ -623,16 +675,8 @@ async function toggle(
   return { active: true };
 }
 
-function requireUser(user: SessionUser | null): SessionUser {
-  if (!user) throw new HttpError(401, 'Entre na sua conta para continuar.');
-  return user;
-}
-
-function requireAdmin(user: SessionUser | null): SessionUser {
-  const current = requireUser(user);
-  if (current.role !== 'admin')
-    throw new HttpError(403, 'Só a equipe da Égua, adota! pode fazer isso.');
-  return current;
+function resourceId(params: unknown): string {
+  return parse(z.object({ id: z.string().uuid() }), params).id;
 }
 
 function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.output<Schema> {
@@ -655,7 +699,7 @@ async function resolveUser(
   try {
     const admin = await import('firebase-admin');
     if (admin.apps.length === 0) admin.initializeApp({ projectId: env.FIREBASE_PROJECT_ID });
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await admin.auth().verifyIdToken(token, true);
     const existing = await findUserByFirebaseUid(pool, decoded.uid);
     if (existing) return existing;
     const email = decoded.email ?? `${decoded.uid}@firebase.local`;

@@ -16,6 +16,7 @@ const env: Env = {
   IMGPROXY_URL: 'http://localhost:8080',
   IMGPROXY_KEY: '',
   IMGPROXY_SALT: '',
+  TRUST_PROXY_HOPS: 1,
   WEB_ORIGIN: 'http://localhost:3000',
 };
 

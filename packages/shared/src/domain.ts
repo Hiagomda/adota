@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const roleSchema = z.enum(['user', 'protector', 'ngo', 'admin']);
+export const roleSchema = z.enum(['user', 'protector', 'ngo', 'moderator', 'admin']);
 export const speciesSchema = z.enum(['dog', 'cat', 'other']);
 export const sizeSchema = z.enum(['small', 'medium', 'large']);
 export const sexSchema = z.enum(['male', 'female', 'unknown']);
@@ -103,24 +103,26 @@ export const feedQuerySchema = z.object({
   adopted: z.enum(['true', 'false']).optional(),
 });
 
-export const updateMeSchema = z.object({
-  name: z.string().trim().min(1).max(80).optional(),
-  handle: z
-    .string()
-    .trim()
-    .regex(/^[a-z0-9._]{3,24}$/)
-    .optional(),
-  phone: z.string().trim().max(20).nullable().optional(),
-  whatsappOptIn: z.boolean().optional(),
-  city: z.string().trim().max(80).nullable().optional(),
-  alertRadiusKm: z.number().int().min(1).max(100).optional(),
-  avatarUrl: z.string().trim().url().nullable().optional(),
-  notificationsEnabled: z.boolean().optional(),
-  quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
-  quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
-  latitude: z.number().gte(-90).lte(90).optional(),
-  longitude: z.number().gte(-180).lte(180).optional(),
-});
+export const updateMeSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    handle: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9._]{3,24}$/)
+      .optional(),
+    phone: z.string().trim().max(20).nullable().optional(),
+    whatsappOptIn: z.boolean().optional(),
+    city: z.string().trim().max(80).nullable().optional(),
+    alertRadiusKm: z.number().int().min(1).max(100).optional(),
+    avatarUrl: z.string().trim().url().nullable().optional(),
+    notificationsEnabled: z.boolean().optional(),
+    quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
+    quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
+    latitude: z.number().gte(-90).lte(90).optional(),
+    longitude: z.number().gte(-180).lte(180).optional(),
+  })
+  .strict();
 
 export const presignSchema = z.object({
   files: z

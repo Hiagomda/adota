@@ -1,25 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  AppState,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useTheme } from '../theme';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
+import { AppModal, AppText, Button } from '../components/ui';
+import { reportError } from '../crash/reporter';
+import { spacing, useTheme } from '../theme';
 import { applyOtaUpdate, checkForAppUpdate, type AppUpdateOffer } from './checkForAppUpdate';
+import { installApk, openInstallPermission } from './installApk';
 
 type PromptState =
   | { phase: 'hidden' }
   | { phase: 'ask'; offer: AppUpdateOffer }
-  | { phase: 'downloading'; offer: AppUpdateOffer }
-  | { phase: 'error'; offer: AppUpdateOffer };
+  | { phase: 'downloading'; offer: AppUpdateOffer; ratio: number | null }
+  | { phase: 'error'; offer: AppUpdateOffer; needsPermission: boolean };
 
 export function UpdatePrompt() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const [prompt, setPrompt] = useState<PromptState>({ phase: 'hidden' });
   const snoozed = useRef(false);
   const checking = useRef(false);
@@ -66,23 +60,33 @@ export function UpdatePrompt() {
 
   async function accept(offer: AppUpdateOffer) {
     if (offer.kind === 'native') {
+      phase.current = 'downloading';
+      setPrompt({ phase: 'downloading', offer, ratio: null });
       try {
-        await Linking.openURL(offer.apkUrl);
-        dismiss();
-      } catch {
+        await installApk(offer.apkUrl, (progress) => {
+          if (phase.current !== 'downloading') return;
+          setPrompt({ phase: 'downloading', offer, ratio: progress.ratio });
+        });
+        phase.current = 'hidden';
+        setPrompt({ phase: 'hidden' });
+      } catch (error) {
+        reportError(error, { source: 'handled', where: 'update:install-apk' });
+        const text = error instanceof Error ? error.message.toLowerCase() : '';
+        const needsPermission = text.includes('permission') || text.includes('denied');
         phase.current = 'error';
-        setPrompt({ phase: 'error', offer });
+        setPrompt({ phase: 'error', offer, needsPermission });
       }
       return;
     }
 
     phase.current = 'downloading';
-    setPrompt({ phase: 'downloading', offer });
+    setPrompt({ phase: 'downloading', offer, ratio: null });
     try {
       await applyOtaUpdate();
-    } catch {
+    } catch (error) {
+      reportError(error, { source: 'handled', where: 'update:ota-apply' });
       phase.current = 'error';
-      setPrompt({ phase: 'error', offer });
+      setPrompt({ phase: 'error', offer, needsPermission: false });
     }
   }
 
@@ -90,117 +94,72 @@ export function UpdatePrompt() {
   const offer = prompt.phase === 'hidden' ? null : prompt.offer;
   const native = offer?.kind === 'native';
   const busy = prompt.phase === 'downloading';
+  const needsPermission = prompt.phase === 'error' && prompt.needsPermission;
+  const ratio = prompt.phase === 'downloading' ? prompt.ratio : null;
+  const actionLabel = needsPermission
+    ? 'Permitir instalação'
+    : prompt.phase === 'error'
+      ? 'Tentar de novo'
+      : native
+        ? 'Instalar agora'
+        : 'Atualizar';
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={dismiss}
-      accessibilityViewIsModal
+      onClose={dismiss}
+      title={native ? 'Nova versão do aplicativo' : 'Atualização disponível'}
+      dismissable={!busy}
     >
-      <View style={styles.backdrop}>
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            {native ? 'Nova versão do aplicativo' : 'Atualização disponível'}
-          </Text>
-          <Text style={[styles.body, { color: theme.muted }]}>
-            {prompt.phase === 'error'
-              ? 'Não consegui concluir a atualização. Tente de novo daqui a pouco.'
-              : native
-                ? 'Esta atualização precisa de um aplicativo novo. Baixe o arquivo e confirme a instalação no Android.'
-                : 'Tem uma versão nova do Égua, adota!. Quer baixar e abrir agora?'}
-          </Text>
-          {busy ? (
-            <View style={styles.busy} accessibilityRole="progressbar">
-              <ActivityIndicator color={theme.accent} />
-              <Text style={{ color: theme.text }}>Baixando a atualização…</Text>
-            </View>
-          ) : (
-            <View style={styles.actions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Agora não"
-                onPress={dismiss}
-                style={[styles.button, styles.secondary, { borderColor: theme.line }]}
-              >
-                <Text style={[styles.buttonText, { color: theme.text }]}>Agora não</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  prompt.phase === 'error'
-                    ? 'Tentar de novo'
-                    : native
-                      ? 'Baixar o app'
-                      : 'Atualizar'
-                }
-                onPress={() => {
-                  if (offer) void accept(offer);
-                }}
-                style={[styles.button, { backgroundColor: theme.accent }]}
-              >
-                <Text style={[styles.buttonText, { color: theme.onAccent }]}>
-                  {prompt.phase === 'error'
-                    ? 'Tentar de novo'
-                    : native
-                      ? 'Baixar o app'
-                      : 'Atualizar'}
-                </Text>
-              </Pressable>
-            </View>
-          )}
+      <AppText color="textSecondary">
+        {prompt.phase === 'error'
+          ? needsPermission
+            ? 'O Android precisa da sua permissão para instalar a atualização por aqui.'
+            : 'Não consegui concluir a atualização. Tente de novo daqui a pouco.'
+          : native
+            ? 'A atualização baixa aqui no app e abre o instalador do Android. Não passa pelo navegador.'
+            : 'Tem uma versão nova do Égua, adota!. Quer baixar e abrir agora?'}
+      </AppText>
+      {busy ? (
+        <View style={styles.busy} accessibilityRole="progressbar">
+          <ActivityIndicator color={colors.primary} />
+          <AppText>
+            {ratio === null
+              ? 'Baixando a atualização…'
+              : `Baixando a atualização… ${Math.round(ratio * 100)}%`}
+          </AppText>
         </View>
-      </View>
-    </Modal>
+      ) : (
+        <View style={styles.actions}>
+          <Button
+            title={actionLabel}
+            variant="secondary"
+            fullWidth
+            onPress={() => {
+              if (!offer) return;
+              if (needsPermission) {
+                void openInstallPermission().catch((error: unknown) => {
+                  reportError(error, { source: 'handled', where: 'update:install-permission' });
+                });
+                return;
+              }
+              void accept(offer);
+            }}
+          />
+          <Button title="Agora não" variant="ghost" fullWidth onPress={dismiss} />
+        </View>
+      )}
+    </AppModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: 'rgba(23, 59, 63, 0.45)',
-  },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  body: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  button: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  secondary: {
-    borderWidth: 1,
-  },
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  actions: { gap: spacing.sm, paddingTop: spacing.sm },
   busy: {
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: spacing.md,
   },
 });

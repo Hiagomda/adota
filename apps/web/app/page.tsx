@@ -23,7 +23,6 @@ export default async function HomePage({
 
   return (
     <Feed
-      activeType={query.type}
       stories={visible
         .filter((post) => post.media[0])
         .slice(0, 8)

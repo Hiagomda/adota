@@ -13,6 +13,7 @@ import {
   Send,
   Sparkles,
 } from 'lucide-react';
+import { SectionTabs } from './section-tabs';
 
 export interface FeedPost {
   id: string;
@@ -30,22 +31,12 @@ export interface FeedPost {
   urgency: string;
 }
 
-const filters = [
-  { label: 'Todos', href: '/', type: undefined },
-  { label: 'Resgates', href: '/?type=rescue_alert', type: 'rescue_alert' },
-  { label: 'Perdidos', href: '/?type=lost', type: 'lost' },
-  { label: 'Adoções', href: '/?type=adoption', type: 'adoption' },
-  { label: 'Ajuda', href: '/?type=help_request', type: 'help_request' },
-] as const;
-
 export function Feed({
   posts,
   stories,
-  activeType,
 }: {
   posts: FeedPost[];
   stories: { id: string; name: string; image: string }[];
-  activeType?: string;
 }) {
   const [liked, setLiked] = useState<string[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
@@ -84,23 +75,7 @@ export function Feed({
         ))}
       </div>
 
-      <div className="mb-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        {filters.map((filter) => {
-          const active = (filter.type ?? undefined) === activeType;
-          return (
-            <Link
-              key={filter.label}
-              href={filter.href}
-              data-active={active}
-              className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold ${
-                active ? 'bg-[#6b2454] text-white' : 'bg-white text-[#5e4556]'
-              }`}
-            >
-              {filter.label}
-            </Link>
-          );
-        })}
-      </div>
+      <SectionTabs />
 
       <div className="mb-3 border-y border-[#eadfe4] bg-white p-4">
         <div className="flex items-center gap-3">

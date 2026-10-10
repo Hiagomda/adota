@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { type HealthResponse } from '@patinha/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -46,9 +47,23 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
   }
 
   const app = Fastify({
-    logger: env.NODE_ENV !== 'test',
+    // Any positive hop count means the API is behind our proxy. 0 keeps the socket address.
+    trustProxy: env.TRUST_PROXY_HOPS > 0,
+    bodyLimit: 256 * 1024,
+    logger:
+      env.NODE_ENV === 'test'
+        ? false
+        : {
+            redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'],
+          },
   });
 
+  await app.register(helmet, {
+    // The API is JSON. CSP belongs on the web app. HSTS waits until this host is served over HTTPS.
+    contentSecurityPolicy: false,
+    hsts: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  });
   await app.register(cors, {
     origin: env.NODE_ENV === 'production' ? [env.WEB_ORIGIN] : true,
   });
@@ -56,6 +71,11 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
     global: true,
     max: 300,
     timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Muitas tentativas. Espere um minuto e tente de novo.',
+    }),
   });
 
   app.setErrorHandler((error, request, reply) => {

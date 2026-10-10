@@ -3,18 +3,26 @@ import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, messageFrom } from '../src/api';
+import { PostCard } from '../src/components/PostCard';
+import {
+  AppText,
+  Button,
+  EmptyState,
+  ErrorState,
+  Header,
+  SkeletonCard,
+} from '../src/components/ui';
 import { useSession } from '../src/session';
-import { palette, screenColumn, useTheme } from '../src/theme';
+import { screenColumn, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
-import { EmptyState, PostCard, SkeletonCard } from '../src/ui';
 
 const emptyPosts: Post[] = [];
 
 export default function LostScreen() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
@@ -62,38 +70,32 @@ export default function LostScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.column}>
-        <View style={styles.header}>
-          <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-            <Text style={{ color: theme.text, fontSize: 16 }}>Voltar</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: theme.text }]}>Animais perdidos</Text>
-          <Text style={[styles.note, { color: theme.muted }]}>
-            Se o seu sumiu, a gente te ajuda a procurar.
-          </Text>
-        </View>
+        <Header title="Animais perdidos" onBack={() => router.back()} />
+        <AppText color="textSecondary" style={styles.intro}>
+          Se o seu sumiu, a gente te ajuda a procurar.
+        </AppText>
         {feed.isLoading ? (
           <SkeletonCard />
         ) : feed.isError ? (
-          <EmptyState
-            pose="sad"
+          <ErrorState
             title="Não consegui carregar os perdidos"
             body={messageFrom(feed.error)}
-            actionLabel="Tentar de novo"
-            onAction={() => void feed.refetch()}
+            onRetry={() => void feed.refetch()}
           />
         ) : (
           <FlashList
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+            style={styles.screen}
+            contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
             data={feed.data?.posts ?? emptyPosts}
             keyExtractor={(post) => post.id}
             refreshControl={
               <RefreshControl
                 refreshing={feed.isRefetching}
                 onRefresh={() => void feed.refetch()}
-                tintColor={theme.text}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
               />
             }
             ListEmptyComponent={
@@ -109,13 +111,14 @@ export default function LostScreen() {
           />
         )}
         {(feed.data?.posts.length ?? 0) > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.publish, { marginBottom: insets.bottom + 12 }]}
-            onPress={() => router.push('/create?kind=lost')}
-          >
-            <Text style={styles.publishText}>Publicar animal perdido</Text>
-          </Pressable>
+          <View style={[styles.publish, { paddingBottom: insets.bottom + spacing.md }]}>
+            <Button
+              title="Publicar animal perdido"
+              icon="plus"
+              fullWidth
+              onPress={() => router.push('/create?kind=lost')}
+            />
+          </View>
         ) : null}
       </View>
     </SafeAreaView>
@@ -123,18 +126,11 @@ export default function LostScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   column: { flex: 1, ...screenColumn },
-  header: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
-  back: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '700' },
-  note: { fontSize: 14, lineHeight: 20 },
-  publish: {
-    marginHorizontal: 16,
-    minHeight: 48,
-    borderRadius: 999,
-    backgroundColor: palette.caju,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  publishText: { color: palette.acai, fontSize: 16, fontWeight: '700' },
+  intro: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  publish: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
 });
+
+// One broken screen must not take the whole app down.
+export { RouteErrorBoundary as ErrorBoundary } from '../src/crash/RouteErrorBoundary';

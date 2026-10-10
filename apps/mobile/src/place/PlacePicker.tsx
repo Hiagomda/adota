@@ -10,7 +10,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
 import { insideServiceArea, serviceCamera, serviceOutline } from '../map/serviceArea';
-import { palette } from '../theme';
+import { mapColors } from '../map/layerColors';
+import { radius } from '../theme';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
 
@@ -90,14 +91,14 @@ export function PlacePicker({
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer
             id="service-outline-line"
-            style={{ lineColor: '#1F8F4E', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
+            style={{ lineColor: mapColors.areaOutline, lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
           />
         </ShapeSource>
         {circle ? (
           <ShapeSource id="accuracy" shape={circle}>
             <FillLayer
               id="accuracy-fill"
-              style={{ fillColor: palette.caju, fillOpacity: 0.2 }}
+              style={{ fillColor: mapColors.accuracy, fillOpacity: 0.2 }}
             />
           </ShapeSource>
         ) : null}
@@ -110,7 +111,7 @@ export function PlacePicker({
 }
 
 const styles = StyleSheet.create({
-  frame: { borderRadius: 16, overflow: 'hidden' },
+  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#E7F0EE' },
   map: { flex: 1 },
   pinLayer: {
     ...StyleSheet.absoluteFill,

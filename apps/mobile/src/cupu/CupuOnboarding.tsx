@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Modal,
-  Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { AppText, Button } from '../components/ui';
 import { useSession } from '../session';
-import { palette } from '../theme';
+import { motion, radius, spacing, useMotionDuration, useTheme } from '../theme';
 import { vocativeFromName } from '../vocative';
 import { hasSeenCupuOnboarding, markCupuOnboardingSeen } from './onboardingStorage';
 
@@ -43,7 +43,18 @@ const steps: {
   },
 ];
 
+const CARD_MAX_WIDTH = 360;
+const MASCOT_WIDTH = 210;
+const MASCOT_HEIGHT = 200;
+const PLATE = 230;
+const MASCOT_OVERLAP = 92;
+const CARD_TOP_SPACE = 96;
+const PAGES_MIN_HEIGHT = 168;
+const DOT = 8;
+
 export default function CupuOnboarding() {
+  const { colors, shadows } = useTheme();
+  const duration = useMotionDuration();
   const { width } = useWindowDimensions();
   const ready = useSession((state) => state.ready);
   const cupuPrompt = useSession((state) => state.cupuPrompt);
@@ -61,7 +72,7 @@ export default function CupuOnboarding() {
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
   const [pageWidth, setPageWidth] = useState(0);
-  const cardWidth = Math.min(width - 48, 360);
+  const cardWidth = Math.min(width - spacing.xxl * 2, CARD_MAX_WIDTH);
   const step = pages[index] ?? pages[0];
 
   useEffect(() => {
@@ -89,10 +100,10 @@ export default function CupuOnboarding() {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => undefined}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
         <View style={[styles.stack, { width: cardWidth }]}>
           <View style={styles.cupuWrap}>
-            <View style={styles.cupuPlate} />
+            <View style={[styles.cupuPlate, { backgroundColor: colors.surfaceRaised }]} />
             <Image
               source={step.image}
               style={styles.cupu}
@@ -100,37 +111,52 @@ export default function CupuOnboarding() {
               accessibilityLabel="Cupu, mascote do Égua, adota!"
             />
           </View>
-          <View style={styles.card}>
+          <View style={[styles.card, shadows.lg, { backgroundColor: colors.surfaceRaised }]}>
             <View
               style={styles.pages}
               onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}
             >
               {pageWidth > 0 ? (
-                <View style={[styles.track, { width: pageWidth * pages.length, transform: [{ translateX: -index * pageWidth }] }]}>
+                <Animated.View
+                  style={[
+                    styles.track,
+                    {
+                      width: pageWidth * pages.length,
+                      transform: [{ translateX: -index * pageWidth }],
+                      transitionProperty: 'transform',
+                      transitionDuration: duration(motion.slow),
+                    },
+                  ]}
+                >
                   {pages.map((item) => (
                     <View key={item.button} style={[styles.page, { width: pageWidth }]}>
-                      <Text style={styles.title}>{item.title}</Text>
-                      <Text style={styles.body}>{item.description}</Text>
+                      <AppText variant="h2" style={styles.center}>
+                        {item.title}
+                      </AppText>
+                      <AppText color="textSecondary" style={styles.center}>
+                        {item.description}
+                      </AppText>
                     </View>
                   ))}
-                </View>
+                </Animated.View>
               ) : null}
             </View>
-            <View style={styles.dots} accessibilityLabel={`Passo ${index + 1} de ${pages.length}`}>
+            <View
+              accessible
+              accessibilityLabel={`Passo ${index + 1} de ${pages.length}`}
+              style={styles.dots}
+            >
               {pages.map((item, dot) => (
                 <View
                   key={item.button}
-                  style={[styles.dot, dot === index ? styles.dotOn : null]}
+                  style={[
+                    styles.dot,
+                    { backgroundColor: dot === index ? colors.secondary : colors.border },
+                  ]}
                 />
               ))}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.button}
-              onPress={() => void advance()}
-            >
-              <Text style={styles.buttonText}>{step.button}</Text>
-            </Pressable>
+            <Button title={step.button} variant="secondary" size="lg" fullWidth onPress={() => void advance()} />
           </View>
         </View>
       </View>
@@ -141,57 +167,39 @@ export default function CupuOnboarding() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: '#00000080',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   stack: { alignItems: 'center' },
   cupuWrap: {
-    width: 210,
-    height: 200,
-    marginBottom: -92,
+    width: MASCOT_WIDTH,
+    height: MASCOT_HEIGHT,
+    marginBottom: -MASCOT_OVERLAP,
     zIndex: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cupuPlate: {
     position: 'absolute',
-    width: 230,
-    height: 230,
-    borderRadius: 115,
-    backgroundColor: palette.white,
-    top: -46,
+    width: PLATE,
+    height: PLATE,
+    borderRadius: radius.pill,
+    top: -spacing.giant,
   },
-  cupu: { width: 210, height: 200 },
+  cupu: { width: MASCOT_WIDTH, height: MASCOT_HEIGHT },
   card: {
     width: '100%',
-    backgroundColor: palette.white,
-    borderRadius: 24,
-    paddingTop: 96,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    elevation: 8,
+    borderRadius: radius.xl,
+    paddingTop: CARD_TOP_SPACE,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
-  pages: { minHeight: 168, overflow: 'hidden' },
+  pages: { minHeight: PAGES_MIN_HEIGHT, overflow: 'hidden' },
   track: { flexDirection: 'row' },
-  page: { gap: 8 },
-  title: { color: palette.acai, fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  body: { color: '#4E6468', fontSize: 16, lineHeight: 23, textAlign: 'center' },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E7E5E4' },
-  dotOn: { backgroundColor: '#F59E0B' },
-  button: {
-    minHeight: 52,
-    borderRadius: 16,
-    backgroundColor: '#F59E0B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: { color: palette.acai, fontSize: 17, fontWeight: '700' },
+  page: { gap: spacing.sm },
+  center: { textAlign: 'center' },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
+  dot: { width: DOT, height: DOT, borderRadius: radius.pill },
 });

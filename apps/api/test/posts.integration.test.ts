@@ -26,6 +26,11 @@ async function createAlert(
   latitude = -1.45234,
   longitude = -48.48321,
 ) {
+  const owner = await pool.query<{ id: string }>(`SELECT id FROM users WHERE firebase_uid = $1`, [
+    `dev:${email}`,
+  ]);
+  const ownerId = owner.rows[0]?.id;
+  if (!ownerId) throw new Error('user lookup failed');
   return app.inject({
     method: 'POST',
     url: '/posts',
@@ -38,7 +43,7 @@ async function createAlert(
       latitude,
       longitude,
       approxLabel: 'Nazaré, Belém',
-      media: [{ url: 'https://images.dog.ceo/breeds/kelpie/n02105412_545.jpg' }],
+      media: [{ url: `uploads/${ownerId}/00000000-0000-4000-8000-000000000001.jpg` }],
     },
   });
 }
@@ -231,12 +236,100 @@ describe('posts', () => {
       url: '/posts?west=-48.50&south=-1.46&east=-48.48&north=-1.45&status=open',
     });
     expect(inside.json().posts).toHaveLength(1);
-    expect(inside.json().posts[0].referencePoint).toBe('em frente à padaria');
+    expect(inside.json().posts[0].referencePoint).toBeNull();
+    expect(inside.json().posts[0].addressText).toBeNull();
+    expect(inside.json().posts[0].accuracyM).toBeNull();
+
+    const author = await app.inject({
+      method: 'GET',
+      url: `/posts/${created.json().id}`,
+      headers: { authorization: 'Bearer dev:place@egua.local' },
+    });
+    expect(author.json().referencePoint).toBe('em frente à padaria');
+    expect(author.json().addressText).toBe('Avenida Nazaré · Nazaré · Belém');
+    expect(author.json().accuracyM).toBe(12);
 
     const outside = await app.inject({
       method: 'GET',
       url: '/posts?west=-48.20&south=-1.20&east=-48.10&north=-1.10&status=open',
     });
     expect(outside.json().posts).toHaveLength(0);
+  });
+
+  it('rejects anonymous writes, a stranger changing status, a foreign photo and an unverified pix', async () => {
+    const anon = await app.inject({
+      method: 'POST',
+      url: '/posts',
+      payload: {
+        species: 'dog',
+        size: 'medium',
+        urgency: 'high',
+        description: 'Cachorro na calçada.',
+        latitude: -1.45,
+        longitude: -48.48,
+        approxLabel: 'Nazaré, Belém',
+        media: [],
+      },
+    });
+    expect(anon.statusCode).toBe(401);
+
+    await insertUser('owner@egua.local', 'owner');
+    await insertUser('stranger@egua.local', 'stranger');
+    const created = await createAlert(app, 'owner@egua.local', 'Cachorro na calçada.');
+    const postId = created.json().id as string;
+
+    const forbidden = await app.inject({
+      method: 'PATCH',
+      url: `/posts/${postId}/status`,
+      headers: { authorization: 'Bearer dev:stranger@egua.local' },
+      payload: { status: 'on_the_way' },
+    });
+    expect(forbidden.statusCode).toBe(403);
+
+    const foreignPhoto = await app.inject({
+      method: 'POST',
+      url: '/posts',
+      headers: { authorization: 'Bearer dev:owner@egua.local' },
+      payload: {
+        species: 'dog',
+        size: 'medium',
+        urgency: 'low',
+        description: "'; DROP TABLE posts; --",
+        latitude: -1.45,
+        longitude: -48.48,
+        approxLabel: 'Nazaré, Belém',
+        media: [{ url: 'https://evil.example/shell.jpg' }],
+      },
+    });
+    expect(foreignPhoto.statusCode).toBe(400);
+
+    const pix = await app.inject({
+      method: 'POST',
+      url: '/posts',
+      headers: { authorization: 'Bearer dev:owner@egua.local' },
+      payload: {
+        type: 'rescue_alert',
+        species: 'dog',
+        size: 'medium',
+        urgency: 'low',
+        description: 'Precisa de ração.',
+        latitude: -1.45,
+        longitude: -48.48,
+        approxLabel: 'Nazaré, Belém',
+        media: [],
+        helpRequest: { kind: 'food', pixKey: 'golpe@pix' },
+      },
+    });
+    expect(pix.statusCode).toBe(403);
+
+    const admin = await app.inject({
+      method: 'GET',
+      url: '/admin/metrics',
+      headers: { authorization: 'Bearer dev:owner@egua.local' },
+    });
+    expect(admin.statusCode).toBe(403);
+
+    const missing = await app.inject({ method: 'GET', url: '/admin/metrics' });
+    expect(missing.statusCode).toBe(401);
   });
 });

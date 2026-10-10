@@ -2,23 +2,47 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, loadFeed, messageFrom } from '../../src/api';
+import { loadFeed, loadMe, messageFrom } from '../../src/api';
+import {
+  ActionCard,
+  AppText,
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  Segmented,
+  SkeletonRows,
+  Touchable,
+} from '../../src/components/ui';
+import { VersionMark } from '../../src/diagnostics/VersionMark';
 import { useSession } from '../../src/session';
-import { screenColumn, useTheme } from '../../src/theme';
-import { EmptyState, SkeletonRows } from '../../src/ui';
+import { motion, screenColumn, spacing, useTheme } from '../../src/theme';
+
+type ProfileTab = 'posts' | 'saved' | 'adopted';
+
+const tabOptions = [
+  { value: 'posts', label: 'Publicações' },
+  { value: 'saved', label: 'Salvos' },
+  { value: 'adopted', label: 'Adotados' },
+] as const;
+
+const MAX_HIGHLIGHTS = 6;
+// Hairline gap between the 3 columns of the grid.
+const CELL_GAP = spacing.xs / 4;
 
 export default function ProfileScreen() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const token = useSession((state) => state.token);
   const logout = useSession((state) => state.logout);
-  const [tab, setTab] = useState<'posts' | 'saved' | 'adopted'>('posts');
+  const [tab, setTab] = useState<ProfileTab>('posts');
   const me = useQuery({
     queryKey: ['me', token],
-    queryFn: () =>
-      api<{ id: string; name: string; handle: string; verified: boolean }>('/me', { token }),
+    queryFn: () => loadMe(token ?? ''),
     enabled: Boolean(token),
   });
   const search =
@@ -34,9 +58,12 @@ export default function ProfileScreen() {
     queryFn: () => loadFeed(token, search),
     enabled: Boolean(token && (tab !== 'posts' || me.data)),
   });
+  const highlights = (posts.data?.posts ?? [])
+    .filter((post) => post.urgency === 'high')
+    .slice(0, MAX_HIGHLIGHTS);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -46,113 +73,146 @@ export default function ProfileScreen() {
               void me.refetch();
               void posts.refetch();
             }}
-            tintColor={theme.text}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
         <View style={styles.column}>
-        <View style={styles.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.name, { color: theme.text }]}>{me.data?.name ?? 'Sua conta'}</Text>
-            <Text style={{ color: theme.muted }}>@{me.data?.handle}</Text>
-          </View>
-          <Pressable style={styles.settings} onPress={() => router.push('/settings')}>
-            <Text style={{ color: theme.text }}>Ajustes</Text>
-          </Pressable>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Minha rede de voluntariado"
-          style={styles.network}
-          onPress={() => router.push('/voluntario')}
-        >
-          <Text style={{ color: theme.accent, fontWeight: '700' }}>Minha rede</Text>
-          <Text style={{ color: theme.muted }}>Transporte, lar temporário e selos</Text>
-        </Pressable>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.highlights}
-        >
-          {(posts.data?.posts ?? [])
-            .filter((post) => post.urgency === 'high')
-            .slice(0, 6)
-            .map((post) => (
-              <Pressable key={post.id} onPress={() => router.push(`/story/${post.id}`)}>
-                {post.media[0] ? (
-                  <Image source={{ uri: post.media[0].thumbUrl }} style={styles.highlight} />
-                ) : null}
-              </Pressable>
-            ))}
-        </ScrollView>
-        <View style={styles.tabs}>
-          {(['posts', 'saved', 'adopted'] as const).map((item) => (
-            <Pressable key={item} style={styles.tab} onPress={() => setTab(item)}>
-              <Text style={{ color: tab === item ? theme.text : theme.muted, fontWeight: '700' }}>
-                {item === 'posts' ? 'Publicações' : item === 'saved' ? 'Salvos' : 'Adotados'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.grid}>
-          {(posts.data?.posts ?? []).map((post) => (
-            <Pressable
-              key={post.id}
-              style={styles.cell}
-              onPress={() => router.push(`/post/${post.id}`)}
-            >
-              {post.media[0] ? (
-                <Image source={{ uri: post.media[0].thumbUrl }} style={styles.cellImage} />
+          <View style={styles.head}>
+            <Avatar name={me.data?.name ?? 'Sua conta'} size="xl" verified={me.data?.verified} />
+            <View style={styles.headText}>
+              <AppText variant="h1" numberOfLines={1}>
+                {me.data?.name ?? 'Sua conta'}
+              </AppText>
+              {me.data ? (
+                <AppText color="textSecondary" numberOfLines={1}>
+                  @{me.data.handle}
+                </AppText>
               ) : null}
-            </Pressable>
-          ))}
-        </View>
-        {!token ? (
-          <EmptyState
-            pose="wave"
-            title="Entre para ver seu perfil"
-            body="Seus resgates, os que você salvou e as adoções concluídas ficam ligados à sua conta."
-          />
-        ) : me.isLoading || posts.isLoading ? (
-          <SkeletonRows />
-        ) : me.isError || posts.isError ? (
-          <EmptyState
-            pose="sad"
-            title="Não consegui abrir seu perfil"
-            body={messageFrom(me.error ?? posts.error)}
-            actionLabel="Tentar de novo"
-            onAction={() => {
-              void me.refetch();
-              void posts.refetch();
-            }}
-          />
-        ) : (posts.data?.posts.length ?? 0) === 0 ? (
-          <EmptyState
-            pose={tab === 'adopted' ? 'home' : 'sad'}
-            title={
-              tab === 'posts' ? 'Você ainda não publicou' : tab === 'saved' ? 'Nada salvo' : 'Nenhuma adoção por aqui'
-            }
-            body={
-              tab === 'posts'
-                ? 'O primeiro resgate que você publicar aparece nesta grade.'
-                : tab === 'saved'
-                  ? 'Toque em salvar num resgate para guardar ele aqui.'
-                  : 'Quando um resgate chegar em adotado, a foto fica nesta aba.'
-            }
-            actionLabel={tab === 'posts' ? 'Criar resgate' : undefined}
-            onAction={tab === 'posts' ? () => router.push('/create') : undefined}
-          />
-        ) : null}
-        {token ? (
-          <Pressable
-            style={styles.logout}
-            onPress={() => {
-              void logout().then(() => router.replace('/'));
-            }}
-          >
-            <Text style={{ color: theme.muted }}>Sair</Text>
-          </Pressable>
-        ) : null}
+              {me.data?.verified ? <Badge kind="label" label="Verificado" tone="primary" /> : null}
+            </View>
+            <IconButton
+              icon="settings"
+              accessibilityLabel="Ajustes"
+              onPress={() => router.push('/settings')}
+            />
+          </View>
+          <View style={styles.network}>
+            <ActionCard
+              title="Minha rede"
+              description="Transporte, lar temporário e selos"
+              icon="users"
+              tone="primary"
+              onPress={() => router.push('/voluntario')}
+            />
+          </View>
+          {highlights.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.highlights}
+            >
+              {highlights.map((post) => (
+                <Touchable
+                  key={post.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver resgate urgente em ${post.approxLabel}`}
+                  pressedScale={0.94}
+                  onPress={() => router.push(`/story/${post.id}`)}
+                >
+                  <Avatar name={post.approxLabel} uri={post.media[0]?.thumbUrl} size="lg" />
+                </Touchable>
+              ))}
+            </ScrollView>
+          ) : null}
+          <View style={styles.tabs}>
+            <Segmented
+              variant="underline"
+              accessibilityLabel="Seções do perfil"
+              options={tabOptions}
+              value={tab}
+              onChange={setTab}
+            />
+          </View>
+          <View style={styles.grid}>
+            {(posts.data?.posts ?? []).map((post) => (
+              <Touchable
+                key={post.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir resgate em ${post.approxLabel}`}
+                pressedScale={0.97}
+                style={styles.cell}
+                onPress={() => router.push(`/post/${post.id}`)}
+              >
+                <View style={[styles.cellFill, { backgroundColor: colors.surfaceMuted }]}>
+                  {post.media[0] ? (
+                    <Image
+                      source={{ uri: post.media[0].thumbUrl }}
+                      style={styles.cellImage}
+                      contentFit="cover"
+                      transition={motion.base}
+                      cachePolicy="memory-disk"
+                      recyclingKey={post.id}
+                    />
+                  ) : null}
+                </View>
+              </Touchable>
+            ))}
+          </View>
+          {!token ? (
+            <EmptyState
+              pose="wave"
+              title="Entre para ver seu perfil"
+              body="Seus resgates, os que você salvou e as adoções concluídas ficam ligados à sua conta."
+              actionLabel="Entrar"
+              onAction={() => router.push({ pathname: '/login', params: { returnTo: '/(tabs)/profile' } })}
+            />
+          ) : me.isLoading || posts.isLoading ? (
+            <SkeletonRows />
+          ) : me.isError || posts.isError ? (
+            <ErrorState
+              title="Não consegui abrir seu perfil"
+              body={messageFrom(me.error ?? posts.error)}
+              onRetry={() => {
+                void me.refetch();
+                void posts.refetch();
+              }}
+            />
+          ) : (posts.data?.posts.length ?? 0) === 0 ? (
+            <EmptyState
+              pose={tab === 'adopted' ? 'home' : 'sad'}
+              title={
+                tab === 'posts'
+                  ? 'Você ainda não publicou'
+                  : tab === 'saved'
+                    ? 'Nada salvo'
+                    : 'Nenhuma adoção por aqui'
+              }
+              body={
+                tab === 'posts'
+                  ? 'O primeiro resgate que você publicar aparece nesta grade.'
+                  : tab === 'saved'
+                    ? 'Toque em salvar num resgate para guardar ele aqui.'
+                    : 'Quando um resgate chegar em adotado, a foto fica nesta aba.'
+              }
+              actionLabel={tab === 'posts' ? 'Criar resgate' : undefined}
+              onAction={tab === 'posts' ? () => router.push('/create') : undefined}
+            />
+          ) : null}
+          {token ? (
+            <View style={styles.logout}>
+              <Button
+                title="Sair"
+                icon="log-out"
+                variant="ghost"
+                onPress={() => {
+                  void logout().then(() => router.replace('/'));
+                }}
+              />
+            </View>
+          ) : null}
+          <VersionMark />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -160,18 +220,25 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingBottom: 24 },
+  screen: { flex: 1 },
+  scroll: { paddingBottom: spacing.xxl },
   column: screenColumn,
-  head: { flexDirection: 'row', padding: 16, alignItems: 'center', gap: 12 },
-  settings: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  network: { paddingHorizontal: 16, paddingBottom: 8, gap: 2 },
-  name: { fontSize: 24, fontWeight: '700' },
-  highlights: { paddingHorizontal: 16, gap: 12 },
-  highlight: { width: 68, height: 68, borderRadius: 34 },
-  tabs: { flexDirection: 'row', paddingVertical: 8 },
-  tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  headText: { flex: 1, gap: spacing.xs, alignItems: 'flex-start' },
+  network: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  highlights: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md },
+  tabs: { paddingHorizontal: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '33.33%', aspectRatio: 1, padding: 1 },
+  cell: { width: '33.33%', aspectRatio: 1, padding: CELL_GAP },
+  cellFill: { flex: 1 },
   cellImage: { width: '100%', height: '100%' },
-  logout: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  logout: { alignItems: 'center', paddingTop: spacing.lg },
 });
+
+// One broken screen must not take the whole app down.
+export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';

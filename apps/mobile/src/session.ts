@@ -1,8 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
-import { loginWithEmail } from './api';
+import { isNetworkError, loadMe, setUnauthorizedHandler, ApiError } from './api';
+import { currentIdToken, signInWithEmail, signOutAuth, signUpWithEmail } from './auth/service';
 import { reportError, setReporterUser } from './crash/reporter';
+import { queryClient } from './queryClient';
 import type { Account } from './types';
 
 const tokenKey = 'egua-token';
@@ -17,11 +19,16 @@ interface SessionState extends Flags {
   token: string | null;
   user: Account | null;
   cupuPrompt: boolean;
+  /** Set when the server rejects the saved session, so the welcome screen can explain it. */
+  signedOutReason: string | null;
   hydrate: () => Promise<void>;
   finishPermissions: () => Promise<void>;
-  login: (email: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<boolean>;
+  refresh: () => Promise<void>;
   clearCupuPrompt: () => void;
-  logout: () => Promise<void>;
+  clearSignedOutReason: () => void;
+  logout: (reason?: string) => Promise<void>;
   setUser: (user: Account) => void;
 }
 
@@ -82,31 +89,103 @@ export const useSession = create<SessionState>((set) => ({
   token: null,
   user: null,
   cupuPrompt: false,
+  signedOutReason: null,
   permissionsSeen: false,
   hydrate: async () => {
     const flags = await readOrDiscard(flagKey, readFlags, { permissionsSeen: false });
-    const token = await readOrDiscard(tokenKey, readToken, null);
-    set({ ready: true, token, ...flags });
+    const stored = await readOrDiscard(tokenKey, readToken, null);
+    let token = stored;
+    let user: Account | null = null;
+    try {
+      const fresh = await currentIdToken();
+      const candidate = fresh ?? stored;
+      if (candidate) {
+        user = await loadMe(candidate);
+        token = candidate;
+        if (fresh) await writeToken(fresh);
+        setReporterUser({ id: user.id, handle: user.handle });
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await signOutAuth();
+        await writeToken(null);
+        token = null;
+        user = null;
+      } else if (!isNetworkError(error)) {
+        reportError(error, { source: 'handled', where: 'session:hydrate' });
+      }
+    }
+    set({ ready: true, token, user, ...flags });
   },
   finishPermissions: async () => {
     const flags = { permissionsSeen: true };
     await writeFlags(flags);
     set(flags);
   },
-  login: async (email) => {
-    const result = await loginWithEmail(email);
-    await writeToken(result.token);
-    setReporterUser({ id: result.user.id, handle: result.user.handle });
-    set({ token: result.token, user: result.user, cupuPrompt: true });
+  signIn: async (email, password) => {
+    const token = await signInWithEmail(email, password);
+    try {
+      const user = await loadMe(token);
+      await writeToken(token);
+      setReporterUser({ id: user.id, handle: user.handle });
+      set({ token, user, cupuPrompt: true, signedOutReason: null });
+    } catch (error) {
+      await signOutAuth();
+      throw error;
+    }
+  },
+  signUp: async (name, email, password) => {
+    const created = await signUpWithEmail(name, email, password);
+    try {
+      const user = await loadMe(created.token);
+      await writeToken(created.token);
+      setReporterUser({ id: user.id, handle: user.handle });
+      set({ token: created.token, user, cupuPrompt: true, signedOutReason: null });
+      return created.verificationSent;
+    } catch (error) {
+      await signOutAuth();
+      throw error;
+    }
+  },
+  refresh: async () => {
+    const next = await currentIdToken();
+    if (!next) return;
+    await writeToken(next);
+    set({ token: next });
   },
   clearCupuPrompt: () => set({ cupuPrompt: false }),
-  logout: async () => {
+  clearSignedOutReason: () => set({ signedOutReason: null }),
+  logout: async (reason) => {
+    await signOutAuth();
     await writeToken(null);
     setReporterUser(null);
-    set({ token: null, user: null });
+    queryClient.clear();
+    set({ token: null, user: null, signedOutReason: reason ?? null });
   },
   setUser: (user) => {
     setReporterUser({ id: user.id, handle: user.handle });
     set({ user });
   },
 }));
+
+let refreshingSession = false;
+
+setUnauthorizedHandler(() => {
+  const state = useSession.getState();
+  if (!state.ready || !state.token || refreshingSession) return;
+  const failed = state.token;
+  refreshingSession = true;
+  void (async () => {
+    try {
+      const next = await currentIdToken(true);
+      if (next && next !== failed) {
+        await writeToken(next);
+        useSession.setState({ token: next });
+        return;
+      }
+      await useSession.getState().logout('Sua sessão expirou. Entre de novo para continuar.');
+    } finally {
+      refreshingSession = false;
+    }
+  })();
+});

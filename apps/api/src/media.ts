@@ -1,7 +1,14 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Env } from './config.js';
+import { HttpError } from './http.js';
+import { assertOwnedMedia, extensionKind, sniffImage } from './mediaPolicy.js';
 
 const extensions: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -47,6 +54,52 @@ export async function presignUploads(
     uploads.push({ key, uploadUrl, contentType: file.contentType });
   }
   return uploads;
+}
+
+/**
+ * In production, read the first bytes of each upload and reject anything that is not a real image.
+ * Tests skip the storage read so they do not need MinIO; the key still has to belong to the account.
+ */
+export async function verifyUploadedImages(
+  env: Env,
+  storage: S3Client,
+  userId: string,
+  urls: string[],
+): Promise<void> {
+  assertOwnedMedia(userId, urls);
+  if (env.NODE_ENV !== 'production' || urls.length === 0) return;
+  for (const url of urls) {
+    const expected = extensionKind(url);
+    let bytes: Uint8Array | undefined;
+    try {
+      const object = await storage.send(
+        new GetObjectCommand({
+          Bucket: env.MINIO_BUCKET,
+          Key: url,
+          Range: 'bytes=0-31',
+        }),
+      );
+      bytes = await object.Body?.transformToByteArray();
+    } catch (error) {
+      const name =
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        typeof error.name === 'string'
+          ? error.name
+          : '';
+      if (name === 'NoSuchKey' || name === 'NotFound') {
+        throw new HttpError(400, 'Não encontrei essa foto. Envie de novo.');
+      }
+      throw new HttpError(503, 'Não consegui conferir a foto. Tente de novo.');
+    }
+    if (!bytes || sniffImage(bytes) !== expected) {
+      await storage
+        .send(new DeleteObjectCommand({ Bucket: env.MINIO_BUCKET, Key: url }))
+        .catch(() => undefined);
+      throw new HttpError(400, 'A foto enviada não é uma imagem válida.');
+    }
+  }
 }
 
 export function publicMediaUrl(env: Env, stored: string, variant: 'full' | 'thumb'): string {

@@ -1,30 +1,33 @@
-import { Redirect } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Redirect, type Href } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+import { AppText } from '../src/components/ui';
 import { Mascot } from '../src/mascot';
 import { useSession } from '../src/session';
-import { useTheme } from '../src/theme';
+import { size, spacing, useTheme } from '../src/theme';
+
+const GATE_MASCOT = size.mascot + spacing.xxxl;
 
 export default function Gate() {
-  const theme = useTheme();
+  const { colors } = useTheme();
   const ready = useSession((state) => state.ready);
+  const token = useSession((state) => state.token);
   const permissionsSeen = useSession((state) => state.permissionsSeen);
 
   if (!ready) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          backgroundColor: theme.background,
-        }}
-      >
-        <Mascot pose="sit" size={180} label="Mascote do Égua, adota!" />
-        <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700' }}>Égua, adota!</Text>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Mascot pose="sit" size={GATE_MASCOT} label="Mascote do Égua, adota!" />
+        <AppText variant="display" color="primary">
+          Égua, adota!
+        </AppText>
       </View>
     );
   }
+  if (!token) return <Redirect href={'/welcome' as Href} />;
   if (!permissionsSeen) return <Redirect href="/permissions" />;
   return <Redirect href="/(tabs)" />;
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+});

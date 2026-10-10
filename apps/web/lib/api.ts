@@ -72,10 +72,14 @@ export async function listPosts(
   if (search.type) params.set('type', search.type);
   if (search.species) params.set('species', search.species);
   if (search.authorId) params.set('authorId', search.authorId);
-  const response = await fetch(`${apiUrl}/posts?${params.toString()}`, { cache: 'no-store' });
-  if (!response.ok) return [];
-  const body = (await response.json()) as { posts: PublicPost[] };
-  return body.posts;
+  try {
+    const response = await fetch(`${apiUrl}/posts?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { posts: PublicPost[] };
+    return body.posts;
+  } catch {
+    return [];
+  }
 }
 
 export async function getPost(id: string): Promise<PublicPost | null> {

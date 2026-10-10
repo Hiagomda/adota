@@ -130,6 +130,38 @@ export async function expandRescueAlert(pool: Pool, env: Env, postId: string): P
   await dispatchRescueAlert(pool, env, postId, 1.5);
 }
 
+export async function notifyDiaryNote(
+  pool: Pool,
+  env: Env,
+  postId: string,
+  writerId: string,
+  description: string,
+): Promise<void> {
+  const post = await pool.query<{ author_id: string; approx_label: string }>(
+    `SELECT author_id, approx_label FROM posts WHERE id = $1`,
+    [postId],
+  );
+  const rescue = post.rows[0];
+  if (!rescue) return;
+  const people = await pool.query<{ id: string; fcm_tokens: string[] }>(
+    `SELECT id, fcm_tokens FROM users WHERE id = $1
+     UNION
+     SELECT u.id, u.fcm_tokens FROM post_follows pf JOIN users u ON u.id = pf.user_id WHERE pf.post_id = $2`,
+    [rescue.author_id, postId],
+  );
+  const title = 'Diário do resgate';
+  const snippet = description.trim().slice(0, 120);
+  const body = `${rescue.approx_label}: ${snippet}`;
+  for (const person of rowsOf<{ id: string; fcm_tokens: string[] }>(people)) {
+    if (person.id === writerId) continue;
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'diary', $2::jsonb)`,
+      [person.id, JSON.stringify({ postId, title, body })],
+    );
+    await sendPush(env, person.fcm_tokens, title, body, postId);
+  }
+}
+
 export async function notifyStatusChange(
   pool: Pool,
   env: Env,

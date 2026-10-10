@@ -11,6 +11,7 @@
     "ios": "expo start --ios --dev-client",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/map/cameraPolicy.test.ts src/auth/validation.test.ts src/auth/errors.test.ts",
     "version:bump": "node scripts/bump-build.mjs",
     "version:sync": "node scripts/bump-build.mjs --sync",
     "version:publish": "node scripts/bump-build.mjs --sync --publish"
@@ -47,6 +48,7 @@
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.25",
+    "firebase": "11.10.0",
     "maplibre-gl": "5.6.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

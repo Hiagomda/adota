@@ -8,8 +8,11 @@ import {
 import type { Pool } from 'pg';
 import type { Env } from './config.js';
 import { HttpError } from './http.js';
+import { assertOwnedMedia } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
+import { assertHelpRequest, canSeeExactPlace, publicPixKey, publicPlace } from './privacy.js';
 import { rowsOf, type SessionUser } from './session.js';
+import { stripControls } from './text.js';
 
 interface PostRow {
   id: string;
@@ -172,7 +175,7 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
   const updates = await pool.query(
     `SELECT p.id, p.description, p.status, p.created_at, u.name, u.handle
      FROM posts p JOIN users u ON u.id = p.author_id
-     WHERE p.parent_post_id = $1 AND p.hidden = false
+     WHERE p.parent_post_id = $1 AND p.hidden = false AND p.review_status = 'published'
      ORDER BY p.created_at ASC`,
     [id],
   );
@@ -196,10 +199,14 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
 }
 
 export async function createPost(pool: Pool, env: Env, user: SessionUser, input: CreatePostInput) {
-  if (input.type === 'help_request' && !user.verified) {
-    throw new HttpError(403, 'Só perfis verificados podem publicar pedidos de ajuda com Pix.');
-  }
-  const reviewStatus = looksLikeAnimalSale(input.description) ? 'pending' : 'published';
+  if (input.parentPostId) return addDiaryNote(pool, user, input);
+  assertHelpRequest(user, input);
+  assertOwnedMedia(
+    user.id,
+    input.media.map((item) => item.url),
+  );
+  const description = stripControls(input.description);
+  const reviewStatus = looksLikeAnimalSale(description) ? 'pending' : 'published';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -230,7 +237,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         animalId,
         input.type,
         input.urgency,
-        input.description,
+        description,
         input.longitude,
         input.latitude,
         input.approxLabel,
@@ -374,10 +381,13 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
     [ids],
   );
   return rows.map((row) => {
-    const exact =
-      viewer !== null &&
-      (viewer.id === row.author_id || viewer.role === 'admin' || row.viewer_will_help);
+    const exact = canSeeExactPlace(viewer, row.author_id, row.viewer_will_help);
     const contact = exact && row.author_whatsapp;
+    const place = publicPlace(exact, {
+      accuracyM: row.accuracy_m,
+      addressText: row.address_text,
+      referencePoint: row.reference_point,
+    });
     const helpRow = help.rows.find((item) => item.post_id === row.id);
     return {
       id: row.id,
@@ -409,9 +419,9 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
       location: exact
         ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }
         : { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
-      accuracyM: row.accuracy_m,
-      addressText: row.address_text,
-      referencePoint: row.reference_point,
+      accuracyM: place.accuracyM,
+      addressText: place.addressText,
+      referencePoint: place.referencePoint,
       media: media.rows
         .filter((item) => item.post_id === row.id)
         .map((item) => ({
@@ -426,7 +436,7 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         ? {
             kind: helpRow.kind,
             goalAmount: helpRow.goal_amount,
-            pixKey: helpRow.pix_key,
+            pixKey: publicPixKey(row.author_verified, helpRow.pix_key),
             deadline: helpRow.deadline?.toISOString() ?? null,
             paymentNotice:
               'O app não intermedia pagamento. O Pix é só um dado do perfil verificado.',
@@ -450,9 +460,43 @@ async function canChange(
   return help.rowCount !== null && help.rowCount > 0;
 }
 
+async function addDiaryNote(
+  pool: Pool,
+  user: SessionUser,
+  input: CreatePostInput,
+): Promise<{ id: string; reviewStatus: string }> {
+  const parentId = input.parentPostId;
+  if (!parentId) throw new HttpError(400, 'Falta o resgate deste diário.');
+  const parent = await pool.query<{ author_id: string }>(
+    `SELECT author_id FROM posts
+     WHERE id = $1 AND parent_post_id IS NULL AND hidden = false`,
+    [parentId],
+  );
+  const row = parent.rows[0];
+  if (!row) throw new HttpError(404, 'Esse resgate não existe.');
+  const allowed = await canChange(pool, row.author_id, parentId, user);
+  if (!allowed) {
+    throw new HttpError(403, 'Só quem publicou ou quem vai ajudar escreve no diário.');
+  }
+  const description = stripControls(input.description.trim());
+  const reviewStatus = looksLikeAnimalSale(description) ? 'pending' : 'published';
+  const inserted = await pool.query<{ id: string }>(
+    `INSERT INTO posts (
+       author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status
+     )
+     SELECT $2, animal_id, 'update', 'low', $3, location, approx_label, status, id, $4
+     FROM posts WHERE id = $1
+     RETURNING id`,
+    [parentId, user.id, description, reviewStatus],
+  );
+  const id = inserted.rows[0]?.id;
+  if (!id) throw new HttpError(500, 'Não consegui salvar o diário.');
+  return { id, reviewStatus };
+}
+
 function statusLabel(status: AnimalStatus): string {
   const labels: Record<AnimalStatus, string> = {
-    open: 'Alerta aberto.',
+    open: 'Resgate aberto.',
     on_the_way: 'Alguém está a caminho.',
     rescued: 'Animal resgatado.',
     fostered: 'Foi para um lar temporário.',
