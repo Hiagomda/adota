@@ -28,6 +28,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "unrs-resolver"
-    ]
+    ],
+    "patchedDependencies": {
+      "@maplibre/maplibre-react-native@10.4.2": "patches/@maplibre__maplibre-react-native@10.4.2.patch"
+    }
   }
 }

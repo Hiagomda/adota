@@ -1,0 +1,63 @@
+diff --git a/android/src/main/java/org/maplibre/reactnative/events/EventEmitter.java b/android/src/main/java/org/maplibre/reactnative/events/EventEmitter.java
+index 379b72f6af5b685108b6bff76e506fe9613e5647..0f59ad14def2d5cbabcc73511e37ab092e507500 100644
+--- a/android/src/main/java/org/maplibre/reactnative/events/EventEmitter.java
++++ b/android/src/main/java/org/maplibre/reactnative/events/EventEmitter.java
+@@ -2,44 +2,30 @@ package org.maplibre.reactnative.events;
+ 
+ import android.util.Log;
+ 
+-import com.facebook.react.ReactApplication;
+-import com.facebook.react.bridge.JavaScriptModule;
+ import com.facebook.react.bridge.ReactApplicationContext;
+-import com.facebook.react.bridge.ReactContext;
+ import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
+-import com.facebook.react.uimanager.events.RCTEventEmitter;
+ 
+ 
+ public class EventEmitter {
+     public static final String LOG_TAG = "EventEmitter";
+ 
+-
+-    private static ReactContext getCurrentReactContext(ReactApplicationContext reactApplicationContext) {
+-        if (reactApplicationContext.getApplicationContext() instanceof ReactApplication) {
+-            ReactApplication reactApplication = ((ReactApplication) reactApplicationContext
+-                    .getApplicationContext());
+-
+-            return reactApplication
+-                    .getReactNativeHost()
+-                    .getReactInstanceManager()
+-                    .getCurrentReactContext();
+-        } else {
+-            Log.d(LOG_TAG, "getApplicationContext() application doesn't implement ReactApplication");
+-            return reactApplicationContext;
+-        }
+-    }
+-
+-
++    /**
++     * The module context already is the live React context. Going through
++     * ReactApplication.getReactNativeHost() throws a RuntimeException on the New
++     * Architecture (React Native 0.74+), which killed the process on every location
++     * update. The context is used directly and only while a React instance is alive.
++     */
+     public static RCTNativeAppEventEmitter getModuleEmitter(ReactApplicationContext reactApplicationContext) {
+-        RCTNativeAppEventEmitter emitter = null;
++        if (reactApplicationContext == null || !reactApplicationContext.hasActiveReactInstance()) {
++            Log.d(LOG_TAG, "No active React instance, dropping event");
++            return null;
++        }
+ 
+         try {
+-            emitter = getCurrentReactContext(reactApplicationContext)
+-                    .getJSModule(RCTNativeAppEventEmitter.class);
+-        } catch (NullPointerException e) {
+-            Log.d(LOG_TAG, e.getLocalizedMessage());
++            return reactApplicationContext.getJSModule(RCTNativeAppEventEmitter.class);
++        } catch (RuntimeException e) {
++            Log.w(LOG_TAG, "Could not get the JS event emitter", e);
++            return null;
+         }
+-
+-        return emitter;
+     }
+ }
