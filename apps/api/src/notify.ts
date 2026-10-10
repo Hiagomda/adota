@@ -2,6 +2,7 @@ import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 import type { Env } from './config.js';
+import { ensureFirebaseApp } from './firebaseAdmin.js';
 import { rowsOf } from './session.js';
 
 const queueName = 'rescue-alerts';
@@ -200,10 +201,8 @@ async function sendPush(
 ): Promise<void> {
   if (!env.FIREBASE_PROJECT_ID || tokens.length === 0) return;
   try {
+    await ensureFirebaseApp(env);
     const admin = await import('firebase-admin');
-    if (admin.apps.length === 0) {
-      admin.initializeApp({ projectId: env.FIREBASE_PROJECT_ID });
-    }
     await admin.messaging().sendEachForMulticast({
       tokens,
       notification: { title, body },

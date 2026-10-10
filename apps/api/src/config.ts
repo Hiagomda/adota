@@ -13,6 +13,8 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
   AUTH_DEV_MODE: z.enum(['true', 'false']).optional(),
   FIREBASE_PROJECT_ID: z.string().min(1).optional(),
+  FIREBASE_CLIENT_EMAIL: z.string().email().optional(),
+  FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
   MINIO_ENDPOINT: z.string().min(1).default('http://localhost:9000'),
   MINIO_ACCESS_KEY: z.string().min(1).default('patinha'),
   MINIO_SECRET_KEY: z.string().min(1).default('patinha-secret'),

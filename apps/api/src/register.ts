@@ -23,6 +23,7 @@ import {
 import { requireAdmin, requireUser } from './authz.js';
 import type { Env } from './config.js';
 import { addResponse, changeStatus, createPost, getPost, listPosts } from './feed.js';
+import { ensureFirebaseApp, firebaseChecksRevocation } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
 import { presignUploads, verifyUploadedImages } from './media.js';
@@ -697,9 +698,9 @@ async function resolveUser(
   }
   if (!env.FIREBASE_PROJECT_ID) return null;
   try {
+    await ensureFirebaseApp(env);
     const admin = await import('firebase-admin');
-    if (admin.apps.length === 0) admin.initializeApp({ projectId: env.FIREBASE_PROJECT_ID });
-    const decoded = await admin.auth().verifyIdToken(token, true);
+    const decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
     const existing = await findUserByFirebaseUid(pool, decoded.uid);
     if (existing) return existing;
     const email = decoded.email ?? `${decoded.uid}@firebase.local`;

@@ -79,6 +79,7 @@ services:
       DATABASE_URL: postgres://patinha:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/patinha
       REDIS_URL: redis://redis:6379
       AUTH_DEV_MODE: 'false'
+      FIREBASE_PROJECT_ID: egua-adota
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
       MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}

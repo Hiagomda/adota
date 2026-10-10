@@ -4,6 +4,7 @@ import { requireRole, requireUser } from '../src/authz.js';
 import type { Env } from '../src/config.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
+import { firebaseChecksRevocation } from '../src/firebaseAdmin.js';
 import { extensionKind, ownedMediaKey, sniffImage } from '../src/mediaPolicy.js';
 import { assertHelpRequest, publicPixKey, publicPlace } from '../src/privacy.js';
 import type { SessionUser } from '../src/session.js';
@@ -145,5 +146,17 @@ describe('http hardening', () => {
     });
     expect(huge.statusCode).toBe(413);
     await app.close();
+  });
+
+  it('checks token revocation only when a service account is configured', () => {
+    expect(firebaseChecksRevocation(env)).toBe(false);
+    expect(
+      firebaseChecksRevocation({
+        ...env,
+        FIREBASE_PROJECT_ID: 'egua-adota',
+        FIREBASE_CLIENT_EMAIL: 'firebase-adminsdk-fbsvc@egua-adota.iam.gserviceaccount.com',
+        FIREBASE_PRIVATE_KEY: 'key',
+      }),
+    ).toBe(true);
   });
 });
