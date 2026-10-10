@@ -321,10 +321,60 @@ const statuses = ['open', 'on_the_way', 'rescued', 'fostered', 'for_adoption', '
 const urgencies = ['high', 'medium', 'low'] as const;
 const sizes = ['small', 'medium', 'large'] as const;
 
+/** Demo rows use firebase_uid `dev:…`. Real accounts come from Firebase and must stay. */
+async function removeDemoContent(pool: Pool): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`
+      UPDATE posts SET parent_post_id = NULL
+      WHERE parent_post_id IN (
+        SELECT posts.id FROM posts
+        JOIN users ON users.id = posts.author_id
+        WHERE users.firebase_uid LIKE 'dev:%'
+      )
+    `);
+    const animals = await client.query<{ animal_id: string }>(`
+      SELECT DISTINCT posts.animal_id
+      FROM posts
+      JOIN users ON users.id = posts.author_id
+      WHERE users.firebase_uid LIKE 'dev:%'
+    `);
+    await client.query(`
+      DELETE FROM posts
+      WHERE author_id IN (SELECT id FROM users WHERE firebase_uid LIKE 'dev:%')
+    `);
+    const animalIds = animals.rows.map((row) => row.animal_id);
+    if (animalIds.length > 0) {
+      await client.query(
+        `DELETE FROM animals
+         WHERE id = ANY($1::uuid[])
+           AND NOT EXISTS (SELECT 1 FROM posts WHERE posts.animal_id = animals.id)`,
+        [animalIds],
+      );
+    }
+    await client.query(`
+      DELETE FROM reports
+      WHERE reporter_id IN (SELECT id FROM users WHERE firebase_uid LIKE 'dev:%')
+         OR (
+           target_type = 'user'
+           AND target_id IN (SELECT id FROM users WHERE firebase_uid LIKE 'dev:%')
+         )
+    `);
+    await client.query(`DELETE FROM users WHERE firebase_uid LIKE 'dev:%'`);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function seed(pool: Pool): Promise<void> {
   if (process.env.SEED_IF_EMPTY === 'true') {
-    const existing = await pool.query<{ n: number }>('select count(*)::int as n from users');
-    if ((existing.rows[0]?.n ?? 0) > 0) return;
+    await removeDemoContent(pool);
+    return;
   }
 
   await pool.query(`

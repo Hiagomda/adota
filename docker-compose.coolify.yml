@@ -87,7 +87,7 @@ services:
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
       MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}
       MINIO_BUCKET: patinha-media
-      IMGPROXY_URL: ${SERVICE_URL_IMGPROXY_8080:-https://img.86.48.25.233.sslip.io}
+      IMGPROXY_URL: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
       IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
       WEB_ORIGIN: ${SERVICE_URL_DOWNLOAD_80:-https://baixar.86.48.25.233.sslip.io}
