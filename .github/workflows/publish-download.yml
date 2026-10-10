@@ -1,0 +1,24 @@
+name: Publish download
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update the download page
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -eu
+            cid=$(docker ps --format '{{.Names}}' | grep '^download-fpmewu0com3qkbfihrsihc6y' | head -n 1)
+            test -n "$cid"
+            docker exec -u root "$cid" wget -O /opt/egua-adota.apk https://github.com/Hiagomda/adota/releases/download/apk-1.0.0-3/egua-adota.apk
+            docker exec -u root "$cid" cp -f /opt/egua-adota.apk /apk/egua-adota.apk
+            docker exec -u root "$cid" sh -c 'printf "%s\n" "{\"version\":\"1.0.0\",\"androidVersionCode\":3}" > /opt/version.json'
+            docker exec -u root "$cid" cp -f /opt/version.json /apk/version.json
+            docker exec -u root "$cid" wc -c /apk/egua-adota.apk /apk/version.json
