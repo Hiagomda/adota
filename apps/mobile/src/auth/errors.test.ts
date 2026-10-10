@@ -12,6 +12,7 @@ describe('auth errors', () => {
 
   it('translates the cases the screen has to explain', () => {
     assert.equal(mapFirebaseCode('auth/email-already-in-use'), 'email-in-use');
+    assert.equal(mapFirebaseCode('auth/account-exists-with-different-credential'), 'email-in-use');
     assert.equal(mapFirebaseCode('auth/too-many-requests'), 'too-many-requests');
     assert.equal(mapFirebaseCode('auth/network-request-failed'), 'offline');
     assert.equal(mapFirebaseCode('auth/user-disabled'), 'disabled');

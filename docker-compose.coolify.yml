@@ -34,6 +34,8 @@ services:
   minio:
     image: bitnamilegacy/minio:2025.7.23
     environment:
+      SERVICE_URL_MINIO_9000: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      MINIO_SERVER_URL: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MINIO}
       MINIO_DEFAULT_BUCKETS: patinha-media
@@ -81,6 +83,7 @@ services:
       AUTH_DEV_MODE: 'false'
       FIREBASE_PROJECT_ID: egua-adota
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
       MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}
       MINIO_BUCKET: patinha-media

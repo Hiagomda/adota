@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar com Google</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #f3e8d2;
+        color: #173b3f;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+      }
+      p { max-width: 320px; }
+    </style>
+  </head>
+  <body>
+    <p id="status">Abrindo o Google…</p>
+    <script type="module">
+      const status = document.querySelector('#status');
+      const say = (text) => {
+        status.textContent = text;
+      };
+      const stored = sessionStorage.getItem('egua-google');
+      const incoming = location.hash.length > 1 ? location.hash.slice(1) : '';
+      if (incoming) sessionStorage.setItem('egua-google', incoming);
+      const cfg = new URLSearchParams(sessionStorage.getItem('egua-google') || stored || '');
+      const apiKey = cfg.get('apiKey');
+      const authDomain = cfg.get('authDomain');
+      const projectId = cfg.get('projectId');
+      const appId = cfg.get('appId');
+      if (!apiKey || !authDomain || !projectId || !appId) {
+        say('Abra o login com Google pelo aplicativo.');
+      } else {
+        const [{ initializeApp }, authMod] = await Promise.all([
+          import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js'),
+          import('https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js'),
+        ]);
+        const app = initializeApp({ apiKey, authDomain, projectId, appId });
+        const auth = authMod.getAuth(app);
+        try {
+          const result = await authMod.getRedirectResult(auth);
+          if (result) {
+            const credential = authMod.GoogleAuthProvider.credentialFromResult(result);
+            const idToken = credential?.idToken;
+            sessionStorage.removeItem('egua-google');
+            sessionStorage.removeItem('egua-google-started');
+            if (!idToken) {
+              say('Não consegui entrar com o Google. Volte ao aplicativo e tente de novo.');
+            } else {
+              say('Voltando para o Égua, adota!…');
+              location.replace(`egua://auth?id_token=${encodeURIComponent(idToken)}`);
+            }
+          } else if (sessionStorage.getItem('egua-google-started') === '1') {
+            sessionStorage.removeItem('egua-google-started');
+            say('Não consegui entrar com o Google. Volte ao aplicativo e tente de novo.');
+          } else {
+            sessionStorage.setItem('egua-google-started', '1');
+            const provider = new authMod.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
+            await authMod.signInWithRedirect(auth, provider);
+          }
+        } catch {
+          sessionStorage.removeItem('egua-google-started');
+          say('Não consegui entrar com o Google. Volte ao aplicativo e tente de novo.');
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -2,7 +2,13 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { isNetworkError, loadMe, setUnauthorizedHandler, ApiError } from './api';
-import { currentIdToken, signInWithEmail, signOutAuth, signUpWithEmail } from './auth/service';
+import {
+  currentIdToken,
+  signInWithEmail,
+  signInWithGoogleIdToken,
+  signOutAuth,
+  signUpWithEmail,
+} from './auth/service';
 import { reportError, setReporterUser } from './crash/reporter';
 import { queryClient } from './queryClient';
 import type { Account } from './types';
@@ -24,6 +30,7 @@ interface SessionState extends Flags {
   hydrate: () => Promise<void>;
   finishPermissions: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<boolean>;
   refresh: () => Promise<void>;
   clearCupuPrompt: () => void;
@@ -124,6 +131,18 @@ export const useSession = create<SessionState>((set) => ({
   },
   signIn: async (email, password) => {
     const token = await signInWithEmail(email, password);
+    try {
+      const user = await loadMe(token);
+      await writeToken(token);
+      setReporterUser({ id: user.id, handle: user.handle });
+      set({ token, user, cupuPrompt: true, signedOutReason: null });
+    } catch (error) {
+      await signOutAuth();
+      throw error;
+    }
+  },
+  signInWithGoogle: async (idToken) => {
+    const token = await signInWithGoogleIdToken(idToken);
     try {
       const user = await loadMe(token);
       await writeToken(token);

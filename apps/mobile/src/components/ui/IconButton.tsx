@@ -12,6 +12,7 @@ export interface IconButtonProps {
   variant?: 'ghost' | 'tonal' | 'filled' | 'glass' | 'hero';
   iconSize?: IconSize;
   disabled?: boolean;
+  accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -22,6 +23,7 @@ export function IconButton({
   variant = 'ghost',
   iconSize = 'lg',
   disabled = false,
+  accessibilityHint,
   style,
 }: IconButtonProps) {
   const { colors } = useTheme();
@@ -40,6 +42,7 @@ export function IconButton({
     <Touchable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       disabled={disabled}
       haptic="light"

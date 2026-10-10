@@ -16,6 +16,11 @@ const envSchema = z.object({
   FIREBASE_CLIENT_EMAIL: z.string().email().optional(),
   FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
   MINIO_ENDPOINT: z.string().min(1).default('http://localhost:9000'),
+  // Host the phone can reach. Empty means the internal endpoint, which only works on the same machine.
+  MINIO_PUBLIC_ENDPOINT: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().min(1).optional(),
+  ),
   MINIO_ACCESS_KEY: z.string().min(1).default('patinha'),
   MINIO_SECRET_KEY: z.string().min(1).default('patinha-secret'),
   MINIO_BUCKET: z.string().min(1).default('patinha-media'),

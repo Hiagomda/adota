@@ -1,11 +1,13 @@
+import * as Linking from 'expo-linking';
 import { Redirect, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleButton } from '../src/components/auth/GoogleButton';
 import { AppText, Button, HeroSurface, Notice, Touchable } from '../src/components/ui';
 import { Mascot } from '../src/mascot';
+import { GOOGLE_HANDOFF_ORIGIN, googleHandoffUrl } from '../src/auth/google';
 import { useSession } from '../src/session';
 import {
   motion,
@@ -28,6 +30,28 @@ export default function WelcomeScreen() {
   const signedOutReason = useSession((state) => state.signedOutReason);
   const clearSignedOutReason = useSession((state) => state.clearSignedOutReason);
   const [notice, setNotice] = useState<string | null>(null);
+  const openingGoogle = useRef(false);
+
+  function continueWithGoogle() {
+    if (openingGoogle.current) return;
+    const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY;
+    const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
+    const appId = process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+    if (!apiKey || !authDomain || !projectId || !appId) {
+      setNotice('O login com Google ainda não foi configurado neste aplicativo.');
+      return;
+    }
+    openingGoogle.current = true;
+    setNotice(null);
+    void Linking.openURL(
+      googleHandoffUrl(GOOGLE_HANDOFF_ORIGIN, { apiKey, authDomain, projectId, appId }),
+    )
+      .catch(() => setNotice('Não consegui abrir o Google. Tente de novo.'))
+      .finally(() => {
+        openingGoogle.current = false;
+      });
+  }
 
   if (token) return <Redirect href={permissionsSeen ? '/(tabs)' : '/permissions'} />;
 
@@ -61,13 +85,7 @@ export default function WelcomeScreen() {
           <View style={styles.column}>
             {signedOutReason ? <Notice message={signedOutReason} tone="warning" /> : null}
             {notice ? <Notice message={notice} tone="info" /> : null}
-            <GoogleButton
-              onPress={() =>
-                setNotice(
-                  'Continuar com Google entra no próximo passo. Por enquanto, use seu e-mail.',
-                )
-              }
-            />
+            <GoogleButton onPress={continueWithGoogle} />
             <Button
               title="Entrar com e-mail"
               icon="mail"

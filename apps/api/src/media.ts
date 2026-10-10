@@ -16,10 +16,20 @@ const extensions: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+/** Address baked into the presigned upload URL. The API itself keeps using the internal endpoint. */
+export function uploadEndpoint(env: Pick<Env, 'MINIO_ENDPOINT' | 'MINIO_PUBLIC_ENDPOINT'>): string {
+  const pub = env.MINIO_PUBLIC_ENDPOINT?.replace(/\/$/, '');
+  return pub && pub.length > 0 ? pub : env.MINIO_ENDPOINT;
+}
+
 export function createStorage(env: Env): S3Client {
+  return storageClient(env, env.MINIO_ENDPOINT);
+}
+
+function storageClient(env: Env, endpoint: string): S3Client {
   return new S3Client({
     region: 'us-east-1',
-    endpoint: env.MINIO_ENDPOINT,
+    endpoint,
     forcePathStyle: true,
     credentials: {
       accessKeyId: env.MINIO_ACCESS_KEY,
@@ -34,6 +44,8 @@ export async function presignUploads(
   userId: string,
   files: { contentType: string; bytes: number }[],
 ): Promise<{ key: string; uploadUrl: string; contentType: string }[]> {
+  const endpoint = uploadEndpoint(env);
+  const signer = endpoint === env.MINIO_ENDPOINT ? storage : storageClient(env, endpoint);
   const uploads = [];
   for (const file of files) {
     const extension = extensions[file.contentType];
@@ -42,7 +54,7 @@ export async function presignUploads(
     }
     const key = `uploads/${userId}/${randomUUID()}.${extension}`;
     const uploadUrl = await getSignedUrl(
-      storage,
+      signer,
       new PutObjectCommand({
         Bucket: env.MINIO_BUCKET,
         Key: key,

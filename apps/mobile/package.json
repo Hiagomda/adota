@@ -11,7 +11,7 @@
     "ios": "expo start --ios --dev-client",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/map/cameraPolicy.test.ts src/auth/validation.test.ts src/auth/errors.test.ts",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/map/cameraPolicy.test.ts src/auth/validation.test.ts src/auth/errors.test.ts src/auth/google.test.ts",
     "version:bump": "node scripts/bump-build.mjs",
     "version:sync": "node scripts/bump-build.mjs --sync",
     "version:publish": "node scripts/bump-build.mjs --sync --publish"

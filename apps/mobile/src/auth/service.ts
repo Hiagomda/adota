@@ -1,7 +1,9 @@
 import {
+  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -38,6 +40,21 @@ export async function signInWithEmail(email: string, password: string): Promise<
     const authError = authErrorFrom(error);
     if (authError.code === 'unexpected') {
       reportError(authError, { source: 'handled', where: 'auth:sign-in' });
+    }
+    throw authError;
+  }
+}
+
+/** Completes the Google handoff. `idToken` is the Google token, not the Firebase one. */
+export async function signInWithGoogleIdToken(idToken: string): Promise<string> {
+  try {
+    const credential = GoogleAuthProvider.credential(idToken);
+    const signed = await signInWithCredential(requireAuth(), credential);
+    return await signed.user.getIdToken();
+  } catch (error) {
+    const authError = authErrorFrom(error);
+    if (authError.code === 'unexpected') {
+      reportError(authError, { source: 'handled', where: 'auth:google' });
     }
     throw authError;
   }

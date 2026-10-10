@@ -1,6 +1,7 @@
+import { File, UploadType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { z } from 'zod';
-import { ApiError, api, fetchWithTimeout, isNetworkError } from '../api';
+import { ApiError, api, isNetworkError } from '../api';
 import type { MapPoint } from '../map/geo';
 
 export const alertDraftSchema = z.object({
@@ -41,23 +42,39 @@ export async function publishAlert(draft: AlertDraft): Promise<{ id: string; rev
       compress: 0.7,
       format: ImageManipulator.SaveFormat.JPEG,
     });
-    // Local file read: a failure here is a missing file, never the network.
-    const file = await fetch(compressed.uri);
-    const blob = await file.blob();
+    const file = new File(compressed.uri);
+    const bytes = file.size ?? 0;
+    if (bytes <= 0) throw new ApiError(0, 'Não consegui ler a foto. Tente de novo.');
     const signed = await api('/uploads/presign', {
       method: 'POST',
       token: draft.token,
-      body: { files: [{ contentType: 'image/jpeg', bytes: blob.size }] },
+      body: { files: [{ contentType: 'image/jpeg', bytes }] },
       schema: presignSchema,
     });
     const upload = signed.uploads[0];
     if (!upload) throw new ApiError(502, 'Sem endereço de envio para a foto.', 'invalid_response');
-    const put = await fetchWithTimeout(
-      upload.uploadUrl,
-      { method: 'PUT', headers: { 'content-type': 'image/jpeg' }, body: blob },
-      uploadTimeoutMs,
-    );
-    if (!put.ok) throw new ApiError(put.status, 'Não consegui enviar a foto. Tente de novo.');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), uploadTimeoutMs);
+    let put: { status: number };
+    try {
+      put = await file.upload(upload.uploadUrl, {
+        httpMethod: 'PUT',
+        uploadType: UploadType.BINARY_CONTENT,
+        headers: { 'content-type': 'image/jpeg' },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new ApiError(0, 'A conexão demorou demais. Tente de novo.', 'timeout');
+      }
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(0, 'Sem conexão. Verifique sua internet e tente de novo.', 'offline');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (put.status < 200 || put.status >= 300) {
+      throw new ApiError(put.status, 'Não consegui enviar a foto. Tente de novo.');
+    }
     media.push({ url: upload.key });
   }
   return api('/posts', {

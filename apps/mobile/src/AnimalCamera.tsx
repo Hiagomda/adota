@@ -1,5 +1,5 @@
 import { CameraView } from 'expo-camera';
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, IconButton, Touchable } from './components/ui';
@@ -8,6 +8,20 @@ import { radius, spacing, useTheme } from './theme';
 
 const SHUTTER = 72;
 const SHUTTER_INNER = 56;
+
+type FlashMode = 'off' | 'on' | 'auto';
+
+const flashLabel: Record<FlashMode, string> = {
+  off: 'Flash desligado',
+  on: 'Flash ligado',
+  auto: 'Flash automático',
+};
+
+function nextFlash(current: FlashMode): FlashMode {
+  if (current === 'off') return 'on';
+  if (current === 'on') return 'auto';
+  return 'off';
+}
 
 const CLOSED_SURFACE = { open: false, preview: false };
 
@@ -22,6 +36,7 @@ export function AnimalCamera() {
   const cameraRef = useRef<CameraView>(null);
   const ready = useRef(false);
   const taking = useRef(false);
+  const [flash, setFlash] = useState<FlashMode>('off');
 
   useEffect(() => {
     if (!surface.preview) ready.current = false;
@@ -54,6 +69,7 @@ export function AnimalCamera() {
           style={StyleSheet.absoluteFill}
           facing="back"
           mode="picture"
+          flash={flash}
           onCameraReady={() => {
             ready.current = true;
           }}
@@ -76,6 +92,18 @@ export function AnimalCamera() {
           accessibilityLabel="Fechar a câmera"
           onPress={() => finishCreateCamera({ canceled: true })}
         />
+      </View>
+      <View style={[styles.flash, { top: insets.top + spacing.md }]}>
+        <IconButton
+          icon="zap"
+          variant={flash === 'off' ? 'glass' : 'filled'}
+          accessibilityLabel={flashLabel[flash]}
+          accessibilityHint="Alterna entre desligado, ligado e automático"
+          onPress={() => setFlash(nextFlash)}
+        />
+        <AppText variant="caption" style={{ color: colors.onMedia }}>
+          {flash === 'auto' ? 'Auto' : flash === 'on' ? 'Ligado' : 'Desligado'}
+        </AppText>
       </View>
       <Touchable
         accessibilityRole="button"
@@ -103,6 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   close: { position: 'absolute', left: spacing.lg, zIndex: 2 },
+  flash: { position: 'absolute', right: spacing.lg, zIndex: 2, alignItems: 'center' },
   shutter: {
     position: 'absolute',
     alignSelf: 'center',

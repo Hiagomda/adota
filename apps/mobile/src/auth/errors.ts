@@ -39,6 +39,7 @@ export function mapFirebaseCode(code: string): AuthErrorCode {
       return 'invalid-credentials';
     case 'auth/email-already-in-use':
     case 'auth/credential-already-in-use':
+    case 'auth/account-exists-with-different-credential':
       return 'email-in-use';
     case 'auth/weak-password':
       return 'weak-password';
