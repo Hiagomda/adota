@@ -31,14 +31,14 @@ const steps: {
     image: require('../../assets/images/cupu-scout.png'),
     title: 'Olha o que tu podes fazer:',
     description:
-      'Podes cadastrar pets pra adoção, oferecer lar temporário, dar aquela carona solidária ou sinalizar no mapa se vires algum animalzinho precisando de resgate.',
+      'Podes cadastrar pets pra adoção, oferecer lar temporário ou sinalizar no mapa se vires algum animalzinho precisando de resgate.',
     button: 'E como ganho selos?',
   },
   {
     image: require('../../assets/images/cupu-happy.png'),
     title: 'Ajuda e ganha XP!',
     description:
-      'A cada boa ação concluída, tu ganhas pontos, sobes de nível e liberas selos bonitões como Herói Local e Piloto do Bem!',
+      'A cada boa ação concluída, tu ganhas pontos, sobes de nível e liberas selos como Herói Local.',
     button: 'Bora lá, Cupu!',
   },
 ];
@@ -156,7 +156,13 @@ export default function CupuOnboarding() {
                 />
               ))}
             </View>
-            <Button title={step.button} variant="secondary" size="lg" fullWidth onPress={() => void advance()} />
+            <Button
+              title={step.button}
+              variant="secondary"
+              size="lg"
+              fullWidth
+              onPress={() => void advance()}
+            />
           </View>
         </View>
       </View>

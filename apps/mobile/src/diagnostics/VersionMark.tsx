@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { formatAppVersion } from '../appVersion';
+import { currentReleaseNotes } from '../updates/releaseNotes';
 import { AppText, BottomSheet, Button, Touchable } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { radius, size, spacing, useTheme } from '../theme';
@@ -68,6 +69,13 @@ export function VersionMark() {
           {label}
         </AppText>
       </Touchable>
+      <View style={styles.notes}>
+        {currentReleaseNotes.map((note) => (
+          <AppText key={note} variant="caption" color="textSecondary" style={styles.caption}>
+            {note}
+          </AppText>
+        ))}
+      </View>
       <BottomSheet visible={open} onClose={() => setOpen(false)} title="Diagnóstico">
         <AppText color="textSecondary">
           Isso identifica o aplicativo instalado neste aparelho. Pode copiar e mandar no suporte.
@@ -104,6 +112,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   caption: { textAlign: 'center' },
+  notes: { gap: spacing.xs, paddingBottom: spacing.sm },
   panel: {
     borderRadius: radius.md,
     padding: spacing.md,

@@ -35,16 +35,23 @@ if (existsSync(gradleFile)) {
   if (!/versionCode \d+/.test(after)) throw new Error(`versionCode not found in ${gradleFile}`);
   if (after !== before) {
     writeFileSync(gradleFile, after);
-    console.log(`android/app/build.gradle -> versionCode ${release.build}, versionName ${release.version}`);
+    console.log(
+      `android/app/build.gradle -> versionCode ${release.build}, versionName ${release.version}`,
+    );
   } else {
     console.log('android/app/build.gradle already in sync');
   }
 } else {
-  console.log('android/ not generated here; `expo prebuild` will read version.json through app.config.ts');
+  console.log(
+    'android/ not generated here; `expo prebuild` will read version.json through app.config.ts',
+  );
 }
 
 if (args.has('--publish')) {
-  const published = { version: release.version, androidVersionCode: release.build };
+  const notes = Array.isArray(release.notes)
+    ? release.notes.filter((item) => typeof item === 'string' && item.trim() !== '')
+    : [];
+  const published = { version: release.version, androidVersionCode: release.build, notes };
   writeFileSync(publishedFile, `${JSON.stringify(published, null, 2)}\n`);
   console.log(`download/version.json -> ${published.version} / ${published.androidVersionCode}`);
 }

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AnimalCamera } from '../../src/AnimalCamera';
 import { FloatingTabBar } from '../../src/components/ui';
 import { openCreateCamera } from '../../src/createCamera';
+import { requestFeedRefresh } from '../../src/feedRefresh';
 import { useTheme } from '../../src/theme';
 
 export default function TabsLayout() {
@@ -26,7 +27,15 @@ export default function TabsLayout() {
           freezeOnBlur: true,
         }}
       >
-        <Tabs.Screen name="index" options={{ tabBarAccessibilityLabel: 'Início' }} />
+        <Tabs.Screen
+          name="index"
+          listeners={{
+            tabPress: () => {
+              requestFeedRefresh();
+            },
+          }}
+          options={{ tabBarAccessibilityLabel: 'Início' }}
+        />
         <Tabs.Screen name="explore" options={{ tabBarAccessibilityLabel: 'Mapa' }} />
         <Tabs.Screen
           name="create"

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
@@ -20,16 +20,16 @@ import {
   HeroSurface,
   IconButton,
   OrgCard,
-  ProgressBar,
   SectionHeader,
   ShortcutCard,
   SkeletonCard,
   SkeletonRail,
   Touchable,
 } from '../../src/components/ui';
+import { onFeedRefresh } from '../../src/feedRefresh';
 import { formatWhen } from '../../src/format';
 import { useSession } from '../../src/session';
-import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
+import { screenColumn, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { useLightStatusBar } from '../../src/useLightStatusBar';
 import { badgeArt } from '../../src/volunteer/badgeArt';
@@ -40,8 +40,6 @@ const STORY_WIDTH = 76;
 const MAX_ORGS = 8;
 const MAX_SEALS = 3;
 const SEAL_SIZE = 72;
-const LEVEL_PLACEHOLDER_HEIGHT = 20;
-
 function postKey(post: Post): string {
   return post.id;
 }
@@ -91,26 +89,13 @@ function collectOrgs(posts: Post[]): OrgSummary[] {
 
 interface HeroProps {
   name: string | null;
-  hasToken: boolean;
-  volunteer: { data: VolunteerStatus | undefined; isLoading: boolean; isError: boolean };
   unread: boolean;
   onNotifications: () => void;
   onLost: () => void;
 }
 
-const Hero = memo(function Hero({
-  name,
-  hasToken,
-  volunteer,
-  unread,
-  onNotifications,
-  onLost,
-}: HeroProps) {
-  const { colors } = useTheme();
+const Hero = memo(function Hero({ name, unread, onNotifications, onLost }: HeroProps) {
   const insets = useSafeAreaInsets();
-  const level = volunteer.data?.level;
-  const xp = volunteer.data?.xp ?? 0;
-  const remaining = level && level.ceiling !== null ? Math.max(level.ceiling - xp, 0) : null;
   const title = name ? `${greeting()}, ${firstName(name)}!` : `${greeting()}!`;
   return (
     <HeroSurface
@@ -150,55 +135,9 @@ const Hero = memo(function Hero({
             ) : null}
           </View>
         </View>
-
-        {hasToken ? (
-          <View style={styles.level}>
-            {volunteer.isLoading ? (
-              <View
-                accessible
-                accessibilityLabel="Carregando seu nível"
-                style={[styles.levelPlaceholder, { backgroundColor: colors.heroTrack }]}
-              />
-            ) : volunteer.isError || !level ? (
-              <AppText variant="bodySmall" color="onHeroMuted">
-                Não consegui carregar seu nível. Puxe a tela para baixo para tentar de novo.
-              </AppText>
-            ) : (
-              <>
-                <View style={styles.levelRow}>
-                  <View style={styles.levelName}>
-                    <AppText variant="caption" color="onHeroMuted">
-                      Seu nível
-                    </AppText>
-                    <AppText variant="h2" color="onHero" numberOfLines={1}>
-                      {level.name}
-                    </AppText>
-                  </View>
-                  <View style={styles.xp}>
-                    <AppText variant="stat" color="onHero">
-                      {xp}
-                    </AppText>
-                    <AppText variant="bodySmallStrong" color="onHeroMuted">
-                      XP
-                    </AppText>
-                  </View>
-                </View>
-                <ProgressBar
-                  tone="hero"
-                  value={level.progress}
-                  label="Rumo ao próximo nível"
-                  caption={
-                    remaining === null ? 'Você chegou no topo' : `Faltam ${remaining} XP`
-                  }
-                />
-              </>
-            )}
-          </View>
-        ) : (
-          <AppText variant="body" color="onHeroMuted" style={styles.welcome}>
-            Belém tem bichinho esperando por você. Cada ajuda conta.
-          </AppText>
-        )}
+        <AppText variant="body" color="onHeroMuted" style={styles.welcome}>
+          Belém tem bichinho esperando por você. Cada ajuda conta.
+        </AppText>
       </View>
     </HeroSurface>
   );
@@ -307,7 +246,7 @@ export default function HomeScreen() {
   const seals = useMemo(
     () =>
       (volunteer.data?.badges ?? [])
-        .filter((badge) => badge.unlockedAt !== null)
+        .filter((badge) => badge.unlockedAt !== null && badge.code !== 'good_pilot')
         .sort((a, b) => (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''))
         .slice(0, MAX_SEALS),
     [volunteer.data],
@@ -354,7 +293,7 @@ export default function HomeScreen() {
     listRef.current?.scrollToOffset({ offset, animated: true });
   }
 
-  function refreshAll() {
+  const refreshAll = useCallback(() => {
     void feed.refetch();
     void stories.refetch();
     void adoption.refetch();
@@ -364,7 +303,14 @@ export default function HomeScreen() {
       void volunteer.refetch();
       void notifications.refetch();
     }
-  }
+  }, [adoption, campaigns, feed, me, notifications, stories, token, volunteer]);
+
+  useEffect(() => {
+    return onFeedRefresh(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      refreshAll();
+    });
+  }, [refreshAll]);
 
   const renderPost = useCallback(
     ({ item }: { item: Post }) => (
@@ -379,12 +325,6 @@ export default function HomeScreen() {
     <View>
       <Hero
         name={me.data?.name ?? null}
-        hasToken={Boolean(token)}
-        volunteer={{
-          data: volunteer.data,
-          isLoading: volunteer.isLoading,
-          isError: volunteer.isError,
-        }}
         unread={unreadNotifications}
         onNotifications={() => router.push('/alerts')}
         onLost={() => router.push('/lost')}
@@ -483,12 +423,12 @@ export default function HomeScreen() {
         ) : null}
 
         <View onLayout={(event) => (campaignY.current = event.nativeEvent.layout.y)}>
-          <SectionHeader
-            title="Campanhas"
-            subtitle="Pedidos de ajuda de perfis verificados"
-          />
+          <SectionHeader title="Campanhas" subtitle="Pedidos de ajuda de perfis verificados" />
           {campaigns.isLoading ? (
-            <SkeletonRail width={size.orgCard.width + spacing.xxl} height={size.animalCompact.height} />
+            <SkeletonRail
+              width={size.orgCard.width + spacing.xxl}
+              height={size.animalCompact.height}
+            />
           ) : campaigns.isError ? (
             <ErrorState
               compact
@@ -626,11 +566,6 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroText: { flex: 1 },
   unread: { position: 'absolute', top: spacing.sm, right: spacing.sm },
-  level: { gap: spacing.md },
-  levelPlaceholder: { height: LEVEL_PLACEHOLDER_HEIGHT, borderRadius: radius.pill },
-  levelRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  levelName: { flex: 1 },
-  xp: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   welcome: { paddingRight: spacing.xl },
   // The block climbs over the header by the room the hero leaves for it. The pull is on the block,
   // not on the shortcuts, so they stay inside their parent and keep receiving touches on Android.

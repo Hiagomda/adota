@@ -66,7 +66,7 @@ export async function saveVolunteerSettings(
        service_radius_km = EXCLUDED.service_radius_km`,
     [
       userId,
-      input.isTransportAvailable,
+      false,
       input.isFosterAvailable,
       JSON.stringify(input.fosterPetTypes),
       input.fosterMaxDays,
@@ -116,7 +116,7 @@ function present(profile: ProfileRow | undefined, xp: number, badges: BadgeRow[]
   return {
     settings: profile
       ? {
-          isTransportAvailable: profile.is_transport_available,
+          isTransportAvailable: false,
           isFosterAvailable: profile.is_foster_available,
           fosterPetTypes: profile.foster_pet_types,
           fosterMaxDays: profile.foster_max_days,
@@ -125,11 +125,13 @@ function present(profile: ProfileRow | undefined, xp: number, badges: BadgeRow[]
       : emptySettings,
     xp,
     level: levelForXp(xp),
-    badges: volunteerBadgeCatalog.map((badge) => ({
-      code: badge.code,
-      name: badge.name,
-      unlockedAt: iso(unlocked.get(badge.code)),
-    })),
+    badges: volunteerBadgeCatalog
+      .filter((badge) => badge.code !== 'good_pilot')
+      .map((badge) => ({
+        code: badge.code,
+        name: badge.name,
+        unlockedAt: iso(unlocked.get(badge.code)),
+      })),
   };
 }
 

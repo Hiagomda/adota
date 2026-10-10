@@ -4,16 +4,18 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { loadFeed, loadMe, messageFrom } from '../../src/api';
+import { api, loadFeed, loadMe, messageFrom } from '../../src/api';
 import {
   ActionCard,
   AppText,
   Avatar,
   Badge,
   Button,
+  Card,
   EmptyState,
   ErrorState,
   IconButton,
+  ProgressBar,
   Segmented,
   SkeletonRows,
   Touchable,
@@ -21,6 +23,7 @@ import {
 import { VersionMark } from '../../src/diagnostics/VersionMark';
 import { useSession } from '../../src/session';
 import { motion, screenColumn, spacing, useTheme } from '../../src/theme';
+import type { VolunteerStatus } from '../../src/volunteer/types';
 
 type ProfileTab = 'posts' | 'saved' | 'adopted';
 
@@ -45,6 +48,14 @@ export default function ProfileScreen() {
     queryFn: () => loadMe(token ?? ''),
     enabled: Boolean(token),
   });
+  const volunteer = useQuery({
+    queryKey: ['volunteer', token],
+    queryFn: () => api<VolunteerStatus>('/volunteers/me', { token }),
+    enabled: Boolean(token),
+  });
+  const level = volunteer.data?.level;
+  const xp = volunteer.data?.xp ?? 0;
+  const remaining = level && level.ceiling !== null ? Math.max(level.ceiling - xp, 0) : null;
   const search =
     tab === 'saved'
       ? '?saved=true&limit=30'
@@ -68,10 +79,13 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl
-            refreshing={Boolean(token) && (me.isRefetching || posts.isRefetching)}
+            refreshing={
+              Boolean(token) && (me.isRefetching || posts.isRefetching || volunteer.isRefetching)
+            }
             onRefresh={() => {
               void me.refetch();
               void posts.refetch();
+              void volunteer.refetch();
             }}
             tintColor={colors.primary}
             colors={[colors.primary]}
@@ -80,7 +94,12 @@ export default function ProfileScreen() {
       >
         <View style={styles.column}>
           <View style={styles.head}>
-            <Avatar name={me.data?.name ?? 'Sua conta'} size="xl" verified={me.data?.verified} />
+            <Avatar
+              name={me.data?.name ?? 'Sua conta'}
+              uri={me.data?.avatarUrl}
+              size="xl"
+              verified={me.data?.verified}
+            />
             <View style={styles.headText}>
               <AppText variant="h1" numberOfLines={1}>
                 {me.data?.name ?? 'Sua conta'}
@@ -98,10 +117,25 @@ export default function ProfileScreen() {
               onPress={() => router.push('/settings')}
             />
           </View>
+          {token && level ? (
+            <View style={styles.network}>
+              <Card elevation="md">
+                <ProgressBar
+                  value={level.progress}
+                  label={level.name}
+                  caption={
+                    remaining === null
+                      ? `${xp} XP · você chegou no topo`
+                      : `${xp} XP · faltam ${remaining} para o próximo`
+                  }
+                />
+              </Card>
+            </View>
+          ) : null}
           <View style={styles.network}>
             <ActionCard
               title="Minha rede"
-              description="Transporte, lar temporário e selos"
+              description="Lar temporário e selos"
               icon="users"
               tone="primary"
               onPress={() => router.push('/voluntario')}
@@ -166,7 +200,9 @@ export default function ProfileScreen() {
               title="Entre para ver seu perfil"
               body="Seus resgates, os que você salvou e as adoções concluídas ficam ligados à sua conta."
               actionLabel="Entrar"
-              onAction={() => router.push({ pathname: '/login', params: { returnTo: '/(tabs)/profile' } })}
+              onAction={() =>
+                router.push({ pathname: '/login', params: { returnTo: '/(tabs)/profile' } })
+              }
             />
           ) : me.isLoading || posts.isLoading ? (
             <SkeletonRows />

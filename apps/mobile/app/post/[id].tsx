@@ -14,13 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadPost, messageFrom, siteUrl } from '../../src/api';
-import {
-  animalHeadline,
-  placeOf,
-  sexLabel,
-  sizeLabel,
-  speciesLabel,
-} from '../../src/animalLabels';
+import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
   AnimalCard,
   AppText,
@@ -63,6 +57,7 @@ import { useLightStatusBar } from '../../src/useLightStatusBar';
 interface Comment {
   id: string;
   body: string;
+  parentHandle: string | null;
   author: { handle: string };
 }
 
@@ -94,6 +89,7 @@ export default function PostScreen() {
   const [adoptOpen, setAdoptOpen] = useState(false);
   const [helping, setHelping] = useState(false);
   const [comment, setComment] = useState('');
+  const [replyTo, setReplyTo] = useState<{ id: string; handle: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const { width } = useWindowDimensions();
@@ -108,7 +104,7 @@ export default function PostScreen() {
   const comments = useQuery({
     queryKey: ['comments', id],
     queryFn: () => api<{ comments: Comment[] }>(`/posts/${id}/comments`, { token }),
-    enabled: commentsOpen && Boolean(id),
+    enabled: Boolean(id),
   });
   const fosters = useQuery({
     queryKey: ['fosters', id],
@@ -155,7 +151,9 @@ export default function PostScreen() {
         body: { kind: 'will_help' },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => undefined,
+      );
       setHelpOpen(false);
       setNote(
         'Combinado. O ponto exato deste resgate fica visível para você. O WhatsApp só aparece se a pessoa autorizou.',
@@ -264,7 +262,9 @@ export default function PostScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: footerHeight + spacing.xl }}
       >
-        <View style={[styles.gallery, { height: galleryHeight, backgroundColor: colors.surfaceMuted }]}>
+        <View
+          style={[styles.gallery, { height: galleryHeight, backgroundColor: colors.surfaceMuted }]}
+        >
           {item.media.length > 0 ? (
             <ScrollView
               horizontal
@@ -304,7 +304,9 @@ export default function PostScreen() {
                   style={[
                     styles.dot,
                     index === photoIndex ? styles.dotActive : null,
-                    { backgroundColor: index === photoIndex ? colors.onMedia : colors.onMediaMuted },
+                    {
+                      backgroundColor: index === photoIndex ? colors.onMedia : colors.onMediaMuted,
+                    },
                   ]}
                 />
               ))}
@@ -332,7 +334,11 @@ export default function PostScreen() {
             <View style={styles.chips}>
               <InfoChip label={speciesName} icon="heart" tone="primary" />
               {sizeLabel[item.animal.size] ? (
-                <InfoChip label={sizeLabel[item.animal.size] ?? ''} icon="maximize-2" tone="caramel" />
+                <InfoChip
+                  label={sizeLabel[item.animal.size] ?? ''}
+                  icon="maximize-2"
+                  tone="caramel"
+                />
               ) : null}
               {sexLabel[item.animal.sex] ? (
                 <InfoChip label={sexLabel[item.animal.sex] ?? ''} icon="user" tone="secondary" />
@@ -346,7 +352,11 @@ export default function PostScreen() {
               <AppText variant="h2">A história deste {speciesName.toLowerCase()}</AppText>
               <AppText>{item.description}</AppText>
               {animalLines.length > 0 ? (
-                <Card padding="none" elevation="none" style={{ backgroundColor: colors.surfaceMuted }}>
+                <Card
+                  padding="none"
+                  elevation="none"
+                  style={{ backgroundColor: colors.surfaceMuted }}
+                >
                   {animalLines.map((line, index) => (
                     <View key={line.text}>
                       {index > 0 ? <Divider inset /> : null}
@@ -392,7 +402,11 @@ export default function PostScreen() {
                 </View>
               </Card>
               {item.author.phone ? (
-                <Card padding="none" elevation="none" style={{ backgroundColor: colors.surfaceMuted }}>
+                <Card
+                  padding="none"
+                  elevation="none"
+                  style={{ backgroundColor: colors.surfaceMuted }}
+                >
                   <ListItem title="WhatsApp" subtitle={item.author.phone} icon="message-circle" />
                 </Card>
               ) : null}
@@ -434,7 +448,9 @@ export default function PostScreen() {
               <View style={styles.spacer} />
               <AppText variant="bodySmall" color="textSecondary">
                 {item.counts.likes === 1 ? '1 curtida' : `${item.counts.likes} curtidas`} ·{' '}
-                {item.counts.comments === 1 ? '1 comentário' : `${item.counts.comments} comentários`}
+                {item.counts.comments === 1
+                  ? '1 comentário'
+                  : `${item.counts.comments} comentários`}
               </AppText>
             </View>
 
@@ -479,6 +495,41 @@ export default function PostScreen() {
                 </Card>
               </View>
             ) : null}
+
+            <View style={styles.section}>
+              <AppText variant="h2">Conversa</AppText>
+              <AppText color="textSecondary">
+                A nota do diário conta o que mudou no resgate. Aqui o pessoal conversa e debate.
+              </AppText>
+              {(comments.data?.comments.length ?? 0) === 0 ? (
+                <AppText color="textSecondary">Ninguém comentou ainda. Escreva o primeiro.</AppText>
+              ) : (
+                (comments.data?.comments ?? []).map((itemComment) => (
+                  <Touchable
+                    key={itemComment.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Responder comentário de @${itemComment.author.handle}`}
+                    onPress={() => {
+                      setReplyTo({ id: itemComment.id, handle: itemComment.author.handle });
+                      setCommentsOpen(true);
+                    }}
+                  >
+                    <AppText>
+                      <AppText variant="bodyStrong">@{itemComment.author.handle}</AppText>
+                      {itemComment.parentHandle ? ` para @${itemComment.parentHandle}` : ''}{' '}
+                      {itemComment.body}
+                    </AppText>
+                  </Touchable>
+                ))
+              )}
+              <Button
+                title="Comentar"
+                icon="message-circle"
+                variant="outline"
+                fullWidth
+                onPress={() => setCommentsOpen(true)}
+              />
+            </View>
 
             <AnimalDiary
               post={item}
@@ -598,7 +649,10 @@ export default function PostScreen() {
           styles.footer,
           shadows.lg,
           // The shadow of the footer goes up, over the content.
-          { shadowOffset: { width: 0, height: -spacing.sm }, backgroundColor: colors.surfaceRaised },
+          {
+            shadowOffset: { width: 0, height: -spacing.sm },
+            backgroundColor: colors.surfaceRaised,
+          },
           { paddingBottom: footerPad },
         ]}
       >
@@ -613,7 +667,11 @@ export default function PostScreen() {
           <View style={styles.footerCta}>
             <Button
               title={
-                forAdoption ? 'Quero adotar' : item.viewerWillHelp ? 'Você vai ajudar' : 'Eu vou ajudar'
+                forAdoption
+                  ? 'Quero adotar'
+                  : item.viewerWillHelp
+                    ? 'Você vai ajudar'
+                    : 'Eu vou ajudar'
               }
               icon={forAdoption || !item.viewerWillHelp ? 'heart' : 'check'}
               variant={!forAdoption && item.viewerWillHelp ? 'outline' : 'secondary'}
@@ -625,7 +683,14 @@ export default function PostScreen() {
         </View>
       </View>
 
-      <BottomSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} title="Comentários">
+      <BottomSheet
+        visible={commentsOpen}
+        onClose={() => {
+          setCommentsOpen(false);
+          setReplyTo(null);
+        }}
+        title="Comentários"
+      >
         <ScrollView style={styles.commentList}>
           {comments.isError ? (
             <AppText color="textSecondary">{messageFrom(comments.error)}</AppText>
@@ -633,39 +698,61 @@ export default function PostScreen() {
             <AppText color="textSecondary">Ninguém comentou ainda. Escreva o primeiro.</AppText>
           ) : null}
           {(comments.data?.comments ?? []).map((itemComment) => (
-            <View key={itemComment.id} style={styles.comment}>
+            <Touchable
+              key={itemComment.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Responder @${itemComment.author.handle}`}
+              onPress={() => setReplyTo({ id: itemComment.id, handle: itemComment.author.handle })}
+              style={styles.comment}
+            >
               <AppText>
-                <AppText variant="bodyStrong">@{itemComment.author.handle}</AppText> {itemComment.body}
+                <AppText variant="bodyStrong">@{itemComment.author.handle}</AppText>
+                {itemComment.parentHandle ? ` para @${itemComment.parentHandle}` : ''}{' '}
+                {itemComment.body}
               </AppText>
-            </View>
+            </Touchable>
           ))}
         </ScrollView>
         <View style={styles.commentForm}>
+          {replyTo ? (
+            <AppText color="textSecondary">
+              Respondendo @{replyTo.handle}. Toque de novo num comentário para mudar.
+            </AppText>
+          ) : null}
           <Input
             label="Seu comentário"
             value={comment}
             onChangeText={setComment}
-            placeholder="Escreva um comentário"
+            placeholder={replyTo ? `Responder @${replyTo.handle}` : 'Escreva um comentário'}
           />
           <Button
-            title="Publicar"
+            title={replyTo ? 'Responder' : 'Publicar'}
             icon="send"
             disabled={comment.trim().length === 0}
             fullWidth
             onPress={() => {
               const body = comment.trim();
               if (!body) return;
-              void act(`/posts/${item.id}/comments`, 'POST', { body }).then((ok) => {
+              void act(`/posts/${item.id}/comments`, 'POST', {
+                body,
+                parentCommentId: replyTo?.id,
+              }).then((ok) => {
                 if (!ok) return;
                 setComment('');
+                setReplyTo(null);
                 void client.invalidateQueries({ queryKey: ['comments', id] });
+                void client.invalidateQueries({ queryKey: ['post', id, token] });
               });
             }}
           />
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={reportOpen} onClose={() => setReportOpen(false)} title="Por que você denuncia?">
+      <BottomSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        title="Por que você denuncia?"
+      >
         {reportReasons.map((reason) => (
           <ListItem
             key={reason}
@@ -690,8 +777,8 @@ export default function PostScreen() {
       <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} title="Você vai ajudar?">
         <View style={styles.help}>
           <AppText color="textSecondary">
-            O ponto exato deste resgate passa a aparecer para você. O WhatsApp da pessoa só entra se ela
-            autorizou o contato. O app não recebe dinheiro.
+            O ponto exato deste resgate passa a aparecer para você. O WhatsApp da pessoa só entra se
+            ela autorizou o contato. O app não recebe dinheiro.
           </AppText>
           <Button
             title={helping ? 'Confirmando...' : 'Confirmar, eu vou ajudar'}
@@ -708,8 +795,8 @@ export default function PostScreen() {
       <BottomSheet visible={adoptOpen} onClose={() => setAdoptOpen(false)} title="Quero adotar">
         <View style={styles.help}>
           <AppText color="textSecondary">
-            Você se compromete a cuidar do animal, manter a castração e avisar quem o resgatou sobre a
-            adaptação. A adoção em si combinam fora do app: o Égua, adota! nunca recebe dinheiro.
+            Você se compromete a cuidar do animal, manter a castração e avisar quem o resgatou sobre
+            a adaptação. A adoção em si combinam fora do app: o Égua, adota! nunca recebe dinheiro.
           </AppText>
           <Button
             title="Aceitar o termo e adotar"

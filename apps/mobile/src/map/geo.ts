@@ -19,6 +19,14 @@ export interface MapBounds {
   north: number;
 }
 
+/** Whole Belém box, so paws load before the camera reports its own edges. */
+export const belemBounds: MapBounds = {
+  west: -48.62753,
+  south: -1.59875,
+  east: -48.08741,
+  north: -0.9356,
+};
+
 // Círculo aproximado em metros, usado como margem do GPS em volta do pino.
 export function accuracyPolygon(point: MapPoint, radiusM: number) {
   const steps = 64;

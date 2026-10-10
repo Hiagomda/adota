@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ApiError, api } from '../../src/api';
+import { ApiError, api, loadPost } from '../../src/api';
 import { reportError } from '../../src/crash/reporter';
 import {
   AppText,
@@ -35,6 +35,7 @@ import { PlacePicker } from '../../src/place/PlacePicker';
 import { isOfflineError, preparePhoto, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
+import type { Post } from '../../src/types';
 
 const suggestions = [
   'Está na rua e precisa de resgate agora.',
@@ -223,6 +224,16 @@ export default function CreateScreen() {
       })
         .then(() => client.invalidateQueries({ queryKey: ['volunteer', token] }))
         .catch(() => undefined);
+      const fresh = await loadPost(created.id, token).catch(() => null);
+      if (fresh) {
+        client.setQueryData(
+          ['posts', token],
+          (current: { posts: Post[]; nextCursor: string | null } | undefined) => ({
+            posts: [fresh, ...(current?.posts ?? []).filter((item) => item.id !== fresh.id)],
+            nextCursor: current?.nextCursor ?? null,
+          }),
+        );
+      }
       void client.invalidateQueries({ queryKey: ['posts'] });
       void client.invalidateQueries({ queryKey: ['map'] });
       if (created.reviewStatus === 'pending') {

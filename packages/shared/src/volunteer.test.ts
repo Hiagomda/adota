@@ -4,7 +4,7 @@ import { badgesForAction, levelForXp, pointsForVolunteerAction } from './volunte
 describe('volunteer points', () => {
   it('scores each action from the server rules', () => {
     expect(pointsForVolunteerAction({ actionType: 'report' })).toBe(20);
-    expect(pointsForVolunteerAction({ actionType: 'transport' })).toBe(150);
+    expect(pointsForVolunteerAction({ actionType: 'transport' })).toBe(0);
     expect(pointsForVolunteerAction({ actionType: 'foster', days: 3 })).toBe(300);
     expect(pointsForVolunteerAction({ actionType: 'donation', amountReais: 40 })).toBe(40);
     expect(pointsForVolunteerAction({ actionType: 'adoption' })).toBe(500);
@@ -21,7 +21,7 @@ describe('volunteer points', () => {
 
   it('unlocks the badge that matches the action', () => {
     expect(badgesForAction('report', 20)).toEqual(['neighborhood_scout']);
-    expect(badgesForAction('transport', 150)).toEqual(['good_pilot', 'local_hero']);
+    expect(badgesForAction('transport', 150)).toEqual(['local_hero']);
     expect(badgesForAction('report', 120)).toContain('local_hero');
   });
 });

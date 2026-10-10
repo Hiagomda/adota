@@ -1,6 +1,7 @@
 export type PublishedNativeApp = {
   version: string;
   androidVersionCode: number | null;
+  notes: string[];
 };
 
 export function parsePublishedNativeApp(value: unknown): PublishedNativeApp | null {
@@ -8,9 +9,15 @@ export function parsePublishedNativeApp(value: unknown): PublishedNativeApp | nu
   const record = value as Record<string, unknown>;
   if (typeof record.version !== 'string' || record.version.trim() === '') return null;
   const code = record.androidVersionCode;
+  const notes = Array.isArray(record.notes)
+    ? record.notes
+        .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+        .slice(0, 8)
+    : [];
   return {
     version: record.version.trim(),
     androidVersionCode: typeof code === 'number' && Number.isFinite(code) ? code : null,
+    notes,
   };
 }
 

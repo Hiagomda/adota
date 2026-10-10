@@ -94,7 +94,24 @@ export function isOfflineError(error: unknown): boolean {
   return isNetworkError(error);
 }
 
-export async function publishAlert(draft: AlertDraft): Promise<{ id: string; reviewStatus: string }> {
+/** Uploads one picture and returns the storage key the API can turn into a public photo. */
+export async function uploadProfilePhoto(token: string, uri: string): Promise<string> {
+  const photo = await preparedPhoto(uri);
+  const signed = await api('/uploads/presign', {
+    method: 'POST',
+    token,
+    body: { files: [{ contentType: 'image/jpeg', bytes: photo.bytes }] },
+    schema: presignSchema,
+  });
+  const upload = signed.uploads[0];
+  if (!upload) throw new ApiError(502, 'Sem endereço de envio para a foto.', 'invalid_response');
+  await putPhoto(photo.uri, upload.uploadUrl);
+  return upload.key;
+}
+
+export async function publishAlert(
+  draft: AlertDraft,
+): Promise<{ id: string; reviewStatus: string }> {
   const photos = await Promise.all(draft.photos.map((photo) => preparedPhoto(photo)));
   const signed = await api('/uploads/presign', {
     method: 'POST',
@@ -108,7 +125,8 @@ export async function publishAlert(draft: AlertDraft): Promise<{ id: string; rev
   const media = await Promise.all(
     photos.map(async (photo, index) => {
       const upload = signed.uploads[index];
-      if (!upload) throw new ApiError(502, 'Sem endereço de envio para a foto.', 'invalid_response');
+      if (!upload)
+        throw new ApiError(502, 'Sem endereço de envio para a foto.', 'invalid_response');
       await putPhoto(photo.uri, upload.uploadUrl);
       return { url: upload.key };
     }),

@@ -117,9 +117,19 @@ export function UpdatePrompt() {
             ? 'O Android precisa da sua permissão para instalar a atualização por aqui.'
             : 'Não consegui concluir a atualização. Tente de novo daqui a pouco.'
           : native
-            ? 'A atualização baixa aqui no app e abre o instalador do Android. Não passa pelo navegador.'
+            ? `Alpha de teste · versão ${offer && offer.kind === 'native' ? offer.version : ''}`
             : 'Tem uma versão nova do Égua, adota!. Quer baixar e abrir agora?'}
       </AppText>
+      {native && offer?.kind === 'native' && offer.notes.length > 0 ? (
+        <View style={styles.notes}>
+          <AppText variant="bodyStrong">O que mudou</AppText>
+          {offer.notes.map((note) => (
+            <AppText key={note} color="textSecondary">
+              {`• ${note}`}
+            </AppText>
+          ))}
+        </View>
+      ) : null}
       {busy ? (
         <View style={styles.busy} accessibilityRole="progressbar">
           <ActivityIndicator color={colors.primary} />
@@ -154,6 +164,7 @@ export function UpdatePrompt() {
 }
 
 const styles = StyleSheet.create({
+  notes: { gap: spacing.xs },
   actions: { gap: spacing.sm, paddingTop: spacing.sm },
   busy: {
     minHeight: 48,

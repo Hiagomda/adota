@@ -26,9 +26,11 @@ import { addResponse, changeStatus, createPost, getPost, listPosts } from './fee
 import { ensureFirebaseApp, firebaseChecksRevocation } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
-import { presignUploads, verifyUploadedImages } from './media.js';
+import { publicMediaUrl, presignUploads, verifyUploadedImages } from './media.js';
+import { assertOwnedMedia } from './mediaPolicy.js';
 import {
   enqueueRescueAlert,
+  notifyComment,
   notifyDiaryNote,
   notifyStatusChange,
   type createQueue,
@@ -42,6 +44,7 @@ type RescueQueue = ReturnType<typeof createQueue>;
 const devLoginSchema = z.object({ email: z.string().trim().email() });
 const commentSchema = z.object({
   body: z.string().trim().min(1).max(500).transform(stripControls),
+  parentCommentId: z.string().uuid().optional(),
 });
 const reportSchema = z.object({
   targetType: z.enum(['post', 'comment', 'user']),
@@ -110,7 +113,12 @@ export async function registerRoutes(
 
   app.patch('/me', async (request) => {
     const user = requireUser(request.user);
-    await updateProfile(pool, user.id, parse(updateMeSchema, request.body));
+    const patch = parse(updateMeSchema, request.body);
+    if (patch.avatarUrl?.startsWith('uploads/')) {
+      assertOwnedMedia(user.id, [patch.avatarUrl]);
+      patch.avatarUrl = publicMediaUrl(env, patch.avatarUrl, 'thumb');
+    }
+    await updateProfile(pool, user.id, patch);
     const fresh = await findUserByFirebaseUid(pool, user.firebaseUid);
     if (!fresh) throw new HttpError(404, 'Essa conta não existe.');
     return publicUser(fresh);
@@ -320,10 +328,14 @@ export async function registerRoutes(
   app.get('/posts/:id/comments', async (request) => {
     const id = resourceId(request.params);
     const result = await pool.query(
-      `SELECT c.id, c.body, c.created_at, u.id AS user_id, u.name, u.handle, u.avatar_url
+      `SELECT c.id, c.body, c.created_at, c.parent_comment_id,
+              u.id AS user_id, u.name, u.handle, u.avatar_url,
+              parent_user.handle AS parent_handle
        FROM comments c
        JOIN users u ON u.id = c.user_id
        JOIN posts p ON p.id = c.post_id
+       LEFT JOIN comments parent ON parent.id = c.parent_comment_id
+       LEFT JOIN users parent_user ON parent_user.id = parent.user_id
        WHERE c.post_id = $1
          AND c.hidden = false
          AND p.hidden = false
@@ -346,6 +358,8 @@ export async function registerRoutes(
         id: string;
         body: string;
         created_at: Date;
+        parent_comment_id: string | null;
+        parent_handle: string | null;
         user_id: string;
         name: string;
         handle: string;
@@ -354,6 +368,8 @@ export async function registerRoutes(
         id: comment.id,
         body: comment.body,
         createdAt: comment.created_at.toISOString(),
+        parentCommentId: comment.parent_comment_id,
+        parentHandle: comment.parent_handle,
         author: {
           id: comment.user_id,
           name: comment.name,
@@ -371,10 +387,23 @@ export async function registerRoutes(
       const user = requireUser(request.user);
       const id = resourceId(request.params);
       const body = parse(commentSchema, request.body);
+      let parentAuthorId: string | null = null;
+      if (body.parentCommentId) {
+        const parent = await pool.query<{ user_id: string }>(
+          `SELECT user_id FROM comments
+           WHERE id = $1 AND post_id = $2 AND hidden = false`,
+          [body.parentCommentId, id],
+        );
+        const parentRow = parent.rows[0];
+        if (!parentRow) throw new HttpError(404, 'Esse comentário não existe mais.');
+        parentAuthorId = parentRow.user_id;
+      }
       const inserted = await pool.query<{ id: string }>(
-        `INSERT INTO comments (post_id, user_id, body) VALUES ($1, $2, $3) RETURNING id`,
-        [id, user.id, body.body],
+        `INSERT INTO comments (post_id, user_id, body, parent_comment_id)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [id, user.id, body.body, body.parentCommentId ?? null],
       );
+      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId);
       return reply.code(201).send({ id: inserted.rows[0]?.id });
     },
   );

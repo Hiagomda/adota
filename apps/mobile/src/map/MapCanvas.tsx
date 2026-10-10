@@ -251,6 +251,10 @@ export function MapCanvas({
       const fromUser = event.properties.isUserInteraction === true;
       const before = policy.current.loaded;
       const step = apply({ type: 'region', bounds, fromUser });
+      if (!fromUser) {
+        commitRef.current?.(bounds);
+        return;
+      }
       if (step.state.loaded && step.state.loaded !== before && !step.state.offer) {
         commitRef.current?.(step.state.loaded);
       }

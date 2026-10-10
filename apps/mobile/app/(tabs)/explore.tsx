@@ -5,10 +5,10 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../../src/api';
-import { AppText, Button, Card, Chip, Icon, StatusPill, Touchable } from '../../src/components/ui';
+import { AppText, Button, Card, Icon, StatusPill, Touchable } from '../../src/components/ui';
 import { formatWhen } from '../../src/format';
 import { MapCanvas } from '../../src/map/MapCanvas';
-import type { MapBounds } from '../../src/map/geo';
+import { belemBounds, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
@@ -27,22 +27,19 @@ const PHOTO_HEIGHT = 90;
 const BANNER_MASCOT = 64;
 
 export default function ExploreScreen() {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const focused = useIsFocused();
   const token = useSession((state) => state.token);
-  const [bounds, setBounds] = useState<MapBounds | null>(null);
+  const [bounds, setBounds] = useState<MapBounds>(belemBounds);
   const [selected, setSelected] = useState<Post | null>(null);
-  const search = bounds
-    ? `?status=open&limit=100&west=${bounds.west}&south=${bounds.south}&east=${bounds.east}&north=${bounds.north}`
-    : '';
+  const search = `?status=open&limit=100&west=${bounds.west}&south=${bounds.south}&east=${bounds.east}&north=${bounds.north}`;
   const feed = useQuery({
     queryKey: ['map', token, search],
     queryFn: () => loadFeed(token, search),
-    enabled: bounds !== null,
   });
-  const posts = feed.data?.posts ?? [];
+  const posts = (feed.data?.posts ?? []).filter((post) => post.type !== 'lost');
   const openPost = useCallback(
     (id: string) => {
       router.push(`/post/${id}`);
@@ -68,18 +65,7 @@ export default function ExploreScreen() {
         onSelect={setSelected}
         onCommitBounds={setBounds}
       />
-      {!selected ? (
-        <View
-          style={[
-            styles.lost,
-            shadows.md,
-            { top: insets.top + spacing.md, backgroundColor: colors.surface },
-          ]}
-        >
-          <Chip label="Animais perdidos" icon="search" onPress={() => router.push('/lost')} />
-        </View>
-      ) : null}
-      {bounds && !selected && (feed.isError || posts.length === 0) ? (
+      {!selected && (feed.isError || posts.length === 0) ? (
         <Card
           padding="md"
           elevation="md"
@@ -161,11 +147,6 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  lost: {
-    position: 'absolute',
-    left: spacing.lg,
-    borderRadius: radius.pill,
-  },
   banner: { position: 'absolute', left: spacing.lg, right: spacing.lg },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   bannerText: { flex: 1 },

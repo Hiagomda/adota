@@ -40,10 +40,8 @@ export default function VolunteerScreen() {
   const router = useRouter();
   const token = useSession((state) => state.token);
   const client = useQueryClient();
-  const transport = useVolunteerAvailability((state) => state.transport);
   const foster = useVolunteerAvailability((state) => state.foster);
   const sync = useVolunteerAvailability((state) => state.sync);
-  const setTransport = useVolunteerAvailability((state) => state.setTransport);
   const setFoster = useVolunteerAvailability((state) => state.setFoster);
   const status = useQuery({
     queryKey: ['volunteer', token],
@@ -53,7 +51,7 @@ export default function VolunteerScreen() {
 
   useEffect(() => {
     if (!status.data) return;
-    sync(status.data.settings.isTransportAvailable, status.data.settings.isFosterAvailable);
+    sync(false, status.data.settings.isFosterAvailable);
   }, [status.data, sync]);
 
   const save = useMutation({
@@ -61,14 +59,14 @@ export default function VolunteerScreen() {
       api<VolunteerStatus>('/volunteers/settings', { method: 'PUT', token, body }),
     onSuccess: (next) => {
       client.setQueryData(['volunteer', token], next);
-      sync(next.settings.isTransportAvailable, next.settings.isFosterAvailable);
+      sync(false, next.settings.isFosterAvailable);
     },
   });
 
   function currentSettings(): VolunteerSettings {
     return (
       status.data?.settings ?? {
-        isTransportAvailable: transport,
+        isTransportAvailable: false,
         isFosterAvailable: foster,
         fosterPetTypes: ['dog'],
         fosterMaxDays: 7,
@@ -78,8 +76,7 @@ export default function VolunteerScreen() {
   }
 
   function update(patch: Partial<VolunteerSettings>) {
-    const next = { ...currentSettings(), ...patch };
-    if (patch.isTransportAvailable !== undefined) setTransport(patch.isTransportAvailable);
+    const next = { ...currentSettings(), ...patch, isTransportAvailable: false };
     if (patch.isFosterAvailable !== undefined) setFoster(patch.isFosterAvailable);
     save.mutate(next);
   }
@@ -113,7 +110,9 @@ export default function VolunteerScreen() {
             <AppText color="textSecondary">
               Cada ajuda na rua fica marcada aqui. Sem pressa, no seu ritmo.
             </AppText>
-            {!token ? <Notice message="Entre na sua conta para guardar o que você já fez." /> : null}
+            {!token ? (
+              <Notice message="Entre na sua conta para guardar o que você já fez." />
+            ) : null}
             {status.isError ? <Notice tone="error" message={messageFrom(status.error)} /> : null}
             <Card elevation="md">
               <View style={styles.levelBox}>
@@ -124,19 +123,6 @@ export default function VolunteerScreen() {
                   caption={xpCaption}
                   tone="secondary"
                 />
-              </View>
-            </Card>
-            <Card>
-              <View style={styles.row}>
-                <Mascot pose="drive" size={ROW_MASCOT} />
-                <View style={styles.rowText}>
-                  <Switch
-                    label="Oferecer transporte"
-                    description="Levar um animal, no estilo Uber Pet."
-                    value={transport}
-                    onValueChange={(value) => update({ isTransportAvailable: value })}
-                  />
-                </View>
               </View>
             </Card>
             <Card>
@@ -160,7 +146,7 @@ export default function VolunteerScreen() {
                 </View>
               </View>
             </Card>
-            {transport || foster ? (
+            {foster ? (
               <View style={styles.block}>
                 <AppText variant="h3">Até onde você chega</AppText>
                 <View style={styles.chips}>
@@ -209,28 +195,30 @@ export default function VolunteerScreen() {
           </View>
           <SectionHeader title="Selos" />
           <View style={styles.grid}>
-            {(status.data?.badges ?? fallbackBadges).map((badge) => {
-              const Art = badgeArt[badge.code];
-              const unlocked = badge.unlockedAt !== null;
-              return (
-                <View
-                  key={badge.code}
-                  accessible
-                  accessibilityLabel={`${badge.name}, ${unlocked ? 'conquistado' : 'ainda não conquistado'}`}
-                  style={styles.seal}
-                >
-                  <Art unlocked={unlocked} />
-                  <AppText variant="caption" style={styles.sealName}>
-                    {badge.name}
-                  </AppText>
-                  <Badge
-                    kind="label"
-                    label={unlocked ? 'Seu' : 'Ainda não'}
-                    tone={unlocked ? 'success' : 'neutral'}
-                  />
-                </View>
-              );
-            })}
+            {(status.data?.badges ?? fallbackBadges)
+              .filter((badge) => badge.code !== 'good_pilot')
+              .map((badge) => {
+                const Art = badgeArt[badge.code];
+                const unlocked = badge.unlockedAt !== null;
+                return (
+                  <View
+                    key={badge.code}
+                    accessible
+                    accessibilityLabel={`${badge.name}, ${unlocked ? 'conquistado' : 'ainda não conquistado'}`}
+                    style={styles.seal}
+                  >
+                    <Art unlocked={unlocked} />
+                    <AppText variant="caption" style={styles.sealName}>
+                      {badge.name}
+                    </AppText>
+                    <Badge
+                      kind="label"
+                      label={unlocked ? 'Seu' : 'Ainda não'}
+                      tone={unlocked ? 'success' : 'neutral'}
+                    />
+                  </View>
+                );
+              })}
           </View>
         </View>
       </ScrollView>
@@ -240,7 +228,6 @@ export default function VolunteerScreen() {
 
 const fallbackBadges: VolunteerBadge[] = [
   { code: 'local_hero', name: 'Herói local', unlockedAt: null },
-  { code: 'good_pilot', name: 'Piloto do bem', unlockedAt: null },
   { code: 'open_doors', name: 'Portas abertas', unlockedAt: null },
   { code: 'top_sponsor', name: 'Padrinho nota 10', unlockedAt: null },
   { code: 'neighborhood_scout', name: 'Olheiro da vizinhança', unlockedAt: null },

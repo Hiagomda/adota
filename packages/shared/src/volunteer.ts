@@ -65,7 +65,7 @@ export type ClaimVolunteerXpInput = z.infer<typeof claimVolunteerXpSchema>;
 
 export function pointsForVolunteerAction(input: ClaimVolunteerXpInput): number {
   if (input.actionType === 'report') return 20;
-  if (input.actionType === 'transport') return 150;
+  if (input.actionType === 'transport') return 0;
   if (input.actionType === 'foster') return 100 * (input.days ?? 0);
   if (input.actionType === 'donation') return input.amountReais ?? 0;
   return 500;
@@ -121,7 +121,6 @@ export function levelForXp(xp: number): {
 export function badgesForAction(action: VolunteerAction, xp: number): VolunteerBadgeCode[] {
   const earned = new Set<VolunteerBadgeCode>();
   if (action === 'report') earned.add('neighborhood_scout');
-  if (action === 'transport') earned.add('good_pilot');
   if (action === 'foster') earned.add('open_doors');
   if (action === 'donation') earned.add('top_sponsor');
   if (action === 'adoption' || xp >= 101) earned.add('local_hero');

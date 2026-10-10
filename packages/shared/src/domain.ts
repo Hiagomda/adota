@@ -115,7 +115,19 @@ export const updateMeSchema = z
     whatsappOptIn: z.boolean().optional(),
     city: z.string().trim().max(80).nullable().optional(),
     alertRadiusKm: z.number().int().min(1).max(100).optional(),
-    avatarUrl: z.string().trim().url().nullable().optional(),
+    avatarUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .refine(
+        (value) =>
+          value.startsWith('uploads/') ||
+          value.startsWith('http://') ||
+          value.startsWith('https://'),
+        'Foto inválida.',
+      )
+      .nullable()
+      .optional(),
     notificationsEnabled: z.boolean().optional(),
     quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
     quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),

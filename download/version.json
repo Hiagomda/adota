@@ -1,4 +1,13 @@
 {
-  "version": "1.0.0",
-  "androidVersionCode": 11
+  "version": "0.1.0",
+  "androidVersionCode": 12,
+  "notes": [
+    "A publicação nova entra no feed na hora.",
+    "Dá para conversar nos comentários e receber aviso quando falarem com você.",
+    "Animais perdidos saíram do mapa de resgate e ficam na lista própria.",
+    "Os resgates abertos aparecem no mapa com a patinha.",
+    "Dá para mudar foto, nome e @. Nome e @ não repetem.",
+    "A carona com o animal saiu do app.",
+    "O nível fica só no seu perfil."
+  ]
 }

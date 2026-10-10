@@ -101,7 +101,16 @@ export async function updateProfile(
     params.push(value);
     fields.push(`${column} = $${params.length}`);
   };
-  if (patch.name !== undefined) set('name', patch.name);
+  if (patch.name !== undefined) {
+    const taken = await pool.query(
+      `SELECT 1 FROM users
+       WHERE lower(name) = lower($1) AND id <> $2 AND deleted_at IS NULL
+       LIMIT 1`,
+      [patch.name, userId],
+    );
+    if ((taken.rowCount ?? 0) > 0) throw new HttpError(409, 'Esse nome já está em uso.');
+    set('name', patch.name);
+  }
   if (patch.handle !== undefined) set('handle', patch.handle);
   if (patch.phone !== undefined) set('phone', patch.phone);
   if (patch.whatsappOptIn !== undefined) set('whatsapp_opt_in', patch.whatsappOptIn);

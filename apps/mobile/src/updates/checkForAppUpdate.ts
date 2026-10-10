@@ -19,7 +19,8 @@ export const downloadPageUrl =
   readDownloadPageUrl(Constants.expoConfig?.extra) ??
   fallbackDownloadPage;
 
-export type AppUpdateOffer = { kind: 'native'; apkUrl: string } | { kind: 'ota' };
+export type AppUpdateOffer =
+  { kind: 'native'; apkUrl: string; version: string; notes: string[] } | { kind: 'ota' };
 
 export function apkDownloadUrl(page: string): string {
   return `${page.replace(/\/$/, '')}/egua-adota.apk`;
@@ -38,7 +39,12 @@ async function checkNativeRelease(): Promise<AppUpdateOffer | null> {
     published,
   );
   if (!newer) return null;
-  return { kind: 'native', apkUrl: apkDownloadUrl(page) };
+  return {
+    kind: 'native',
+    apkUrl: apkDownloadUrl(page),
+    version: published.version,
+    notes: published.notes,
+  };
 }
 
 function otaUpdatesAvailable(): boolean {
