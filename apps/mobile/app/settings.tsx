@@ -311,6 +311,15 @@ export default function SettingsScreen() {
                 />
                 <Divider inset />
                 <ListItem
+                  title="Sair da conta"
+                  subtitle="Você pode entrar de novo quando quiser."
+                  icon="log-out"
+                  onPress={() => {
+                    void logout().then(() => router.replace('/'));
+                  }}
+                />
+                <Divider inset />
+                <ListItem
                   title="Excluir minha conta"
                   subtitle="Apaga telefone, foto e avisos. Não dá para desfazer."
                   icon="trash-2"

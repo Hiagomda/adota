@@ -141,6 +141,19 @@ export default function ProfileScreen() {
               onPress={() => router.push('/voluntario')}
             />
           </View>
+          {token ? (
+            <View style={styles.logout}>
+              <Button
+                title="Sair da conta"
+                icon="log-out"
+                variant="outline"
+                fullWidth
+                onPress={() => {
+                  void logout().then(() => router.replace('/'));
+                }}
+              />
+            </View>
+          ) : null}
           {highlights.length > 0 ? (
             <ScrollView
               horizontal
@@ -236,18 +249,6 @@ export default function ProfileScreen() {
               onAction={tab === 'posts' ? () => router.push('/create') : undefined}
             />
           ) : null}
-          {token ? (
-            <View style={styles.logout}>
-              <Button
-                title="Sair"
-                icon="log-out"
-                variant="ghost"
-                onPress={() => {
-                  void logout().then(() => router.replace('/'));
-                }}
-              />
-            </View>
-          ) : null}
           <VersionMark />
         </View>
       </ScrollView>
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
   cell: { width: '33.33%', aspectRatio: 1, padding: CELL_GAP },
   cellFill: { flex: 1 },
   cellImage: { width: '100%', height: '100%' },
-  logout: { alignItems: 'center', paddingTop: spacing.lg },
+  logout: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
 });
 
 // One broken screen must not take the whole app down.

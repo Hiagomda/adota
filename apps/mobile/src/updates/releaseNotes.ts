@@ -7,4 +7,5 @@ export const currentReleaseNotes = [
   'Dá para mudar foto, nome e @. Nome e @ não repetem.',
   'A carona com o animal saiu do app.',
   'O nível fica só no seu perfil.',
+  'Dá para sair da conta nos Ajustes e no perfil.',
 ];
