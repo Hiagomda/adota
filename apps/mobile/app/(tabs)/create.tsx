@@ -32,7 +32,7 @@ import { Mascot } from '../../src/mascot';
 import { enqueueAlert } from '../../src/place/outbox';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src/permissions';
 import { PlacePicker } from '../../src/place/PlacePicker';
-import { isOfflineError, publishAlert } from '../../src/place/publish';
+import { isOfflineError, preparePhoto, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 
@@ -89,6 +89,9 @@ export default function CreateScreen() {
   useEffect(() => {
     setCreatePhotoCount(photos.length);
   }, [photos]);
+  useEffect(() => {
+    for (const uri of photosRef.current) preparePhoto(uri);
+  }, []);
   useLayoutEffect(() => {
     setCreatePhotoCount(photosRef.current.length);
     if (photosRef.current.length > 0) return;
@@ -126,6 +129,7 @@ export default function CreateScreen() {
 
   const addPhoto = useCallback((uri: string) => {
     if (photosRef.current.length >= MAX_PHOTOS || photosRef.current.includes(uri)) return;
+    preparePhoto(uri);
     const next = [...photosRef.current, uri];
     photosRef.current = next;
     setCreatePhotoCount(next.length);
@@ -219,8 +223,8 @@ export default function CreateScreen() {
       })
         .then(() => client.invalidateQueries({ queryKey: ['volunteer', token] }))
         .catch(() => undefined);
-      await client.invalidateQueries({ queryKey: ['posts'] });
-      await client.invalidateQueries({ queryKey: ['map'] });
+      void client.invalidateQueries({ queryKey: ['posts'] });
+      void client.invalidateQueries({ queryKey: ['map'] });
       if (created.reviewStatus === 'pending') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
           () => undefined,

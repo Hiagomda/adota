@@ -80,37 +80,39 @@ export async function verifyUploadedImages(
 ): Promise<void> {
   assertOwnedMedia(userId, urls);
   if (env.NODE_ENV !== 'production' || urls.length === 0) return;
-  for (const url of urls) {
-    const expected = extensionKind(url);
-    let bytes: Uint8Array | undefined;
-    try {
-      const object = await storage.send(
-        new GetObjectCommand({
-          Bucket: env.MINIO_BUCKET,
-          Key: url,
-          Range: 'bytes=0-31',
-        }),
-      );
-      bytes = await object.Body?.transformToByteArray();
-    } catch (error) {
-      const name =
-        typeof error === 'object' &&
-        error !== null &&
-        'name' in error &&
-        typeof error.name === 'string'
-          ? error.name
-          : '';
-      if (name === 'NoSuchKey' || name === 'NotFound') {
-        throw new HttpError(400, 'Não encontrei essa foto. Envie de novo.');
-      }
-      throw new HttpError(503, 'Não consegui conferir a foto. Tente de novo.');
+  await Promise.all(urls.map((url) => verifyOneUpload(env, storage, url)));
+}
+
+async function verifyOneUpload(env: Env, storage: S3Client, url: string): Promise<void> {
+  const expected = extensionKind(url);
+  let bytes: Uint8Array | undefined;
+  try {
+    const object = await storage.send(
+      new GetObjectCommand({
+        Bucket: env.MINIO_BUCKET,
+        Key: url,
+        Range: 'bytes=0-31',
+      }),
+    );
+    bytes = await object.Body?.transformToByteArray();
+  } catch (error) {
+    const name =
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      typeof error.name === 'string'
+        ? error.name
+        : '';
+    if (name === 'NoSuchKey' || name === 'NotFound') {
+      throw new HttpError(400, 'Não encontrei essa foto. Envie de novo.');
     }
-    if (!bytes || sniffImage(bytes) !== expected) {
-      await storage
-        .send(new DeleteObjectCommand({ Bucket: env.MINIO_BUCKET, Key: url }))
-        .catch(() => undefined);
-      throw new HttpError(400, 'A foto enviada não é uma imagem válida.');
-    }
+    throw new HttpError(503, 'Não consegui conferir a foto. Tente de novo.');
+  }
+  if (!bytes || sniffImage(bytes) !== expected) {
+    await storage
+      .send(new DeleteObjectCommand({ Bucket: env.MINIO_BUCKET, Key: url }))
+      .catch(() => undefined);
+    throw new HttpError(400, 'A foto enviada não é uma imagem válida.');
   }
 }
 
