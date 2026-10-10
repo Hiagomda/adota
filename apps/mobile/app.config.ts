@@ -8,6 +8,13 @@ const googleServicesAndroid = path.join(appDir, 'google-services.json');
 const googleServicesIos = path.join(appDir, 'GoogleService-Info.plist');
 // Expo's Android config type omits this field. The test API is plain HTTP.
 const androidCleartext = { usesCleartextTraffic: true };
+// Crash reports. The DSN is public and lives in EXPO_PUBLIC_SENTRY_DSN; the upload token for
+// source maps is SENTRY_AUTH_TOKEN at build time and is never written into the app.
+const sentryPlugin = {
+  url: 'https://sentry.io/',
+  ...(process.env.SENTRY_ORG ? { organization: process.env.SENTRY_ORG } : {}),
+  ...(process.env.SENTRY_PROJECT ? { project: process.env.SENTRY_PROJECT } : {}),
+};
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -36,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'app.egua.adota',
-    versionCode: 3,
+    versionCode: 4,
     ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -98,6 +105,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-notifications',
     'expo-apple-authentication',
+    ['@sentry/react-native/expo', sentryPlugin],
     [
       'expo-splash-screen',
       {

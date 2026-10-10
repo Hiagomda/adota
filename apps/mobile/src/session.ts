@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { loginWithEmail } from './api';
+import { reportError, setReporterUser } from './crash/reporter';
 import type { Account } from './types';
 
 const tokenKey = 'egua-token';
@@ -39,12 +40,35 @@ async function writeToken(token: string | null): Promise<void> {
   else await SecureStore.deleteItemAsync(tokenKey);
 }
 
+function parseFlags(raw: string | null): Flags {
+  if (!raw) return { permissionsSeen: false };
+  const parsed: unknown = JSON.parse(raw);
+  const seen =
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    (parsed as { permissionsSeen?: unknown }).permissionsSeen === true;
+  return { permissionsSeen: seen };
+}
+
 async function readFlags(): Promise<Flags> {
   const raw =
     Platform.OS === 'web' ? localStorage.getItem(flagKey) : await SecureStore.getItemAsync(flagKey);
-  if (!raw) return { permissionsSeen: false };
-  const parsed = JSON.parse(raw) as { permissionsSeen?: boolean };
-  return { permissionsSeen: parsed.permissionsSeen === true };
+  return parseFlags(raw);
+}
+
+/**
+ * The secure store can refuse to decrypt after a backup restore or a keystore reset, and a stored
+ * value can be corrupted. Either would reject `hydrate` and leave the app on the splash forever.
+ * The broken entry is removed, the error is recorded and the app continues signed out.
+ */
+async function readOrDiscard<T>(key: string, read: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    reportError(error, { source: 'handled', where: `session:${key}` });
+    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(key).catch(() => undefined);
+    return fallback;
+  }
 }
 
 async function writeFlags(flags: Flags): Promise<void> {
@@ -60,8 +84,8 @@ export const useSession = create<SessionState>((set) => ({
   cupuPrompt: false,
   permissionsSeen: false,
   hydrate: async () => {
-    const flags = await readFlags();
-    const token = await readToken();
+    const flags = await readOrDiscard(flagKey, readFlags, { permissionsSeen: false });
+    const token = await readOrDiscard(tokenKey, readToken, null);
     set({ ready: true, token, ...flags });
   },
   finishPermissions: async () => {
@@ -72,12 +96,17 @@ export const useSession = create<SessionState>((set) => ({
   login: async (email) => {
     const result = await loginWithEmail(email);
     await writeToken(result.token);
+    setReporterUser({ id: result.user.id, handle: result.user.handle });
     set({ token: result.token, user: result.user, cupuPrompt: true });
   },
   clearCupuPrompt: () => set({ cupuPrompt: false }),
   logout: async () => {
     await writeToken(null);
+    setReporterUser(null);
     set({ token: null, user: null });
   },
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    setReporterUser({ id: user.id, handle: user.handle });
+    set({ user });
+  },
 }));
