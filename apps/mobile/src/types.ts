@@ -59,6 +59,7 @@ export interface Post {
   updates?: {
     id: string;
     description: string;
+    status?: string;
     createdAt: string;
     author: { name: string; handle: string };
   }[];

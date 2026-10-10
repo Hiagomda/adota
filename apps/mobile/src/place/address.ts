@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { api, isNetworkError } from '../api';
+import { reportError } from '../crash/reporter';
 import type { MapPoint } from '../map/geo';
 
 // Espera o pino parar antes de pedir o endereço. A API ainda segura 1 pedido por segundo.
@@ -21,8 +22,12 @@ export function useAddress(point: MapPoint | null) {
         .then((result) => {
           if (active) setFetched({ key, address: result.address });
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (active) setFetched({ key, address: null });
+          // Offline or a missing address is normal; anything else is a bug in the client or API.
+          if (!isNetworkError(error)) {
+            reportError(error, { source: 'handled', where: 'geocode:reverse' });
+          }
         })
         .finally(() => {
           if (active) setLooking(false);
