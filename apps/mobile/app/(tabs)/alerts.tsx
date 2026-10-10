@@ -19,7 +19,7 @@ import type { AppNotification } from '../../src/types';
 function notificationBody(body: string | undefined): string {
   if (!body) return '';
   return body.replace(
-    /agora está: (on_the_way|for_adoption|fostered|rescued|adopted|open)\b/g,
+    /agora está: (on_the_way|not_found|for_adoption|fostered|rescued|adopted|open)\b/g,
     (_match, status: string) => `agora está: ${statusLabel[status] ?? 'atualizado'}`,
   );
 }

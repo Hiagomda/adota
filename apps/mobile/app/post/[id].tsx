@@ -22,6 +22,7 @@ import {
   BottomSheet,
   Button,
   Card,
+  ConfirmDialog,
   Divider,
   ErrorState,
   FavoriteButton,
@@ -41,6 +42,7 @@ import {
 import { AnimalDiary } from '../../src/diary';
 import { formatKm, formatWhen } from '../../src/format';
 import { Mascot } from '../../src/mascot';
+import { PostEditor } from '../../src/post/PostEditor';
 import { useSession } from '../../src/session';
 import {
   contentMaxWidth,
@@ -81,13 +83,18 @@ export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
-  const userId = useSession((state) => state.user?.id);
+  const user = useSession((state) => state.user);
+  const userId = user?.id;
   const client = useQueryClient();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [adoptOpen, setAdoptOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSession, setEditSession] = useState(0);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [helping, setHelping] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [comment, setComment] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; handle: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -95,7 +102,6 @@ export default function PostScreen() {
   const { width } = useWindowDimensions();
   const galleryHeight = Math.min(Math.round(width * 1.1), size.galleryMax);
   const footerPad = Math.max(insets.bottom, spacing.lg);
-  const footerHeight = spacing.lg + SHARE_BUTTON + footerPad;
   const post = useQuery({
     queryKey: ['post', id, token],
     queryFn: () => loadPost(id, token),
@@ -134,6 +140,8 @@ export default function PostScreen() {
     try {
       await api(path, { method, token, body });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['posts'] });
+      await client.invalidateQueries({ queryKey: ['map'] });
       return true;
     } catch (error) {
       setNote(messageFrom(error));
@@ -151,6 +159,8 @@ export default function PostScreen() {
         body: { kind: 'will_help' },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['posts'] });
+      await client.invalidateQueries({ queryKey: ['map'] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => undefined,
       );
@@ -208,6 +218,12 @@ export default function PostScreen() {
   }
 
   const following = nextStatus[item.status];
+  const isAuthor = userId === item.author.id;
+  const canOwn = isAuthor || user?.role === 'admin';
+  const canMoveStatus = canOwn || item.viewerWillHelp;
+  const helpingNow = item.viewerWillHelp && item.status !== 'for_adoption';
+  const footerHeight =
+    spacing.lg + SHARE_BUTTON + footerPad + (helpingNow ? size.control + spacing.sm * 2 : 0);
   const fosterList = fosters.data?.fosters ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
   const forAdoption = item.status === 'for_adoption';
@@ -217,12 +233,39 @@ export default function PostScreen() {
     item.animal.temperament ? { icon: 'smile' as const, text: item.animal.temperament } : null,
   ].filter((line) => line !== null);
 
+  const rescueId = item.id;
+
+  async function leaveRescue(outcome: 'could_not' | 'not_found') {
+    if (!token || leaving) return;
+    setLeaving(true);
+    try {
+      const result = await api<{ status: string }>(`/posts/${rescueId}/help/leave`, {
+        method: 'POST',
+        token,
+        body: { outcome },
+      });
+      await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['posts'] });
+      await client.invalidateQueries({ queryKey: ['map'] });
+      if (outcome === 'could_not' && result.status === 'open') {
+        setNote('Você saiu. O resgate voltou para Aberto.');
+      } else if (outcome === 'could_not') {
+        setNote('Você saiu deste resgate.');
+      } else if (result.status === 'not_found') {
+        setNote('Marquei que o animal não foi encontrado.');
+      } else {
+        setNote('Anotei que você não encontrou. Outra pessoa ainda está a caminho.');
+      }
+    } catch (error) {
+      setNote(messageFrom(error));
+    } finally {
+      setLeaving(false);
+    }
+  }
+
   function onHelpPress() {
     if (!item) return;
-    if (item.viewerWillHelp) {
-      setNote('Você já está neste resgate. O ponto exato continua visível para você.');
-      return;
-    }
+    if (item.viewerWillHelp) return;
     if (!token) {
       setNote('Entre na sua conta para dizer que vai ajudar.');
       return;
@@ -454,16 +497,16 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {forAdoption ? (
+            {forAdoption && !item.viewerWillHelp ? (
               <Button
-                title={item.viewerWillHelp ? 'Você vai ajudar' : 'Eu vou ajudar'}
-                icon={item.viewerWillHelp ? 'check' : 'heart'}
+                title="Eu vou ajudar"
+                icon="heart"
                 variant="outline"
                 fullWidth
                 onPress={onHelpPress}
               />
             ) : null}
-            {following ? (
+            {canMoveStatus && following ? (
               <Button
                 title={`Marcar como ${statusLabel[following]}`}
                 icon="arrow-right"
@@ -471,6 +514,16 @@ export default function PostScreen() {
                 variant="outline"
                 fullWidth
                 onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: following })}
+              />
+            ) : null}
+            {canOwn && (item.status === 'on_the_way' || item.status === 'not_found') &&
+            following !== 'open' ? (
+              <Button
+                title="Voltar para aberto"
+                icon="rotate-ccw"
+                variant="outline"
+                fullWidth
+                onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: 'open' })}
               />
             ) : null}
 
@@ -596,6 +649,25 @@ export default function PostScreen() {
             ) : null}
 
             <View style={styles.secondaryActions}>
+              {canOwn ? (
+                <Button
+                  title="Editar"
+                  icon="edit-2"
+                  variant="ghost"
+                  onPress={() => {
+                    setEditSession((value) => value + 1);
+                    setEditOpen(true);
+                  }}
+                />
+              ) : null}
+              {canOwn ? (
+                <Button
+                  title="Excluir"
+                  icon="trash-2"
+                  variant="ghost"
+                  onPress={() => setDeleteOpen(true)}
+                />
+              ) : null}
               <Button
                 title="Denunciar"
                 icon="flag"
@@ -667,21 +739,74 @@ export default function PostScreen() {
           <View style={styles.footerCta}>
             <Button
               title={
-                forAdoption
-                  ? 'Quero adotar'
-                  : item.viewerWillHelp
-                    ? 'Você vai ajudar'
-                    : 'Eu vou ajudar'
+                forAdoption ? 'Quero adotar' : helpingNow ? 'Não consegui' : 'Eu vou ajudar'
               }
-              icon={forAdoption || !item.viewerWillHelp ? 'heart' : 'check'}
-              variant={!forAdoption && item.viewerWillHelp ? 'outline' : 'secondary'}
+              icon={helpingNow ? 'x' : 'heart'}
+              variant={helpingNow ? 'outline' : 'secondary'}
               size="lg"
               fullWidth
-              onPress={forAdoption ? onAdoptPress : onHelpPress}
+              loading={helpingNow && leaving}
+              onPress={
+                forAdoption
+                  ? onAdoptPress
+                  : helpingNow
+                    ? () => void leaveRescue('could_not')
+                    : onHelpPress
+              }
             />
           </View>
         </View>
+        {helpingNow ? (
+          <Button
+            title="Não encontrei"
+            icon="search"
+            variant="outline"
+            size="lg"
+            fullWidth
+            disabled={leaving}
+            onPress={() => void leaveRescue('not_found')}
+            style={styles.leaveSecond}
+          />
+        ) : null}
       </View>
+
+      <PostEditor
+        key={editSession}
+        visible={editOpen}
+        token={token ?? ''}
+        description={item.description}
+        urgency={item.urgency}
+        photos={item.media.flatMap((photo) =>
+          photo.storageKey ? [{ key: photo.storageKey, preview: photo.thumbUrl }] : [],
+        )}
+        onClose={() => setEditOpen(false)}
+        onSave={async (body) => {
+          if (!token) {
+            setNote('Entre na sua conta para editar.');
+            return;
+          }
+          await api(`/posts/${item.id}`, { method: 'PATCH', token, body });
+          await client.invalidateQueries({ queryKey: ['post', id, token] });
+          await client.invalidateQueries({ queryKey: ['posts'] });
+          await client.invalidateQueries({ queryKey: ['map'] });
+          setEditOpen(false);
+          setNote('Resgate atualizado.');
+        }}
+      />
+      <ConfirmDialog
+        visible={deleteOpen}
+        title="Excluir este resgate?"
+        message="Ele sai do feed, do mapa e dos detalhes. Essa ação não apaga sua conta."
+        confirmLabel="Excluir"
+        destructive
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          void act(`/posts/${item.id}`, 'DELETE').then((ok) => {
+            if (ok) router.back();
+          });
+        }}
+      />
 
       <BottomSheet
         visible={commentsOpen}
@@ -882,6 +1007,7 @@ const styles = StyleSheet.create({
   },
   share: { width: SHARE_BUTTON, height: SHARE_BUTTON },
   footerCta: { flex: 1 },
+  leaveSecond: { marginTop: spacing.sm },
   commentList: { flexShrink: 1 },
   comment: { paddingVertical: spacing.sm },
   commentForm: { gap: spacing.md, paddingTop: spacing.md },

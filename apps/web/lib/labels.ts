@@ -1,6 +1,7 @@
 export const statusLabel: Record<string, string> = {
   open: 'Aberto',
   on_the_way: 'A caminho',
+  not_found: 'Não encontrado',
   rescued: 'Resgatado',
   fostered: 'Lar temporário',
   for_adoption: 'Para adoção',

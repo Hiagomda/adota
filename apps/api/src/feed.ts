@@ -1,14 +1,17 @@
 import {
   canTransitionStatus,
   looksLikeAnimalSale,
+  statusAfterLeavingHelp,
   type AnimalStatus,
   type CreatePostInput,
   type FeedQuery,
+  type LeaveHelpOutcome,
+  type UpdatePostInput,
 } from '@patinha/shared';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { Env } from './config.js';
 import { HttpError } from './http.js';
-import { assertOwnedMedia } from './mediaPolicy.js';
+import { assertOwnedMedia, ownedMediaKey } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
 import { assertHelpRequest, canSeeExactPlace, publicPixKey, publicPlace } from './privacy.js';
 import { rowsOf, type SessionUser } from './session.js';
@@ -303,17 +306,163 @@ export async function changeStatus(
   if (!canTransitionStatus(post.status, status)) {
     throw new HttpError(400, 'Essa mudança de status não é permitida.');
   }
-  await pool.query('UPDATE posts SET status = $2 WHERE id = $1', [postId, status]);
-  await pool.query(
+  await applyStatus(pool, postId, user.id, post.animal_id, status);
+}
+
+async function applyStatus(
+  db: Pool | PoolClient,
+  postId: string,
+  userId: string,
+  animalId: string,
+  status: AnimalStatus,
+) {
+  await db.query('UPDATE posts SET status = $2 WHERE id = $1', [postId, status]);
+  await db.query(
     "UPDATE animals SET status = $2, current_owner_id = CASE WHEN $2 = 'adopted' THEN $3 ELSE current_owner_id END WHERE id = $1",
-    [post.animal_id, status, user.id],
+    [animalId, status, userId],
   );
-  await pool.query(
+  await db.query(
     `INSERT INTO posts (author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id)
      SELECT $2, animal_id, 'update', urgency, $3, location, approx_label, $4, id
      FROM posts WHERE id = $1`,
-    [postId, user.id, statusLabel(status), status],
+    [postId, userId, statusLabel(status), status],
   );
+}
+
+export async function updatePost(
+  pool: Pool,
+  postId: string,
+  user: SessionUser,
+  input: UpdatePostInput,
+  verifyFreshMedia: (urls: string[]) => Promise<void>,
+) {
+  const current = await pool.query<{ author_id: string }>(
+    `SELECT author_id FROM posts
+     WHERE id = $1 AND parent_post_id IS NULL AND hidden = false`,
+    [postId],
+  );
+  const post = current.rows[0];
+  if (!post) throw new HttpError(404, 'Esse resgate não existe.');
+  if (user.id !== post.author_id && user.role !== 'admin') {
+    throw new HttpError(403, 'Só quem publicou pode editar esse resgate.');
+  }
+  const description = stripControls(input.description.trim());
+  if (looksLikeAnimalSale(description)) {
+    throw new HttpError(400, 'Não é permitido vender animais.');
+  }
+  const stored = await pool.query<{ url: string }>(
+    `SELECT url FROM post_media WHERE post_id = $1`,
+    [postId],
+  );
+  const existing = new Set(stored.rows.map((row) => row.url));
+  const urls = input.media.map((item) => item.url);
+  const fresh = urls.filter((url) => !existing.has(url));
+  for (const url of urls) {
+    if (!existing.has(url) && !ownedMediaKey(user.id, url)) {
+      throw new HttpError(400, 'A foto precisa ser um envio da sua conta.');
+    }
+  }
+  assertOwnedMedia(user.id, fresh);
+  await verifyFreshMedia(fresh);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`UPDATE posts SET description = $2, urgency = $3 WHERE id = $1`, [
+      postId,
+      description,
+      input.urgency,
+    ]);
+    await client.query(`DELETE FROM post_media WHERE post_id = $1`, [postId]);
+    for (const [position, url] of urls.entries()) {
+      await client.query(
+        `INSERT INTO post_media (post_id, url, type, position) VALUES ($1, $2, 'image', $3)`,
+        [postId, url, position],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deletePost(pool: Pool, postId: string, user: SessionUser) {
+  const current = await pool.query<{ author_id: string }>(
+    `SELECT author_id FROM posts
+     WHERE id = $1 AND parent_post_id IS NULL AND hidden = false`,
+    [postId],
+  );
+  const post = current.rows[0];
+  if (!post) throw new HttpError(404, 'Esse resgate não existe.');
+  if (user.id !== post.author_id && user.role !== 'admin') {
+    throw new HttpError(403, 'Só quem publicou pode excluir esse resgate.');
+  }
+  await pool.query(`UPDATE posts SET hidden = true WHERE id = $1 OR parent_post_id = $1`, [postId]);
+}
+
+export async function leaveHelp(
+  pool: Pool,
+  postId: string,
+  user: SessionUser,
+  outcome: LeaveHelpOutcome,
+): Promise<{ status: AnimalStatus; changed: boolean; noted: boolean }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query<{ status: AnimalStatus; animal_id: string }>(
+      `SELECT status, animal_id FROM posts
+       WHERE id = $1 AND parent_post_id IS NULL AND hidden = false
+       FOR UPDATE`,
+      [postId],
+    );
+    const post = current.rows[0];
+    if (!post) throw new HttpError(404, 'Esse resgate não existe.');
+    const mine = await client.query(
+      `DELETE FROM responses
+       WHERE post_id = $1 AND user_id = $2 AND kind = 'will_help'
+       RETURNING id`,
+      [postId, user.id],
+    );
+    if ((mine.rowCount ?? 0) === 0) {
+      throw new HttpError(403, 'Você não está neste resgate.');
+    }
+    const left = await client.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
+      [postId],
+    );
+    const remaining = left.rows[0]?.count ?? 0;
+    const next = statusAfterLeavingHelp(post.status, outcome, remaining);
+    if (next) {
+      if (!canTransitionStatus(post.status, next)) {
+        throw new HttpError(400, 'Essa mudança de status não é permitida.');
+      }
+      await applyStatus(client, postId, user.id, post.animal_id, next);
+      await client.query('COMMIT');
+      return { status: next, changed: true, noted: false };
+    }
+    let noted = false;
+    if (outcome === 'not_found') {
+      await client.query(
+        `INSERT INTO posts (
+           author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id
+         )
+         SELECT $2, animal_id, 'update', 'low', $3, location, approx_label, status, id
+         FROM posts WHERE id = $1`,
+        [postId, user.id, 'Não encontrei o animal.'],
+      );
+      noted = true;
+    }
+    await client.query('COMMIT');
+    return { status: post.status, changed: false, noted };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function addResponse(
@@ -337,7 +486,8 @@ export async function addResponse(
       `SELECT status FROM posts WHERE id = $1`,
       [postId],
     );
-    if (current.rows[0]?.status === 'open') {
+    const status = current.rows[0]?.status;
+    if (status === 'open' || status === 'not_found') {
       await changeStatus(pool, postId, user, 'on_the_way');
     }
   }
@@ -427,6 +577,8 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         .map((item) => ({
           url: publicMediaUrl(env, item.url, 'full'),
           thumbUrl: publicMediaUrl(env, item.url, 'thumb'),
+          storageKey:
+            viewer && (viewer.id === row.author_id || viewer.role === 'admin') ? item.url : null,
         })),
       counts: { likes: row.like_count, comments: row.comment_count },
       liked: row.liked,
@@ -498,6 +650,7 @@ function statusLabel(status: AnimalStatus): string {
   const labels: Record<AnimalStatus, string> = {
     open: 'Resgate aberto.',
     on_the_way: 'Alguém está a caminho.',
+    not_found: 'Não encontrei o animal.',
     rescued: 'Animal resgatado.',
     fostered: 'Foi para um lar temporário.',
     for_adoption: 'Disponível para adoção.',

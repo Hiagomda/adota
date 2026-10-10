@@ -7,6 +7,7 @@ export const sexSchema = z.enum(['male', 'female', 'unknown']);
 export const animalStatusSchema = z.enum([
   'open',
   'on_the_way',
+  'not_found',
   'rescued',
   'fostered',
   'for_adoption',
@@ -29,12 +30,28 @@ export const statusTransitions: Record<
   readonly z.infer<typeof animalStatusSchema>[]
 > = {
   open: ['on_the_way'],
-  on_the_way: ['rescued'],
+  on_the_way: ['rescued', 'open', 'not_found'],
+  not_found: ['open', 'on_the_way'],
   rescued: ['fostered'],
   fostered: ['for_adoption'],
   for_adoption: ['adopted'],
   adopted: [],
 };
+
+export const leaveHelpOutcomeSchema = z.enum(['could_not', 'not_found']);
+
+/**
+ * Status after the last person on the way steps back.
+ * Returns null when someone else is still going, or the rescue already moved on.
+ */
+export function statusAfterLeavingHelp(
+  status: z.infer<typeof animalStatusSchema>,
+  outcome: z.infer<typeof leaveHelpOutcomeSchema>,
+  helpersRemaining: number,
+): z.infer<typeof animalStatusSchema> | null {
+  if (status !== 'on_the_way' || helpersRemaining > 0) return null;
+  return outcome === 'not_found' ? 'not_found' : 'open';
+}
 
 export function canTransitionStatus(
   from: z.infer<typeof animalStatusSchema>,
@@ -103,6 +120,21 @@ export const feedQuerySchema = z.object({
   adopted: z.enum(['true', 'false']).optional(),
 });
 
+export const updatePostSchema = z
+  .object({
+    description: z.string().trim().min(1).max(2000),
+    urgency: urgencySchema,
+    media: z
+      .array(
+        z.object({
+          url: z.string().trim().min(1).max(2000),
+        }),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+
 export const updateMeSchema = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
@@ -149,6 +181,8 @@ export const presignSchema = z.object({
 });
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;
+export type UpdatePostInput = z.infer<typeof updatePostSchema>;
+export type LeaveHelpOutcome = z.infer<typeof leaveHelpOutcomeSchema>;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type AnimalStatus = z.infer<typeof animalStatusSchema>;
 export type PostType = z.infer<typeof postTypeSchema>;

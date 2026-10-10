@@ -54,7 +54,7 @@ Contas locais, senha nenhuma. O token é `dev:<e-mail>`:
 | patas@egua.local | ONG verificada        |
 | admin@egua.local | moderação em `/admin` |
 
-No app, a tela de entrada tem esses atalhos. O login com Google abre o seletor de conta no próprio app. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem tocou em "Eu vou ajudar".
+No app, a tela de entrada tem esses atalhos. O login com Google abre o seletor de conta no próprio app. Quem publicou o resgate pode editar a descrição, a urgência e as fotos, ou excluir o resgate. Quem tocou em "Eu vou ajudar" pode dizer que não conseguiu (o pedido volta para Aberto se ninguém mais estiver indo) ou que não encontrou o animal. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem ainda está ajudando naquele resgate.
 
 ## Como testar a API
 

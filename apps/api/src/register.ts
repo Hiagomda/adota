@@ -2,6 +2,8 @@ import {
   animalStatusSchema,
   claimVolunteerXpSchema,
   createPostSchema,
+  leaveHelpOutcomeSchema,
+  updatePostSchema,
   feedQuerySchema,
   presignSchema,
   responseKindSchema,
@@ -22,7 +24,16 @@ import {
 } from './accounts.js';
 import { requireAdmin, requireUser } from './authz.js';
 import type { Env } from './config.js';
-import { addResponse, changeStatus, createPost, getPost, listPosts } from './feed.js';
+import {
+  addResponse,
+  changeStatus,
+  createPost,
+  deletePost,
+  getPost,
+  leaveHelp,
+  listPosts,
+  updatePost,
+} from './feed.js';
 import { ensureFirebaseApp, firebaseChecksRevocation } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
@@ -298,6 +309,42 @@ export async function registerRoutes(
         ).catch(() => undefined);
       }
       return reply.code(201).send(created);
+    },
+  );
+
+  app.patch('/posts/:id', async (request) => {
+    const user = requireUser(request.user);
+    const id = resourceId(request.params);
+    const body = parse(updatePostSchema, request.body);
+    await updatePost(pool, id, user, body, (urls) =>
+      verifyUploadedImages(env, storage, user.id, urls),
+    );
+    return { ok: true };
+  });
+
+  app.delete('/posts/:id', async (request) => {
+    const user = requireUser(request.user);
+    const id = resourceId(request.params);
+    await deletePost(pool, id, user);
+    return { ok: true };
+  });
+
+  app.post(
+    '/posts/:id/help/leave',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request) => {
+      const user = requireUser(request.user);
+      const id = resourceId(request.params);
+      const body = parse(z.object({ outcome: leaveHelpOutcomeSchema }), request.body);
+      const result = await leaveHelp(pool, id, user, body.outcome);
+      if (result.changed) {
+        await notifyStatusChange(pool, env, id, result.status).catch(() => undefined);
+      } else if (result.noted) {
+        await notifyDiaryNote(pool, env, id, user.id, 'Não encontrei o animal.').catch(
+          () => undefined,
+        );
+      }
+      return result;
     },
   );
 

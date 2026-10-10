@@ -1,7 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 14,
+  "androidVersionCode": 15,
   "notes": [
+    "Dá para editar e excluir o próprio resgate.",
+    "Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.",
+    "A patinha no mapa ficou mais fácil de tocar.",
     "O login com Google abre a conta dentro do app.",
     "A publicação nova entra no feed na hora.",
     "Dá para conversar nos comentários e receber aviso quando falarem com você.",

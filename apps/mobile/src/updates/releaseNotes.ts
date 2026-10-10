@@ -1,5 +1,8 @@
 /** Plain-language notes for this alpha. Shown in Ajustes and in the update dialog. */
 export const currentReleaseNotes = [
+  'Dá para editar e excluir o próprio resgate.',
+  'Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.',
+  'A patinha no mapa ficou mais fácil de tocar.',
   'O login com Google abre a conta dentro do app.',
   'A publicação nova entra no feed na hora.',
   'Dá para conversar nos comentários e receber aviso quando falarem com você.',

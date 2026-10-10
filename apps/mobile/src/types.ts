@@ -44,7 +44,7 @@ export interface Post {
   accuracyM: number | null;
   addressText: string | null;
   referencePoint: string | null;
-  media: { url: string; thumbUrl: string }[];
+  media: { url: string; thumbUrl: string; storageKey: string | null }[];
   counts: { likes: number; comments: number };
   liked: boolean;
   saved: boolean;

@@ -6,6 +6,7 @@ import { toneColors, type Tone } from './tones';
 const statusTone: Record<string, Tone> = {
   open: 'secondary',
   on_the_way: 'info',
+  not_found: 'neutral',
   rescued: 'primary',
   fostered: 'caramel',
   for_adoption: 'warning',

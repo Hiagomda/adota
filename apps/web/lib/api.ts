@@ -4,7 +4,7 @@ export interface PublicPost {
   urgency: 'low' | 'medium' | 'high';
   description: string;
   approxLabel: string;
-  status: 'open' | 'on_the_way' | 'rescued' | 'fostered' | 'for_adoption' | 'adopted';
+  status: 'open' | 'on_the_way' | 'not_found' | 'rescued' | 'fostered' | 'for_adoption' | 'adopted';
   createdAt: string;
   boosted: boolean;
   author: {

@@ -216,7 +216,17 @@ export async function notifyStatusChange(
     [alert.author_id, postId],
   );
   const title = 'Atualização de resgate';
-  const body = `${alert.approx_label} agora está: ${status}`;
+  const statusName =
+    {
+      open: 'Aberto',
+      on_the_way: 'A caminho',
+      not_found: 'Não encontrado',
+      rescued: 'Resgatado',
+      fostered: 'Lar temporário',
+      for_adoption: 'Para adoção',
+      adopted: 'Adotado',
+    }[status] ?? status;
+  const body = `${alert.approx_label} agora está: ${statusName}`;
   for (const person of rowsOf<{ id: string; fcm_tokens: string[] }>(people)) {
     await pool.query(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'status', $2::jsonb)`,

@@ -130,7 +130,7 @@ export function MapCanvas({
           const post = group.posts[0];
           if (!post) return new maplibregl.Marker({ element }).setLngLat([0, 0]);
           const selected = post.id === selectedRef.current;
-          const size = selected ? 56 : 48;
+          const size = selected ? 72 : 64;
           element.setAttribute('aria-label', post.approxLabel);
           element.style.width = `${size}px`;
           element.style.height = `${size}px`;

@@ -16,9 +16,14 @@ const postMedia = z
   .object({
     url: z.string().min(1),
     thumbUrl: z.string().min(1).nullish(),
+    storageKey: z.string().min(1).nullish(),
   })
   // A row without a thumbnail still shows the full picture.
-  .transform((media) => ({ url: media.url, thumbUrl: media.thumbUrl ?? media.url }));
+  .transform((media) => ({
+    url: media.url,
+    thumbUrl: media.thumbUrl ?? media.url,
+    storageKey: media.storageKey ?? null,
+  }));
 
 export const postSchema: Schema<Post> = z.object({
   id: z.string().min(1),

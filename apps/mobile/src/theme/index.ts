@@ -34,6 +34,7 @@ export function useTheme(): Theme {
 export const statusLabel: Record<string, string> = {
   open: 'Aberto',
   on_the_way: 'A caminho',
+  not_found: 'Não encontrado',
   rescued: 'Resgatado',
   fostered: 'Lar temporário',
   for_adoption: 'Para adoção',
@@ -49,6 +50,7 @@ export const urgencyLabel: Record<string, string> = {
 export const nextStatus: Record<string, string | undefined> = {
   open: 'on_the_way',
   on_the_way: 'rescued',
+  not_found: 'open',
   rescued: 'fostered',
   fostered: 'for_adoption',
   for_adoption: 'adopted',

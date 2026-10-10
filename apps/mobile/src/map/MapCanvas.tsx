@@ -381,6 +381,15 @@ export function MapCanvas({
               textColor: mapColors.clusterText,
             }}
           />
+          <CircleLayer
+            id="pin-hit"
+            filter={['!', ['has', 'point_count']]}
+            style={{
+              circleRadius: 36,
+              circleColor: '#000000',
+              circleOpacity: 0.01,
+            }}
+          />
           <SymbolLayer
             id="pins"
             filter={['!', ['has', 'point_count']]}
@@ -396,7 +405,7 @@ export function MapCanvas({
                 'pawLow',
                 'pawMedium',
               ],
-              iconSize: ['case', ['==', ['get', 'selected'], true], 0.5, 0.4],
+              iconSize: ['case', ['==', ['get', 'selected'], true], 0.62, 0.55],
               iconAllowOverlap: true,
               iconIgnorePlacement: true,
             }}
