@@ -9,7 +9,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from '../map/serviceArea';
+import { insideServiceArea, serviceCamera, serviceOutline } from '../map/serviceArea';
 import { palette } from '../theme';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
@@ -87,9 +87,6 @@ export function PlacePicker({
           }}
           defaultSettings={{ centerCoordinate: belem, zoomLevel: 17 }}
         />
-        <ShapeSource id="service-mask" shape={serviceMask}>
-          <FillLayer id="service-mask-fill" style={{ fillColor: '#E23B3B', fillOpacity: 0.45 }} />
-        </ShapeSource>
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer
             id="service-outline-line"

@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 
-const blockedRed = '#E23B3B';
+const outsideArea = '#1B2B2B';
 const limitGreen = '#1F8F4E';
 
 export function limitMapToBelem(map: MapLibreMap) {
@@ -20,7 +20,7 @@ export function showServiceLimit(map: MapLibreMap) {
       id: 'service-mask',
       type: 'fill',
       source: 'service-mask',
-      paint: { 'fill-color': blockedRed, 'fill-opacity': 0.45 },
+      paint: { 'fill-color': outsideArea, 'fill-opacity': 0.28 },
     });
     map.addSource('service-outline', { type: 'geojson', data: serviceOutline });
     map.addLayer({

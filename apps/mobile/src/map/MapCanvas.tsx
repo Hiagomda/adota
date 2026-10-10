@@ -1,7 +1,6 @@
 import {
   Camera,
   CircleLayer,
-  FillLayer,
   Images,
   LineLayer,
   Logger,
@@ -17,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState, type ComponentProps } from '
 import { Platform } from 'react-native';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type MapBounds } from './geo';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
+import { insideServiceArea, serviceCamera, serviceOutline } from './serviceArea';
 import { palette } from '../theme';
 
 const pawImages = {
@@ -145,22 +144,18 @@ export function MapCanvas({
         }}
         animationDuration={600}
       />
-      <ShapeSource id="service-mask" shape={serviceMask}>
-        <FillLayer
-          id="service-mask-fill"
-          style={{ fillColor: '#E23B3B', fillOpacity: 0.45 }}
-        />
-      </ShapeSource>
       <ShapeSource id="service-outline" shape={serviceOutline}>
         <LineLayer
           id="service-outline-line"
           style={{ lineColor: '#1F8F4E', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
         />
       </ShapeSource>
-      {gpsReady && tracking ? (
+      {gpsReady ? (
         // AnimatedPoint overwrites AnimatedNode._listeners (a Map) with a plain object.
         // RN 0.86 then crashes in callListeners: "undefined is not a function".
-        <UserLocation visible animated={false} minDisplacement={25} />
+        // Unmounting this view when the tab blurs crashes the process the same way,
+        // so it stays mounted and only hides.
+        <UserLocation visible={tracking} animated={false} minDisplacement={25} />
       ) : null}
       <Images images={pawImages} />
       <ShapeSource
