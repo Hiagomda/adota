@@ -1,5 +1,6 @@
 /** Plain-language notes for this alpha. Shown in Ajustes and in the update dialog. */
 export const currentReleaseNotes = [
+  'O login com Google abre a conta dentro do app.',
   'A publicação nova entra no feed na hora.',
   'Dá para conversar nos comentários e receber aviso quando falarem com você.',
   'Animais perdidos saíram do mapa de resgate e ficam na lista própria.',

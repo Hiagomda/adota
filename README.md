@@ -54,7 +54,7 @@ Contas locais, senha nenhuma. O token é `dev:<e-mail>`:
 | patas@egua.local | ONG verificada        |
 | admin@egua.local | moderação em `/admin` |
 
-No app, a tela de entrada tem esses atalhos. Google e Apple aparecem na interface e explicam que precisam do Firebase. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem tocou em "Eu vou ajudar".
+No app, a tela de entrada tem esses atalhos. O login com Google abre o seletor de conta no próprio app. O site público mostra a localização aproximada. O ponto exato só volta para o autor, a moderação ou quem tocou em "Eu vou ajudar".
 
 ## Como testar a API
 

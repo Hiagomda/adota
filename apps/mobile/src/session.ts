@@ -9,6 +9,7 @@ import {
   signOutAuth,
   signUpWithEmail,
 } from './auth/service';
+import { signOutGoogle } from './auth/googleNative';
 import { reportError, setReporterUser } from './crash/reporter';
 import { queryClient } from './queryClient';
 import type { Account } from './types';
@@ -175,6 +176,7 @@ export const useSession = create<SessionState>((set) => ({
   clearCupuPrompt: () => set({ cupuPrompt: false }),
   clearSignedOutReason: () => set({ signedOutReason: null }),
   logout: async (reason) => {
+    await signOutGoogle();
     await signOutAuth();
     await writeToken(null);
     setReporterUser(null);

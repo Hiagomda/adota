@@ -45,7 +45,7 @@ export async function signInWithEmail(email: string, password: string): Promise<
   }
 }
 
-/** Completes the Google handoff. `idToken` is the Google token, not the Firebase one. */
+/** Turns a Google ID token from the in-app account picker into a Firebase ID token. */
 export async function signInWithGoogleIdToken(idToken: string): Promise<string> {
   try {
     const credential = GoogleAuthProvider.credential(idToken);

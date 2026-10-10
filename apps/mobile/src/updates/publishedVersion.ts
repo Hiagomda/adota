@@ -12,7 +12,7 @@ export function parsePublishedNativeApp(value: unknown): PublishedNativeApp | nu
   const notes = Array.isArray(record.notes)
     ? record.notes
         .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
-        .slice(0, 8)
+        .slice(0, 12)
     : [];
   return {
     version: record.version.trim(),
