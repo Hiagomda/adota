@@ -75,6 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: './assets/adaptive-icon-mono.png',
     },
     predictiveBackGestureEnabled: false,
+    permissions: ['REQUEST_INSTALL_PACKAGES'],
     ...(existsSync(googleServicesAndroid) ? { googleServicesFile: './google-services.json' } : {}),
   },
   web: {
