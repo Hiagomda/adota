@@ -775,6 +775,7 @@ export default function PostScreen() {
         visible={editOpen}
         token={token ?? ''}
         description={item.description}
+        name={item.animal.name ?? ''}
         urgency={item.urgency}
         photos={item.media.flatMap((photo) =>
           photo.storageKey ? [{ key: photo.storageKey, preview: photo.thumbUrl }] : [],

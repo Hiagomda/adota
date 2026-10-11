@@ -89,12 +89,13 @@ function collectOrgs(posts: Post[]): OrgSummary[] {
 
 interface HeroProps {
   name: string | null;
+  avatarUrl: string | null;
   unread: boolean;
   onNotifications: () => void;
   onLost: () => void;
 }
 
-const Hero = memo(function Hero({ name, unread, onNotifications, onLost }: HeroProps) {
+const Hero = memo(function Hero({ name, avatarUrl, unread, onNotifications, onLost }: HeroProps) {
   const insets = useSafeAreaInsets();
   const title = name ? `${greeting()}, ${firstName(name)}!` : `${greeting()}!`;
   return (
@@ -106,7 +107,7 @@ const Hero = memo(function Hero({ name, unread, onNotifications, onLost }: HeroP
     >
       <View style={styles.heroColumn}>
         <View style={styles.heroTop}>
-          <Avatar name={name ?? 'Você'} size="lg" ring="light" />
+          <Avatar name={name ?? 'Você'} uri={avatarUrl} size="lg" ring="light" />
           <View style={styles.heroText}>
             <AppText variant="bodySmall" color="onHeroMuted" numberOfLines={1}>
               Égua, adota!
@@ -232,10 +233,16 @@ export default function HomeScreen() {
     enabled: Boolean(token),
   });
 
-  const storyPosts = stories.data?.posts ?? emptyPosts;
+  const storyPosts = (stories.data?.posts ?? emptyPosts).filter(
+    (post) => post.helpRequest?.kind !== 'transport',
+  );
   const adoptionPosts = adoption.data?.posts ?? emptyPosts;
-  const campaignPosts = campaigns.data?.posts ?? emptyPosts;
-  const feedPosts = feed.data?.posts ?? emptyPosts;
+  const campaignPosts = (campaigns.data?.posts ?? emptyPosts).filter(
+    (post) => post.helpRequest?.kind !== 'transport',
+  );
+  const feedPosts = (feed.data?.posts ?? emptyPosts).filter(
+    (post) => post.helpRequest?.kind !== 'transport',
+  );
   const orgs = useMemo(
     () => collectOrgs([...feedPosts, ...adoptionPosts, ...campaignPosts]),
     [feedPosts, adoptionPosts, campaignPosts],
@@ -325,6 +332,7 @@ export default function HomeScreen() {
     <View>
       <Hero
         name={me.data?.name ?? null}
+        avatarUrl={me.data?.avatarUrl ?? null}
         unread={unreadNotifications}
         onNotifications={() => router.push('/alerts')}
         onLost={() => router.push('/lost')}
@@ -346,17 +354,10 @@ export default function HomeScreen() {
             onPress={() => router.push('/voluntario')}
           />
           <ShortcutCard
-            label="Transporte"
-            icon="truck"
-            tone="caramel"
-            index={2}
-            onPress={() => router.push('/voluntario')}
-          />
-          <ShortcutCard
             label="Doar"
             icon="gift"
             tone="info"
-            index={3}
+            index={2}
             onPress={() => scrollTo(campaignY.current)}
           />
         </View>

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../src/api';
 import {
@@ -20,6 +20,7 @@ import {
   Switch,
 } from '../src/components/ui';
 import { VersionMark } from '../src/diagnostics/VersionMark';
+import { AvatarCropper } from '../src/profile/AvatarCropper';
 import { permissionOutcome } from '../src/permissions';
 import { uploadProfilePhoto } from '../src/place/publish';
 import { useSession } from '../src/session';
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
   const [deleting, setDeleting] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [crop, setCrop] = useState<{ uri: string; width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!me.data) return;
@@ -103,11 +105,24 @@ export default function SettingsScreen() {
     });
     const uri = picked.canceled ? undefined : picked.assets?.[0]?.uri;
     if (!uri) return;
+    const size = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      Image.getSize(uri, (width, height) => resolve({ width, height }), reject);
+    }).catch(() => null);
+    if (!size || size.width < 1 || size.height < 1) {
+      setMessage('Não consegui ler essa foto. Escolha outra.');
+      return;
+    }
+    setCrop({ uri, width: size.width, height: size.height });
+  }
+
+  async function saveCroppedPhoto(uri: string) {
+    if (!token) return;
     setUploadingPhoto(true);
     await run(async () => {
       const key = await uploadProfilePhoto(token, uri);
       await api('/me', { method: 'PATCH', token, body: { avatarUrl: key } });
       await client.invalidateQueries({ queryKey: ['me', token] });
+      setCrop(null);
     }, 'Foto do perfil atualizada.');
     setUploadingPhoto(false);
   }
@@ -135,6 +150,16 @@ export default function SettingsScreen() {
       style={[styles.screen, { backgroundColor: colors.background }]}
       edges={['top', 'bottom']}
     >
+      {crop ? (
+        <AvatarCropper
+          uri={crop.uri}
+          width={crop.width}
+          height={crop.height}
+          busy={uploadingPhoto}
+          onCancel={() => setCrop(null)}
+          onConfirm={(uri) => void saveCroppedPhoto(uri)}
+        />
+      ) : null}
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.column}>
           <Header title="Ajustes" large onBack={() => router.back()} />

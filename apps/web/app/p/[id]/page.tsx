@@ -16,7 +16,8 @@ export async function generateMetadata({
   const { id } = await params;
   const post = await getPost(id);
   if (!post) return { title: 'Alerta não encontrado' };
-  const title = `${speciesLabel[post.animal.species] ?? 'Animal'} em ${post.approxLabel}`;
+  const animalName = post.animal.name?.trim() || speciesLabel[post.animal.species] || 'Animal';
+  const title = `${animalName} em ${post.approxLabel}`;
   return {
     title,
     description: post.description,
@@ -53,7 +54,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <h1>{post.approxLabel}</h1>
           <p>{post.description}</p>
           <p>
-            {speciesLabel[post.animal.species] ?? 'Animal'} · publicado por{' '}
+            {post.animal.name?.trim() || speciesLabel[post.animal.species] || 'Animal'} · publicado
+            por{' '}
             <Link href={`/u/${post.author.handle}`}>@{post.author.handle}</Link>
             {post.author.verified ? ' · verificado' : ''}
           </p>

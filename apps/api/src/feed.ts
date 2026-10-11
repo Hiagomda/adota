@@ -37,6 +37,7 @@ interface PostRow {
   author_whatsapp: boolean;
   species: string;
   size: string;
+  animal_name: string | null;
   sex: string;
   age_estimate: string | null;
   health_notes: string | null;
@@ -209,13 +210,17 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     input.media.map((item) => item.url),
   );
   const description = stripControls(input.description);
-  const reviewStatus = looksLikeAnimalSale(description) ? 'pending' : 'published';
+  const named = input.name?.trim() ?? '';
+  const reviewStatus =
+    looksLikeAnimalSale(description) || (named !== '' && looksLikeAnimalSale(named))
+      ? 'pending'
+      : 'published';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const animal = await client.query<{ id: string }>(
-      `INSERT INTO animals (species, size, sex, age_estimate, health_notes, temperament, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open') RETURNING id`,
+      `INSERT INTO animals (species, size, sex, age_estimate, health_notes, temperament, status, name)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7) RETURNING id`,
       [
         input.species,
         input.size,
@@ -223,6 +228,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.ageEstimate ?? null,
         input.healthNotes ?? null,
         input.temperament ?? null,
+        input.name?.trim() || null,
       ],
     );
     const animalId = animal.rows[0]?.id;
@@ -364,6 +370,10 @@ export async function updatePost(
   }
   assertOwnedMedia(user.id, fresh);
   await verifyFreshMedia(fresh);
+  const animalName = input.name?.trim() ?? '';
+  if (input.name !== undefined && looksLikeAnimalSale(animalName)) {
+    throw new HttpError(400, 'Não é permitido vender animais.');
+  }
 
   const client = await pool.connect();
   try {
@@ -373,6 +383,13 @@ export async function updatePost(
       description,
       input.urgency,
     ]);
+    if (input.name !== undefined) {
+      await client.query(
+        `UPDATE animals SET name = $2
+         WHERE id = (SELECT animal_id FROM posts WHERE id = $1)`,
+        [postId, animalName === '' ? null : animalName],
+      );
+    }
     await client.query(`DELETE FROM post_media WHERE post_id = $1`, [postId]);
     for (const [position, url] of urls.entries()) {
       await client.query(
@@ -499,7 +516,7 @@ function postColumns(viewerParam: string): string {
     CASE p.urgency WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END AS urgency_rank,
     u.id AS author_id, u.name AS author_name, u.handle AS author_handle, u.avatar_url AS author_avatar,
     u.role AS author_role, u.verified AS author_verified, u.phone AS author_phone, u.whatsapp_opt_in AS author_whatsapp,
-    a.id AS animal_id, a.species, a.size, a.sex, a.age_estimate, a.health_notes, a.temperament,
+    a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.sex, a.age_estimate, a.health_notes, a.temperament,
     ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
     ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
     ST_Y(p.location::geometry) AS exact_lat,
@@ -561,6 +578,7 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         id: row.animal_id,
         species: row.species,
         size: row.size,
+        name: row.animal_name,
         sex: row.sex,
         ageEstimate: row.age_estimate,
         healthNotes: row.health_notes,

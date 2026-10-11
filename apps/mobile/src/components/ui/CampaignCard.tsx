@@ -19,7 +19,6 @@ const kinds: Record<string, { label: string; icon: IconName; tone: Tone }> = {
   food: { label: 'Ração e comida', icon: 'package', tone: 'caramel' },
   vet: { label: 'Cuidados de saúde', icon: 'activity', tone: 'error' },
   castration: { label: 'Castração', icon: 'scissors', tone: 'info' },
-  transport: { label: 'Transporte', icon: 'truck', tone: 'primary' },
 };
 const fallbackKind = { label: 'Pedido de ajuda', icon: 'heart' as IconName, tone: 'secondary' as Tone };
 

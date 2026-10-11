@@ -70,6 +70,7 @@ export const createPostSchema = z.object({
   type: postTypeSchema.default('rescue_alert'),
   species: speciesSchema,
   size: sizeSchema,
+  name: z.string().trim().max(80).optional(),
   sex: sexSchema.optional(),
   ageEstimate: z.string().max(40).optional(),
   healthNotes: z.string().max(500).optional(),
@@ -124,6 +125,7 @@ export const updatePostSchema = z
   .object({
     description: z.string().trim().min(1).max(2000),
     urgency: urgencySchema,
+    name: z.string().trim().max(80).optional(),
     media: z
       .array(
         z.object({

@@ -35,6 +35,7 @@ export interface Post {
     id: string;
     species: string;
     size: string;
+    name: string | null;
     sex: string;
     ageEstimate: string | null;
     healthNotes: string | null;

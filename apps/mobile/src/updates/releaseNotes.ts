@@ -1,15 +1,15 @@
 /** Plain-language notes for this alpha. Shown in Ajustes and in the update dialog. */
 export const currentReleaseNotes = [
+  'O resgate pode ter um nome, em vez de Cachorro médio.',
+  'Dá para tirar a foto antes de publicar.',
+  'A foto do perfil encaixa num círculo e dá para arrastar.',
+  'A sua foto aparece no topo do início.',
+  'O atalho de transporte saiu do início.',
   'A patinha do mapa aparece em qualquer zoom.',
   'Ao excluir o resgate, ele some do mapa na hora.',
   'Dá para editar e excluir o próprio resgate.',
   'Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.',
-  'A patinha no mapa ficou mais fácil de tocar.',
   'O login com Google abre a conta dentro do app.',
-  'A publicação nova entra no feed na hora.',
-  'Dá para conversar nos comentários e receber aviso quando falarem com você.',
-  'Animais perdidos saíram do mapa de resgate e ficam na lista própria.',
-  'Os resgates abertos aparecem no mapa com a patinha.',
   'Dá para mudar foto, nome e @. Nome e @ não repetem.',
   'Dá para sair da conta nos Ajustes e no perfil.',
 ];

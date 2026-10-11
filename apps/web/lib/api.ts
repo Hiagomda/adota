@@ -18,6 +18,7 @@ export interface PublicPost {
   animal: {
     species: string;
     size: string;
+    name: string | null;
     sex: string;
     ageEstimate: string | null;
   };

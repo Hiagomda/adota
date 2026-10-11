@@ -13,6 +13,7 @@ import {
   Button,
   Chip,
   Icon,
+  IconButton,
   Input,
   Notice,
   Segmented,
@@ -99,6 +100,7 @@ export default function CreateScreen() {
     if (bootShot && 'error' in bootShot) return;
     openCreateCamera();
   }, [bootShot]);
+  const [animalName, setAnimalName] = useState('');
   const [description, setDescription] = useState('');
   const [reference, setReference] = useState('');
   const [kind, setKind] = useState<'rescue_alert' | 'lost'>(
@@ -127,6 +129,13 @@ export default function CreateScreen() {
   const located = gps.fix && insideServiceArea(gps.fix) ? gps.fix : null;
   const point = moved ? manual : located;
   const { address, looking } = useAddress(point);
+
+  const removePhoto = useCallback((uri: string) => {
+    const next = photosRef.current.filter((photo) => photo !== uri);
+    photosRef.current = next;
+    setCreatePhotoCount(next.length);
+    setPhotos(next);
+  }, []);
 
   const addPhoto = useCallback((uri: string) => {
     if (photosRef.current.length >= MAX_PHOTOS || photosRef.current.includes(uri)) return;
@@ -203,6 +212,7 @@ export default function CreateScreen() {
       description: description.trim(),
       kind,
       species,
+      name: animalName.trim(),
       urgency,
       point,
       accuracyM: gps.fix?.accuracy ?? null,
@@ -215,6 +225,7 @@ export default function CreateScreen() {
       photosRef.current = [];
       setCreatePhotoCount(0);
       setPhotos([]);
+      setAnimalName('');
       setDescription('');
       setReference('');
       void api('/volunteers/actions/claim-xp', {
@@ -253,6 +264,7 @@ export default function CreateScreen() {
         photosRef.current = [];
         setCreatePhotoCount(0);
         setPhotos([]);
+        setAnimalName('');
         setDescription('');
         setReference('');
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
@@ -322,13 +334,21 @@ export default function CreateScreen() {
           ) : (
             <View style={styles.grid}>
               {photos.map((photo) => (
-                <Image
-                  key={photo}
-                  source={{ uri: photo }}
-                  style={[styles.thumb, thumbSize]}
-                  contentFit="cover"
-                  accessibilityLabel="Foto do animal"
-                />
+                <View key={photo} style={[styles.thumbWrap, thumbSize]}>
+                  <Image
+                    source={{ uri: photo }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                    accessibilityLabel="Foto do animal"
+                  />
+                  <IconButton
+                    icon="x"
+                    variant="filled"
+                    accessibilityLabel="Remover esta foto"
+                    onPress={() => removePhoto(photo)}
+                    style={styles.removePhoto}
+                  />
+                </View>
               ))}
               {photos.length < MAX_PHOTOS ? (
                 <Touchable
@@ -372,6 +392,14 @@ export default function CreateScreen() {
                 options={kindOptions}
                 value={kind}
                 onChange={setKind}
+              />
+              <Input
+                label="Nome"
+                value={animalName}
+                onChangeText={setAnimalName}
+                placeholder="Ex.: Pretinho da esquina"
+                maxLength={80}
+                helper="É o título do resgate. Se ficar vazio, o card mostra só Cachorro, Gato ou Outro."
               />
               <View style={styles.group}>
                 <AppText variant="bodyStrong">Espécie</AppText>
@@ -533,7 +561,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  thumb: { borderRadius: radius.md },
+  thumbWrap: { borderRadius: radius.md, overflow: 'hidden' },
+  thumb: { width: '100%', height: '100%' },
+  removePhoto: { position: 'absolute', top: spacing.xs, right: spacing.xs },
   add: {
     borderRadius: radius.md,
     borderWidth: 2,

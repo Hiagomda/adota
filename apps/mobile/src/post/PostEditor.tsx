@@ -18,11 +18,13 @@ interface PostEditorProps {
   visible: boolean;
   token: string;
   description: string;
+  name: string;
   urgency: 'low' | 'medium' | 'high';
   photos: EditPhoto[];
   onClose: () => void;
   onSave: (body: {
     description: string;
+    name: string;
     urgency: 'low' | 'medium' | 'high';
     media: { url: string }[];
   }) => Promise<void>;
@@ -38,12 +40,14 @@ export function PostEditor({
   visible,
   token,
   description,
+  name,
   urgency,
   photos,
   onClose,
   onSave,
 }: PostEditorProps) {
   const [draft, setDraft] = useState(description);
+  const [title, setTitle] = useState(name);
   const [level, setLevel] = useState(urgency);
   const [pictures, setPictures] = useState(photos);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +95,7 @@ export function PostEditor({
     try {
       await onSave({
         description: text,
+        name: title.trim(),
         urgency: level,
         media: pictures.map((photo) => ({ url: photo.key })),
       });
@@ -104,6 +109,14 @@ export function PostEditor({
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Editar resgate">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
+        <Input
+          label="Nome"
+          value={title}
+          onChangeText={setTitle}
+          maxLength={80}
+          placeholder="Ex.: Pretinho da esquina"
+          helper="É o título do resgate. Vazio mostra só a espécie."
+        />
         <Input
           label="O que aconteceu"
           value={draft}

@@ -47,6 +47,7 @@ export const postSchema: Schema<Post> = z.object({
     id: z.string().min(1),
     species: z.string(),
     size: z.string(),
+    name: nullableString,
     sex: z.string(),
     ageEstimate: nullableString,
     healthNotes: nullableString,
