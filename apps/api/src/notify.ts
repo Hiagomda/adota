@@ -81,7 +81,6 @@ export async function dispatchRescueAlert(
        AND u.suspended = false
        AND u.notifications_enabled = true
        AND u.id <> $2
-       AND u.role IN ('protector', 'ngo', 'admin')
        AND u.base_location IS NOT NULL
        AND ST_DWithin(u.base_location, (SELECT location FROM posts WHERE id = $1), u.alert_radius_km * 1000 * $3)
        AND NOT EXISTS (
@@ -96,8 +95,14 @@ export async function dispatchRescueAlert(
      JOIN users u ON u.id = f.user_id
      WHERE f.available = true
        AND u.deleted_at IS NULL
+       AND u.suspended = false
+       AND u.notifications_enabled = true
        AND u.id <> $2
-       AND ST_DWithin(f.location, (SELECT location FROM posts WHERE id = $1), f.radius_km * 1000 * $3)`,
+       AND ST_DWithin(f.location, (SELECT location FROM posts WHERE id = $1), f.radius_km * 1000 * $3)
+       AND NOT EXISTS (
+         SELECT 1 FROM blocks b
+         WHERE (b.blocker_id = u.id AND b.blocked_id = $2) OR (b.blocker_id = $2 AND b.blocked_id = u.id)
+       )`,
     [postId, alert.author_id, radiusFactor],
   );
   const hour = belemHour();
@@ -105,7 +110,7 @@ export async function dispatchRescueAlert(
   for (const target of targets.rows) {
     if (target.recent >= 8) continue;
     const quiet = isQuiet(target.quiet_hours_start, target.quiet_hours_end, hour);
-    const title = urgent ? 'Alerta urgente em Belém' : 'Novo alerta de resgate';
+    const title = urgent ? 'Resgate urgente perto de você' : 'Novo resgate perto de você';
     const body = `${alert.approx_label}: ${alert.description.slice(0, 120)}`;
     await pool.query(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'rescue_alert', $2::jsonb)`,

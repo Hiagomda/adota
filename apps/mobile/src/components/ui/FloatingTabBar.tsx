@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import type { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -12,18 +13,18 @@ import {
   useMotionDuration,
   useTheme,
 } from '../../theme';
-import { Icon, type IconName } from './Icon';
 import { Touchable } from './Touchable';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+type IonName = ComponentProps<typeof Ionicons>['name'];
 
-/** Icon of each tab by route name. `create` is the raised center button. */
-const tabIcons: Record<string, IconName> = {
-  index: 'home',
-  explore: 'map',
-  create: 'plus',
-  alerts: 'bell',
-  profile: 'user',
+/** Outline when idle, filled when the tab is the one on screen. `create` stays the coral plus. */
+const tabIcons: Record<string, { idle: IonName; active: IonName }> = {
+  index: { idle: 'home-outline', active: 'home' },
+  explore: { idle: 'map-outline', active: 'map' },
+  create: { idle: 'add', active: 'add' },
+  alerts: { idle: 'notifications-outline', active: 'notifications' },
+  profile: { idle: 'person-outline', active: 'person' },
 };
 
 const ACTIVE_SCALE = 1.08;
@@ -49,7 +50,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) 
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const options = descriptors[route.key]?.options;
-          const icon = tabIcons[route.name] ?? 'circle';
+          const icon = tabIcons[route.name] ?? { idle: 'ellipse-outline', active: 'ellipse' };
           const isCreate = route.name === 'create';
 
           function onPress() {
@@ -80,7 +81,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) 
                       { backgroundColor: colors.secondary },
                     ]}
                   >
-                    <Icon name={icon} size="xl" color={colors.onSecondary} />
+                    <Ionicons name={icon.active} size={size.icon.xl} color={colors.onSecondary} />
                   </View>
                 ) : (
                   <Animated.View
@@ -94,9 +95,9 @@ export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) 
                       },
                     ]}
                   >
-                    <Icon
-                      name={icon}
-                      size="lg"
+                    <Ionicons
+                      name={focused ? icon.active : icon.idle}
+                      size={size.icon.lg}
                       color={focused ? colors.onPrimary : colors.tabBarInactive}
                     />
                   </Animated.View>

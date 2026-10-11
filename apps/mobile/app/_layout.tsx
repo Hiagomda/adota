@@ -19,6 +19,7 @@ import {
 } from '../src/crash/reporter';
 import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
+import { syncNearbyPresence } from '../src/nearby/presence';
 import { flushOutbox } from '../src/place/outbox';
 import { queryClient } from '../src/queryClient';
 import { useSession } from '../src/session';
@@ -43,6 +44,7 @@ function RootLayout() {
   const hydrate = useSession((state) => state.hydrate);
   const refresh = useSession((state) => state.refresh);
   const sessionReady = useSession((state) => state.ready);
+  const token = useSession((state) => state.token);
   const fatal = useFatalError();
   const [fontsLoaded, fontError] = useFonts(appFonts);
   const [timedOut, setTimedOut] = useState(false);
@@ -61,11 +63,18 @@ function RootLayout() {
   }, [hydrate]);
 
   useEffect(() => {
+    if (!token) return;
+    void syncNearbyPresence(token);
+  }, [token]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void refresh();
+      if (next !== 'active') return;
+      void refresh();
+      if (token) void syncNearbyPresence(token);
     });
     return () => subscription.remove();
-  }, [refresh]);
+  }, [refresh, token]);
 
   useEffect(() => {
     navigationIntegration.registerNavigationContainer(navigationRef);

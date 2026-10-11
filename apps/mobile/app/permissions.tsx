@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api } from '../src/api';
+import { syncNearbyPresence } from '../src/nearby/presence';
 import { AppText, Button, Card, ListItem, Divider, Notice } from '../src/components/ui';
 import { reportError } from '../src/crash/reporter';
 import { Mascot } from '../src/mascot';
@@ -34,16 +34,8 @@ export default function PermissionsScreen() {
 
   async function registerPushToken() {
     if (!token) return;
-    const notifications = await Notifications.requestPermissionsAsync();
-    if (notifications.status !== 'granted') return;
-    try {
-      const push = await Notifications.getDevicePushTokenAsync();
-      const value = typeof push.data === 'string' ? push.data : null;
-      if (value) await api('/me/fcm-token', { method: 'POST', token, body: { token: value } });
-    } catch (error) {
-      // No Firebase config in this build, or no Play Services: alerts stay in-app for now.
-      reportError(error, { source: 'handled', where: 'permissions:push-token' });
-    }
+    await Notifications.requestPermissionsAsync();
+    await syncNearbyPresence(token);
   }
 
   async function finish() {

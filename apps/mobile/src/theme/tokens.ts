@@ -256,9 +256,11 @@ export const size = {
   animalLarge: { width: 264, height: 336 },
   animalCompact: { width: 168, height: 208 },
   orgCard: { width: 248 },
-  galleryMax: 460,
+  galleryMax: 560,
+  /** Full-width animal on the home, before the carousels. */
+  homeFeature: 420,
   /** How much the white sheet of the detail screen climbs over the photo. */
-  sheetOverlap: 32,
+  sheetOverlap: 48,
 } as const;
 
 export const motion = {

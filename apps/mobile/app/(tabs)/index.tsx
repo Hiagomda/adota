@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Image } from 'expo-image';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
@@ -18,25 +19,39 @@ import {
   EmptyState,
   ErrorState,
   HeroSurface,
+  Icon,
   IconButton,
   OrgCard,
+  PhotoScrim,
+  ProgressBar,
+  SearchBar,
   SectionHeader,
-  ShortcutCard,
   SkeletonCard,
   SkeletonRail,
+  StatusPill,
   Touchable,
+  type IconName,
 } from '../../src/components/ui';
 import { onFeedRefresh } from '../../src/feedRefresh';
 import { formatWhen } from '../../src/format';
 import { useSession } from '../../src/session';
-import { screenColumn, size, spacing, useTheme } from '../../src/theme';
+import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
-import { useLightStatusBar } from '../../src/useLightStatusBar';
 import { badgeArt } from '../../src/volunteer/badgeArt';
 import type { VolunteerStatus } from '../../src/volunteer/types';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
+const CATEGORY_SIZE = 64;
+
+type HomeLens = 'all' | 'dog' | 'cat' | 'urgent';
+
+const lenses: { id: HomeLens; label: string; icon: IconName }[] = [
+  { id: 'all', label: 'Tudo', icon: 'grid' },
+  { id: 'dog', label: 'Cães', icon: 'heart' },
+  { id: 'cat', label: 'Gatos', icon: 'heart' },
+  { id: 'urgent', label: 'Urgentes', icon: 'alert-circle' },
+];
 const MAX_ORGS = 8;
 const MAX_SEALS = 3;
 const SEAL_SIZE = 72;
@@ -87,63 +102,6 @@ function collectOrgs(posts: Post[]): OrgSummary[] {
   return [...byId.values()].sort((a, b) => b.rescues - a.rescues).slice(0, MAX_ORGS);
 }
 
-interface HeroProps {
-  name: string | null;
-  avatarUrl: string | null;
-  unread: boolean;
-  onNotifications: () => void;
-  onLost: () => void;
-}
-
-const Hero = memo(function Hero({ name, avatarUrl, unread, onNotifications, onLost }: HeroProps) {
-  const insets = useSafeAreaInsets();
-  const title = name ? `${greeting()}, ${firstName(name)}!` : `${greeting()}!`;
-  return (
-    <HeroSurface
-      style={[
-        styles.hero,
-        { paddingTop: insets.top + spacing.md, paddingBottom: size.curve + spacing.giant },
-      ]}
-    >
-      <View style={styles.heroColumn}>
-        <View style={styles.heroTop}>
-          <Avatar name={name ?? 'Você'} uri={avatarUrl} size="lg" ring="light" />
-          <View style={styles.heroText}>
-            <AppText variant="bodySmall" color="onHeroMuted" numberOfLines={1}>
-              Égua, adota!
-            </AppText>
-            <AppText variant="h1" color="onHero" numberOfLines={1}>
-              {title}
-            </AppText>
-          </View>
-          <IconButton
-            icon="search"
-            variant="hero"
-            accessibilityLabel="Animais perdidos"
-            onPress={onLost}
-          />
-          <View>
-            <IconButton
-              icon="bell"
-              variant="hero"
-              accessibilityLabel={unread ? 'Notificações. Você tem novidades' : 'Notificações'}
-              onPress={onNotifications}
-            />
-            {unread ? (
-              <View style={styles.unread} pointerEvents="none">
-                <Badge kind="dot" accessibilityLabel="Notificações não lidas" />
-              </View>
-            ) : null}
-          </View>
-        </View>
-        <AppText variant="body" color="onHeroMuted" style={styles.welcome}>
-          Belém tem bichinho esperando por você. Cada ajuda conta.
-        </AppText>
-      </View>
-    </HeroSurface>
-  );
-});
-
 const Stories = memo(function Stories({ posts }: { posts: Post[] }) {
   const router = useRouter();
   if (posts.length === 0) return null;
@@ -190,8 +148,18 @@ function Rail({ children }: { children: ReactNode }) {
   );
 }
 
+function matchesLens(post: Post, lens: HomeLens, seek: string): boolean {
+  if (lens === 'dog' && post.animal.species !== 'dog') return false;
+  if (lens === 'cat' && post.animal.species !== 'cat') return false;
+  if (lens === 'urgent' && post.urgency !== 'high') return false;
+  const needle = seek.trim().toLowerCase();
+  if (!needle) return true;
+  return `${animalHeadline(post.animal)} ${post.approxLabel} ${post.description} ${post.author.name}`
+    .toLowerCase()
+    .includes(needle);
+}
+
 export default function HomeScreen() {
-  useLightStatusBar();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -199,7 +167,8 @@ export default function HomeScreen() {
   const client = useQueryClient();
   const listRef = useRef<FlashListRef<Post>>(null);
   const adoptionY = useRef(0);
-  const campaignY = useRef(0);
+  const [seek, setSeek] = useState('');
+  const [lens, setLens] = useState<HomeLens>('all');
 
   const feed = useQuery({
     queryKey: ['posts', token],
@@ -233,20 +202,27 @@ export default function HomeScreen() {
     enabled: Boolean(token),
   });
 
+  const keep = useCallback((post: Post) => matchesLens(post, lens, seek), [lens, seek]);
   const storyPosts = (stories.data?.posts ?? emptyPosts).filter(
-    (post) => post.helpRequest?.kind !== 'transport',
+    (post) => post.helpRequest?.kind !== 'transport' && keep(post),
   );
-  const adoptionPosts = adoption.data?.posts ?? emptyPosts;
+  const adoptionPosts = (adoption.data?.posts ?? emptyPosts).filter(keep);
   const campaignPosts = (campaigns.data?.posts ?? emptyPosts).filter(
-    (post) => post.helpRequest?.kind !== 'transport',
+    (post) => post.helpRequest?.kind !== 'transport' && keep(post),
   );
   const feedPosts = (feed.data?.posts ?? emptyPosts).filter(
-    (post) => post.helpRequest?.kind !== 'transport',
+    (post) => post.helpRequest?.kind !== 'transport' && keep(post),
   );
-  const orgs = useMemo(
-    () => collectOrgs([...feedPosts, ...adoptionPosts, ...campaignPosts]),
-    [feedPosts, adoptionPosts, campaignPosts],
-  );
+  const featured = storyPosts[0] ?? feedPosts[0] ?? null;
+  const nearbyPosts = feedPosts.filter((post) => post.id !== featured?.id).slice(0, 8);
+  const resumePosts = feedPosts.filter((post) => post.saved || post.viewerWillHelp);
+  const city = me.data?.city?.trim() || 'Belém';
+  const levelProgress = volunteer.data
+    ? volunteer.data.level.progress > 1
+      ? volunteer.data.level.progress / 100
+      : volunteer.data.level.progress
+    : 0;
+  const orgs = collectOrgs([...feedPosts, ...adoptionPosts, ...campaignPosts]);
   const unreadNotifications = (notifications.data?.notifications ?? []).some(
     (item) => item.readAt === null,
   );
@@ -330,39 +306,195 @@ export default function HomeScreen() {
 
   const header = (
     <View>
-      <Hero
-        name={me.data?.name ?? null}
-        avatarUrl={me.data?.avatarUrl ?? null}
-        unread={unreadNotifications}
-        onNotifications={() => router.push('/alerts')}
-        onLost={() => router.push('/lost')}
-      />
-      <View style={[styles.column, styles.pullUp]}>
-        <View style={styles.shortcuts}>
-          <ShortcutCard
-            label="Adotar"
-            icon="heart"
-            tone="secondary"
-            index={0}
-            onPress={() => scrollTo(adoptionY.current)}
-          />
-          <ShortcutCard
-            label="Casa Amiga"
-            icon="home"
-            tone="primary"
-            index={1}
-            onPress={() => router.push('/voluntario')}
-          />
-          <ShortcutCard
-            label="Doar"
-            icon="gift"
-            tone="info"
-            index={2}
-            onPress={() => scrollTo(campaignY.current)}
-          />
+      <View style={[styles.mast, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.mastRow}>
+          <Avatar name={me.data?.name ?? 'Você'} uri={me.data?.avatarUrl} size="md" />
+          <View style={styles.heroText}>
+            <AppText variant="caption" color="textSecondary">
+              {greeting()}
+            </AppText>
+            <AppText variant="h2" numberOfLines={1}>
+              {me.data?.name ? firstName(me.data.name) : 'Égua, adota!'}
+            </AppText>
+          </View>
+          <View>
+            <IconButton
+              icon="bell"
+              accessibilityLabel={unreadNotifications ? 'Notificações. Você tem novidades' : 'Notificações'}
+              onPress={() => router.push('/alerts')}
+            />
+            {unreadNotifications ? (
+              <View style={styles.unread} pointerEvents="none">
+                <Badge kind="dot" accessibilityLabel="Notificações não lidas" />
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel={`Animais perto de ${city}, Pará. Abrir o mapa`}
+          pressedScale={0.98}
+          onPress={() => router.push('/explore')}
+          style={[styles.placeChip, { backgroundColor: colors.primarySoft }]}
+        >
+          <Icon name="map-pin" size="sm" color={colors.onPrimarySoft} />
+          <AppText variant="bodySmallStrong" style={{ color: colors.onPrimarySoft }} numberOfLines={1}>
+            Animais perto de: {city}, PA
+          </AppText>
+        </Touchable>
+        <SearchBar
+          value={seek}
+          onChangeText={setSeek}
+          placeholder="Buscar animal, bairro ou pessoa"
+          accessibilityLabel="Buscar animal, bairro ou pessoa"
+        />
+      </View>
+
+      <View style={styles.column}>
+        <View style={styles.lenses}>
+          {lenses.map((item) => {
+            const selected = lens === item.id;
+            return (
+              <Touchable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={item.label}
+                pressedScale={0.94}
+                onPress={() => setLens(item.id)}
+                style={styles.lens}
+              >
+                <View
+                  style={[
+                    styles.lensCircle,
+                    { backgroundColor: selected ? colors.primary : colors.surface },
+                  ]}
+                >
+                  <Icon name={item.icon} color={selected ? colors.onPrimary : colors.primary} />
+                </View>
+                <AppText variant="caption" numberOfLines={1}>
+                  {item.label}
+                </AppText>
+              </Touchable>
+            );
+          })}
         </View>
 
-        <Stories posts={storyPosts} />
+        <View style={styles.shortcuts}>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Adotar"
+            pressedScale={0.94}
+            onPress={() => scrollTo(adoptionY.current)}
+            style={styles.shortcut}
+          >
+            <View style={[styles.lensCircle, { backgroundColor: colors.secondarySoft }]}>
+              <Icon name="heart" color={colors.secondary} />
+            </View>
+            <AppText variant="caption">Adotar</AppText>
+          </Touchable>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Casa Amiga"
+            pressedScale={0.94}
+            onPress={() => router.push('/voluntario')}
+            style={styles.shortcut}
+          >
+            <View style={[styles.lensCircle, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="home" color={colors.primary} />
+            </View>
+            <AppText variant="caption">Casa Amiga</AppText>
+          </Touchable>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Doar"
+            pressedScale={0.94}
+            onPress={() => router.push('/doar')}
+            style={styles.shortcut}
+          >
+            <View style={[styles.lensCircle, { backgroundColor: colors.infoSoft }]}>
+              <Icon name="gift" color={colors.info} />
+            </View>
+            <AppText variant="caption">Doar</AppText>
+          </Touchable>
+        </View>
+
+        {featured ? (
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel={`Conhecer ${animalHeadline(featured.animal)}`}
+            pressedScale={0.98}
+            onPress={() => openPost(featured.id)}
+            style={[styles.feature, { backgroundColor: colors.surfaceMuted }]}
+          >
+            {featured.media[0] ? (
+              <Image
+                source={{ uri: featured.media[0].url }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                accessibilityLabel={`Foto de ${animalHeadline(featured.animal)}`}
+              />
+            ) : null}
+            <PhotoScrim stop={0.28} />
+            <View style={styles.featureCopy}>
+              <StatusPill urgency={featured.urgency} />
+              <AppText variant="display" color="onMedia" numberOfLines={2}>
+                {animalHeadline(featured.animal)}
+              </AppText>
+              <AppText variant="body" color="onMedia" numberOfLines={1}>
+                {placeOf(featured.approxLabel)}
+              </AppText>
+              <View style={[styles.cta, { backgroundColor: colors.secondary }]}>
+                <AppText variant="button" numberOfLines={1} style={{ color: colors.onSecondary }}>
+                  Conhecer {firstName(animalHeadline(featured.animal))}
+                </AppText>
+              </View>
+            </View>
+          </Touchable>
+        ) : null}
+
+        <Stories posts={storyPosts.filter((post) => post.id !== featured?.id)} />
+
+        {nearbyPosts.length > 0 ? (
+          <View>
+            <SectionHeader title="Perto de você" subtitle="O lugar mostrado é aproximado" />
+            <Rail>
+              {nearbyPosts.map((post, index) => (
+                <AnimalCard
+                  key={post.id}
+                  index={index}
+                  photoUri={post.media[0]?.thumbUrl ?? post.media[0]?.url}
+                  title={animalHeadline(post.animal)}
+                  subtitle={placeOf(post.approxLabel)}
+                  status={post.status}
+                  urgency={post.urgency}
+                  onPress={() => openPost(post.id)}
+                />
+              ))}
+            </Rail>
+          </View>
+        ) : null}
+
+        {resumePosts.length > 0 ? (
+          <View>
+            <SectionHeader title="Continue de onde parou" subtitle="Salvos e resgates em que você entrou" />
+            <Rail>
+              {resumePosts.map((post, index) => (
+                <AnimalCard
+                  key={post.id}
+                  index={index}
+                  variant="compact"
+                  photoUri={post.media[0]?.thumbUrl ?? post.media[0]?.url}
+                  title={animalHeadline(post.animal)}
+                  subtitle={post.viewerWillHelp ? 'Você vai ajudar' : 'Salvo'}
+                  status={post.status}
+                  onPress={() => openPost(post.id)}
+                />
+              ))}
+            </Rail>
+          </View>
+        ) : null}
 
         <View onLayout={(event) => (adoptionY.current = event.nativeEvent.layout.y)}>
           <SectionHeader
@@ -423,8 +555,13 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        <View onLayout={(event) => (campaignY.current = event.nativeEvent.layout.y)}>
-          <SectionHeader title="Campanhas" subtitle="Pedidos de ajuda de perfis verificados" />
+        <View>
+          <SectionHeader
+            title="Campanhas"
+            subtitle="Pedidos de ajuda de perfis verificados"
+            actionLabel="Pedir doação"
+            onAction={() => router.push('/doar')}
+          />
           {campaigns.isLoading ? (
             <SkeletonRail
               width={size.orgCard.width + spacing.xxl}
@@ -463,6 +600,31 @@ export default function HomeScreen() {
             </Rail>
           )}
         </View>
+
+        {token && volunteer.data ? (
+          <View style={styles.impactPad}>
+            <HeroSurface curved={false} style={styles.impact}>
+              <AppText variant="caption" color="onHeroMuted">
+                Seu impacto
+              </AppText>
+              <AppText variant="display" color="onHero">
+                {volunteer.data.xp} XP
+              </AppText>
+              <AppText variant="body" color="onHero">
+                Nível {volunteer.data.level.name}
+              </AppText>
+              <ProgressBar
+                tone="hero"
+                value={levelProgress}
+                caption={
+                  volunteer.data.level.ceiling
+                    ? `${volunteer.data.xp} / ${volunteer.data.level.ceiling}`
+                    : volunteer.data.level.name
+                }
+              />
+            </HeroSurface>
+          </View>
+        ) : null}
 
         {token ? (
           <>
@@ -562,16 +724,61 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   column: screenColumn,
-  hero: { width: '100%', paddingHorizontal: spacing.lg },
-  heroColumn: { ...screenColumn, gap: spacing.xl },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  mast: { ...screenColumn, gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  mastRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroText: { flex: 1 },
-  unread: { position: 'absolute', top: spacing.sm, right: spacing.sm },
-  welcome: { paddingRight: spacing.xl },
-  // The block climbs over the header by the room the hero leaves for it. The pull is on the block,
-  // not on the shortcuts, so they stay inside their parent and keep receiving touches on Android.
-  pullUp: { marginTop: -spacing.giant },
-  shortcuts: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg },
+  unread: { position: 'absolute', top: spacing.xs, right: spacing.xs },
+  placeChip: {
+    minHeight: size.touch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+  },
+  lenses: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  lens: { width: CATEGORY_SIZE + spacing.lg, alignItems: 'center', gap: spacing.xs },
+  lensCircle: {
+    width: CATEGORY_SIZE,
+    height: CATEGORY_SIZE,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shortcuts: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: spacing.lg,
+  },
+  shortcut: { width: CATEGORY_SIZE + spacing.xxl, alignItems: 'center', gap: spacing.xs },
+  feature: {
+    marginHorizontal: spacing.lg,
+    height: size.homeFeature,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  featureCopy: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  cta: {
+    alignSelf: 'flex-start',
+    minHeight: size.touch,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+  },
+  impactPad: { paddingHorizontal: spacing.lg },
+  impact: { borderRadius: radius.xl, padding: spacing.xl, gap: spacing.sm },
   stories: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,

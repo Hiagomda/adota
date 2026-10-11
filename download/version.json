@@ -1,18 +1,18 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 17,
+  "androidVersionCode": 18,
   "notes": [
+    "No cadastro dá para escolher porte e sexo.",
+    "No feed, dá para passar o dedo nas outras fotos.",
+    "O atalho Doar abre pedido de ração, veterinário ou castração.",
+    "Quem está perto e deixou os avisos ligados recebe o resgate.",
+    "O início tem busca, o lugar e um animal em destaque.",
     "O resgate pode ter um nome, em vez de Cachorro médio.",
     "Dá para tirar a foto antes de publicar.",
     "A foto do perfil encaixa num círculo e dá para arrastar.",
-    "A sua foto aparece no topo do início.",
-    "O atalho de transporte saiu do início.",
     "A patinha do mapa aparece em qualquer zoom.",
-    "Ao excluir o resgate, ele some do mapa na hora.",
     "Dá para editar e excluir o próprio resgate.",
-    "Depois de ajudar, dá para dizer que não conseguiu ou que não encontrou.",
     "O login com Google abre a conta dentro do app.",
-    "Dá para mudar foto, nome e @. Nome e @ não repetem.",
     "Dá para sair da conta nos Ajustes e no perfil."
   ]
 }

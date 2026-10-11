@@ -9,10 +9,19 @@ export const alertDraftSchema = z.object({
   token: z.string().min(1),
   photos: z.array(z.string().min(1)).min(1).max(5),
   description: z.string().min(1),
-  kind: z.enum(['rescue_alert', 'lost']),
+  kind: z.enum(['rescue_alert', 'lost', 'help_request']),
   species: z.enum(['dog', 'cat', 'other']),
+  size: z.enum(['small', 'medium', 'large']).default('medium'),
+  sex: z.enum(['male', 'female', 'unknown']).default('unknown'),
   name: z.string().trim().max(80).optional().default(''),
   urgency: z.enum(['low', 'medium', 'high']),
+  helpRequest: z
+    .object({
+      kind: z.enum(['food', 'vet', 'castration']),
+      pixKey: z.string().trim().min(1).max(120),
+      goalAmount: z.number().positive().nullable().optional(),
+    })
+    .optional(),
   point: z.object({ latitude: z.number(), longitude: z.number() }),
   accuracyM: z.number().nullable(),
   addressText: z.string().nullable(),
@@ -139,8 +148,18 @@ export async function publishAlert(
     body: {
       type: draft.kind,
       species: draft.species,
-      size: 'medium',
+      size: draft.size,
+      sex: draft.sex,
       ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
+      ...(draft.helpRequest
+        ? {
+            helpRequest: {
+              kind: draft.helpRequest.kind,
+              pixKey: draft.helpRequest.pixKey,
+              goalAmount: draft.helpRequest.goalAmount ?? null,
+            },
+          }
+        : {}),
       urgency: draft.urgency,
       description: draft.description,
       latitude: draft.point.latitude,

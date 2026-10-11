@@ -100,7 +100,7 @@ export default function PostScreen() {
   const [note, setNote] = useState<string | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const { width } = useWindowDimensions();
-  const galleryHeight = Math.min(Math.round(width * 1.1), size.galleryMax);
+  const galleryHeight = Math.min(Math.round(width * 1.25), size.galleryMax);
   const footerPad = Math.max(insets.bottom, spacing.lg);
   const post = useQuery({
     queryKey: ['post', id, token],
@@ -360,7 +360,7 @@ export default function PostScreen() {
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           <View style={styles.column}>
             <View style={styles.titleBlock}>
-              <AppText variant="h1">{animalHeadline(item.animal)}</AppText>
+              <AppText variant="display">{animalHeadline(item.animal)}</AppText>
               <View style={styles.pills}>
                 <StatusPill status={item.status} />
                 <StatusPill urgency={item.urgency} />
@@ -392,7 +392,7 @@ export default function PostScreen() {
             </View>
 
             <View style={styles.section}>
-              <AppText variant="h2">A história deste {speciesName.toLowerCase()}</AppText>
+              <AppText variant="h2">A história de {animalHeadline(item.animal)}</AppText>
               <AppText>{item.description}</AppText>
               {animalLines.length > 0 ? (
                 <Card
@@ -431,9 +431,10 @@ export default function PostScreen() {
                       <AppText variant="h3" numberOfLines={1}>
                         {item.author.name}
                       </AppText>
-                      <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                      <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
                         @{item.author.handle}
-                        {item.author.verified ? ' · verificado' : ''} · {formatWhen(item.createdAt)}
+                        {item.author.verified ? ' · perfil verificado' : ''} · publicou{' '}
+                        {formatWhen(item.createdAt)}
                       </AppText>
                     </View>
                   </Touchable>

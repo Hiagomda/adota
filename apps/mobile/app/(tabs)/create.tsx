@@ -56,6 +56,18 @@ const speciesOptions = [
   { value: 'other', label: 'Outro' },
 ] as const;
 
+const sizeOptions = [
+  { value: 'small', label: 'Pequeno' },
+  { value: 'medium', label: 'Médio' },
+  { value: 'large', label: 'Grande' },
+] as const;
+
+const sexOptions = [
+  { value: 'male', label: 'Macho' },
+  { value: 'female', label: 'Fêmea' },
+  { value: 'unknown', label: 'Não sei' },
+] as const;
+
 const urgencyOptions = [
   { value: 'high', label: 'Urgente' },
   { value: 'medium', label: 'Atenção' },
@@ -112,6 +124,8 @@ export default function CreateScreen() {
     if (askedKind === 'lost') setKind('lost');
   }
   const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>('dog');
+  const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [sex, setSex] = useState<'male' | 'female' | 'unknown'>('unknown');
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>('high');
   const [manual, setManual] = useState<MapPoint | null>(null);
   const [moved, setMoved] = useState(false);
@@ -212,6 +226,8 @@ export default function CreateScreen() {
       description: description.trim(),
       kind,
       species,
+      size,
+      sex,
       name: animalName.trim(),
       urgency,
       point,
@@ -410,6 +426,32 @@ export default function CreateScreen() {
                       label={option.label}
                       selected={species === option.value}
                       onPress={() => setSpecies(option.value)}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.group}>
+                <AppText variant="bodyStrong">Porte</AppText>
+                <View style={styles.chips}>
+                  {sizeOptions.map((option) => (
+                    <Chip
+                      key={option.value}
+                      label={option.label}
+                      selected={size === option.value}
+                      onPress={() => setSize(option.value)}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.group}>
+                <AppText variant="bodyStrong">Sexo</AppText>
+                <View style={styles.chips}>
+                  {sexOptions.map((option) => (
+                    <Chip
+                      key={option.value}
+                      label={option.label}
+                      selected={sex === option.value}
+                      onPress={() => setSex(option.value)}
                     />
                   ))}
                 </View>

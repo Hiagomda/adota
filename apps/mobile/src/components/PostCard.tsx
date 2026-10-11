@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
 import { memo, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { animalHeadline } from '../animalLabels';
-import { formatWhen } from '../format';
 import {
   motion,
   radius,
@@ -26,11 +25,17 @@ const HEART_MS = 650;
 export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCardProps) {
   const { colors, shadows } = useTheme();
   const duration = useMotionDuration();
-  const photo = post.media[0]?.thumbUrl || post.media[0]?.url;
   const lastTap = useRef(0);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [heart, setHeart] = useState(false);
+  const [frameWidth, setFrameWidth] = useState(0);
+  const [frameHeight, setFrameHeight] = useState(0);
+  const [photoIndex, setPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    setPhotoIndex(0);
+  }, [post.id]);
 
   useEffect(
     () => () => {
@@ -65,55 +70,97 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
       style={[shadows.md, styles.shadow, { backgroundColor: colors.surfaceRaised }]}
     >
       <View style={styles.card}>
-        <Touchable
-          accessibilityRole="button"
-          accessibilityLabel={`Abrir resgate de ${post.author.name}, ${post.approxLabel}`}
-          pressedScale={0.99}
-          onPress={() => onOpen(post.id)}
-          style={styles.head}
-        >
-          <Avatar
-            name={post.author.name}
-            uri={post.author.avatarUrl}
-            size="md"
-            ring={post.urgency === 'high' ? 'urgent' : undefined}
-            verified={post.author.verified}
-          />
-          <View style={styles.headText}>
-            <AppText variant="bodyStrong" numberOfLines={1}>
-              {post.author.name}
-            </AppText>
-            <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-              {formatWhen(post.createdAt)}
-            </AppText>
-          </View>
-          <StatusPill urgency={post.urgency} />
-        </Touchable>
-
-        <Pressable
-          accessibilityRole="imagebutton"
-          accessibilityLabel="Foto do animal. Toque para abrir, toque duas vezes para curtir."
-          onPress={onPhoto}
+        <View
           style={[styles.photoFrame, { backgroundColor: colors.surfaceMuted }]}
+          onLayout={(event) => {
+            const nextWidth = Math.round(event.nativeEvent.layout.width);
+            const nextHeight = Math.round(event.nativeEvent.layout.height);
+            setFrameWidth((current) => (current === nextWidth ? current : nextWidth));
+            setFrameHeight((current) => (current === nextHeight ? current : nextHeight));
+          }}
         >
-          {photo ? (
-            <Image
-              source={{ uri: photo }}
+          {post.media.length > 0 && frameWidth === 0 ? (
+            <Pressable
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Foto do animal. Toque para abrir, toque duas vezes para curtir."
+              onPress={onPhoto}
               style={styles.photo}
-              contentFit="cover"
-              transition={motion.base}
-              cachePolicy="memory-disk"
-              recyclingKey={post.id}
-            />
+            >
+              <Image
+                source={{ uri: post.media[0]?.thumbUrl || post.media[0]?.url }}
+                style={styles.photo}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={post.id}
+              />
+            </Pressable>
+          ) : post.media.length > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              style={{ width: frameWidth, height: frameHeight }}
+              onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                if (frameWidth <= 0) return;
+                const next = Math.round(event.nativeEvent.contentOffset.x / frameWidth);
+                setPhotoIndex(Math.min(Math.max(next, 0), post.media.length - 1));
+              }}
+            >
+              {post.media.map((media, index) => (
+                <Pressable
+                  key={media.url}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Foto ${index + 1} de ${post.media.length}. Toque para abrir, toque duas vezes para curtir.`}
+                  onPress={onPhoto}
+                  style={{ width: frameWidth, height: frameHeight }}
+                >
+                  <Image
+                    source={{ uri: media.thumbUrl || media.url }}
+                    style={styles.photo}
+                    contentFit="cover"
+                    transition={motion.base}
+                    cachePolicy="memory-disk"
+                    recyclingKey={`${post.id}-${index}`}
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
           ) : (
-            <View style={styles.photoEmpty}>
+            <Pressable
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Foto do animal. Toque para abrir, toque duas vezes para curtir."
+              onPress={onPhoto}
+              style={styles.photoEmpty}
+            >
               <Icon name="camera" size="xl" color={colors.textDisabled} />
-            </View>
+            </Pressable>
           )}
           <PhotoScrim stop={0.5} />
-          <View style={styles.overlay}>
-            <StatusPill status={post.status} />
-            {post.media.length > 1 ? <Badge kind="label" label={`1/${post.media.length}`} /> : null}
+          <View style={styles.overlay} pointerEvents="box-none">
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir resgate de ${post.author.name}`}
+              pressedScale={0.98}
+              onPress={() => onOpen(post.id)}
+              style={styles.authorChip}
+            >
+              <Avatar
+                name={post.author.name}
+                uri={post.author.avatarUrl}
+                size="sm"
+                verified={post.author.verified}
+              />
+              <AppText variant="bodySmallStrong" numberOfLines={1} style={{ color: colors.onMedia, flex: 1 }}>
+                {post.author.name}
+              </AppText>
+            </Touchable>
+            <View style={styles.overlayMeta} pointerEvents="none">
+              <StatusPill urgency={post.urgency} />
+              {post.media.length > 1 ? (
+                <Badge kind="label" label={`${photoIndex + 1}/${post.media.length}`} />
+              ) : null}
+            </View>
           </View>
           <View style={styles.caption} pointerEvents="none">
             <AppText variant="h2" numberOfLines={1} style={{ color: colors.onMedia }}>
@@ -139,7 +186,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
               <Icon name="heart" size="xl" color={colors.onMedia} />
             </Animated.View>
           ) : null}
-        </Pressable>
+        </View>
 
         <AppText numberOfLines={3} style={styles.description}>
           {post.description}
@@ -168,16 +215,15 @@ const styles = StyleSheet.create({
   // The shadow lives on the outer view: the card clips its photo, which would clip the shadow.
   shadow: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, borderRadius: radius.xl },
   card: { borderRadius: radius.xl, overflow: 'hidden', paddingBottom: spacing.lg },
-  head: {
+  photoFrame: { width: '100%', aspectRatio: 4 / 5 },
+  authorChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minHeight: 64,
+    gap: spacing.sm,
+    maxWidth: '70%',
+    minHeight: 44,
   },
-  headText: { flex: 1 },
-  photoFrame: { width: '100%', aspectRatio: 1 },
+  overlayMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   photo: { width: '100%', height: '100%' },
   photoEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   overlay: {

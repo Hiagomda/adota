@@ -26,7 +26,7 @@ export function SearchBar({
       style={[
         styles.bar,
         shadows.sm,
-        { backgroundColor: colors.surface, borderColor: colors.border },
+        { backgroundColor: colors.surface },
         style,
       ]}
     >
@@ -63,7 +63,6 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
   },
   input: { flex: 1, paddingVertical: spacing.sm },
 });
