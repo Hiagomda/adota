@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 19,
+  "androidVersionCode": 20,
   "notes": [
-    "A distância até o animal aparece no resgate.",
-    "O mapa mostra as patas da área visível.",
-    "Dá para publicar para adoção. O Pix fica com a equipe."
+    "O início abre nas fotos, sem a pilha de atalhos.",
+    "A postagem nova aparece no mapa. Dá para tocar em Mostrar no mapa.",
+    "Perto de você só mostra animais a até 10 km."
   ]
 }

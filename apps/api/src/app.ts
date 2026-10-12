@@ -98,6 +98,26 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
     return reply.code(500).send({ message: 'Algo deu errado. Tente de novo.' });
   });
 
+  app.addHook('onSend', async (request, reply, payload) => {
+    reply.header('server-timing', `app;dur=${Math.round(reply.elapsedTime)}`);
+    reply.header('x-request-id', request.id);
+    return payload;
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const route = request.routeOptions.url ?? request.url.split('?')[0];
+    request.log.info(
+      {
+        requestId: request.id,
+        method: request.method,
+        route,
+        status: reply.statusCode,
+        ms: Math.round(reply.elapsedTime),
+      },
+      'handled',
+    );
+  });
+
   app.get('/health', async (_request, reply) => {
     const body: HealthResponse = await getHealth(database, redis);
     return reply.code(body.status === 'ok' ? 200 : 503).send(body);

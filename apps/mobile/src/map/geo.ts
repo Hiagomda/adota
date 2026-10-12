@@ -48,6 +48,16 @@ export function usableMapBounds(bounds: MapBounds): boolean {
   return width > 0.00005 && height > 0.00005 && width < 3 && height < 3;
 }
 
+/** A small box around a pin, so "mostrar no mapa" loads that animal immediately. */
+export function boundsAround(point: MapPoint, span = 0.03): MapBounds {
+  return {
+    west: point.longitude - span,
+    east: point.longitude + span,
+    south: point.latitude - span,
+    north: point.latitude + span,
+  };
+}
+
 /** Whole Belém box, so paws load before the camera reports its own edges. */
 export const belemBounds: MapBounds = {
   west: -48.62753,

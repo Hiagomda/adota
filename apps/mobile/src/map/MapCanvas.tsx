@@ -10,6 +10,7 @@ import {
   UserLocation,
   type CameraRef,
   type OnPressEvent,
+  type ShapeSourceRef,
 } from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import {
@@ -84,6 +85,7 @@ export function MapCanvas({
   controlsBottom,
   onSelect,
   onCommitBounds,
+  focus,
 }: {
   posts: Post[];
   selectedId: string | null;
@@ -93,10 +95,13 @@ export function MapCanvas({
   onSelect: (post: Post) => void;
   /** Called when the camera settles on an area, so the paws for that view can load. */
   onCommitBounds?: (bounds: MapBounds) => void;
+  /** Opens the camera on this pin, ahead of the GPS center. */
+  focus?: LngLat | null;
 }) {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const camera = useRef<CameraRef>(null);
+  const pins = useRef<ShapeSourceRef>(null);
   const policy = useRef<CameraState>(initialCameraState);
   const commitRef = useRef(onCommitBounds);
   const [hud, setHud] = useState(initialCameraState);
@@ -236,6 +241,11 @@ export function MapCanvas({
   }, [apply, hud.follow]);
 
   useEffect(() => {
+    if (!focus) return;
+    apply({ type: 'pin', point: focus });
+  }, [apply, focus]);
+
+  useEffect(() => {
     if (!selectedId) {
       framedPin.current = null;
       apply({ type: 'dismissPin' });
@@ -263,6 +273,11 @@ export function MapCanvas({
     }),
     [posts, selectedId],
   );
+
+  useEffect(() => {
+    if (!pinsReady) return;
+    pins.current?.setNativeProps({ shape });
+  }, [pinsReady, shape]);
 
   const onRegionDidChange = useCallback<
     NonNullable<ComponentProps<typeof MapView>['onRegionDidChange']>
@@ -380,7 +395,7 @@ export function MapCanvas({
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         {styleReady ? <Images images={pawImages} /> : null}
         {pinsReady ? (
-          <ShapeSource id="alerts" shape={shape} onPress={onPinPress}>
+          <ShapeSource id="alerts" ref={pins} shape={shape} onPress={onPinPress}>
             <CircleLayer
               id="pin-hit"
               style={{

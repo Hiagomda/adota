@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { uploadEndpoint } from '../src/media.js';
+import type { Env } from '../src/config.js';
+import { publicMediaUrl, uploadEndpoint } from '../src/media.js';
 
 describe('upload endpoint', () => {
   it('uses the public host when the phone cannot reach the internal one', () => {
@@ -14,6 +15,29 @@ describe('upload endpoint', () => {
   it('keeps the internal host for local development', () => {
     expect(uploadEndpoint({ MINIO_ENDPOINT: 'http://localhost:9000' })).toBe(
       'http://localhost:9000',
+    );
+  });
+});
+
+describe('public media url', () => {
+  const env = {
+    IMGPROXY_URL: 'http://img.example',
+    IMGPROXY_KEY: '',
+    IMGPROXY_SALT: '',
+    MINIO_BUCKET: 'patinha-media',
+  } as Env;
+
+  it('asks imgproxy for WebP at the same frame the app already uses', () => {
+    const thumb = publicMediaUrl(env, 'uploads/a.jpg', 'thumb');
+    const full = publicMediaUrl(env, 'uploads/a.jpg', 'full');
+    expect(thumb).toContain('/rs:fill:480:600/q:80/f:webp/');
+    expect(full).toContain('/rs:fit:1080:1350/q:80/f:webp/');
+    expect(thumb.startsWith('http://img.example/insecure/')).toBe(true);
+  });
+
+  it('leaves an already public url untouched', () => {
+    expect(publicMediaUrl(env, 'https://cdn.example/a.jpg', 'thumb')).toBe(
+      'https://cdn.example/a.jpg',
     );
   });
 });

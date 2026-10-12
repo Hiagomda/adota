@@ -58,6 +58,8 @@ describe('GET /health', () => {
     const response = await app.inject({ method: 'GET', url: '/health' });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers['server-timing']).toMatch(/^app;dur=\d+$/);
+    expect(typeof response.headers['x-request-id']).toBe('string');
     expect(response.json()).toEqual({
       status: 'ok',
       checks: { database: 'ok', redis: 'ok' },

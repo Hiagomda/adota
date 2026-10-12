@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { apiUrl } from '../api';
 import { appVersion, formatAppVersion, releaseName, type AppEnvironment } from '../appVersion';
 import { sentryDsn } from '../crash/reporter';
+import { lastRequestLabel } from '../net/timings';
 import { downloadPageUrl } from '../updates/checkForAppUpdate';
 
 const environmentLabel: Record<AppEnvironment, string> = {
@@ -61,6 +62,7 @@ export function diagnosticRows(): DiagnosticRow[] {
     { label: 'Plataforma', value: `${Platform.OS} ${String(Platform.Version)}` },
     { label: 'Aparelho', value: deviceSummary() },
     { label: 'API', value: apiUrl },
+    { label: 'Última chamada', value: lastRequestLabel() },
     { label: 'Download', value: downloadPageUrl },
     { label: 'Sentry', value: sentryDsn ? 'ligado' : 'desligado' },
   ];

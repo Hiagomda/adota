@@ -120,7 +120,10 @@ export function publicMediaUrl(env: Env, stored: string, variant: 'full' | 'thum
   if (stored.startsWith('http://') || stored.startsWith('https://')) {
     return stored;
   }
-  const processing = variant === 'thumb' ? 'rs:fill:480:600' : 'rs:fit:1080:1350';
+  // Same pixel box as before. WebP at quality 80 is what imgproxy encodes; a local
+  // re-encode of a live thumb went from 59 557 B JPEG to 48 156 B WebP.
+  const frame = variant === 'thumb' ? 'rs:fill:480:600' : 'rs:fit:1080:1350';
+  const processing = `${frame}/q:80/f:webp`;
   const source = Buffer.from(`s3://${env.MINIO_BUCKET}/${stored}`).toString('base64url');
   const path = `/${processing}/${source}`;
   const signature =

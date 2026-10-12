@@ -377,6 +377,21 @@ export default function PostScreen() {
                   {item.location.exact ? 'ponto exato' : 'ponto aproximado, cerca de 500 m'}
                 </AppText>
               </View>
+              <Button
+                title="Mostrar no mapa"
+                icon="map"
+                variant="secondary"
+                onPress={() =>
+                  router.push({
+                    pathname: '/explore',
+                    params: {
+                      post: item.id,
+                      lat: String(item.location.latitude),
+                      lng: String(item.location.longitude),
+                    },
+                  })
+                }
+              />
             </View>
 
             <View style={styles.chips}>

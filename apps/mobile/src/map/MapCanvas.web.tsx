@@ -13,6 +13,7 @@ export function MapCanvas({
   tracking,
   onSelect,
   onCommitBounds,
+  focus,
 }: {
   posts: Post[];
   selectedId: string | null;
@@ -21,6 +22,7 @@ export function MapCanvas({
   controlsBottom?: number;
   onSelect: (post: Post) => void;
   onCommitBounds?: (bounds: MapBounds) => void;
+  focus?: [number, number] | null;
 }) {
   const host = useRef<HTMLElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -125,6 +127,11 @@ export function MapCanvas({
     if (!map) return;
     map.fire('moveend');
   }, [posts, selectedId]);
+
+  useEffect(() => {
+    if (!focus) return;
+    mapRef.current?.easeTo({ center: focus, zoom: 15, duration: 600 });
+  }, [focus]);
 
   return (
     <View

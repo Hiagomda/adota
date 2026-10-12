@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { useIsFocused, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../../src/api';
@@ -9,7 +9,7 @@ import { AppText, Button, Card, Icon, StatusPill, Touchable } from '../../src/co
 import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { MapCanvas } from '../../src/map/MapCanvas';
-import { belemBounds, type MapBounds } from '../../src/map/geo';
+import { belemBounds, boundsAround, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
@@ -26,6 +26,21 @@ const PHOTO_WIDTH = 72;
 const PHOTO_HEIGHT = 90;
 const BANNER_MASCOT = 64;
 
+/** Animals still out in the city. Adopted and finished rescues leave the map. */
+const ON_MAP = new Set(['open', 'on_the_way', 'for_adoption']);
+
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function readFocus(params: { post?: string | string[]; lat?: string | string[]; lng?: string | string[] }) {
+  const lat = Number(one(params.lat));
+  const lng = Number(one(params.lng));
+  const post = one(params.post);
+  if (!post || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { post, lat, lng };
+}
+
 export default function ExploreScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -33,15 +48,43 @@ export default function ExploreScreen() {
   const focused = useIsFocused();
   const token = useSession((state) => state.token);
   const here = useViewerLocation();
+  const params = useLocalSearchParams<{ post?: string; lat?: string; lng?: string }>();
+  const postParam = one(params.post);
+  const latParam = one(params.lat);
+  const lngParam = one(params.lng);
+  const focus = useMemo(
+    () => readFocus({ post: postParam, lat: latParam, lng: lngParam }),
+    [latParam, lngParam, postParam],
+  );
+  const focusPoint = useMemo(
+    () => (focus ? ([focus.lng, focus.lat] as [number, number]) : null),
+    [focus],
+  );
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const search = `?status=open&limit=100&west=${bounds.west}&south=${bounds.south}&east=${bounds.east}&north=${bounds.north}`;
+  const [pinnedPost, setPinnedPost] = useState<string | null>(null);
+  const [pick, setPick] = useState<{ id: string; forPost: string | null } | null>(null);
+  const aiming = focus !== null && focus.post !== pinnedPost;
+  const view = aiming ? boundsAround({ latitude: focus.lat, longitude: focus.lng }) : bounds;
+  const selectedId = aiming
+    ? focus.post
+    : pick && pick.forPost === (focus?.post ?? null)
+      ? pick.id
+      : (focus?.post ?? null);
+  const search = `?limit=100&west=${view.west}&south=${view.south}&east=${view.east}&north=${view.north}`;
   const feed = useQuery({
     queryKey: ['map', token, search],
     queryFn: () => loadFeed(token, search),
     placeholderData: keepPreviousData,
   });
-  const posts = (feed.data?.posts ?? []).filter((post) => post.type !== 'lost');
+  const refetchMap = feed.refetch;
+  useEffect(() => {
+    if (!focused) return;
+    void refetchMap();
+  }, [focused, refetchMap]);
+  const posts = (feed.data?.posts ?? []).filter(
+    (post) =>
+      post.type !== 'lost' && post.type !== 'help_request' && ON_MAP.has(post.status),
+  );
   const selected = posts.find((post) => post.id === selectedId) ?? null;
   const openPost = useCallback(
     (id: string) => {
@@ -65,8 +108,12 @@ export default function ExploreScreen() {
         selectedId={selected?.id ?? null}
         tracking={focused}
         controlsBottom={controlsBottom}
-        onSelect={(post) => setSelectedId(post.id)}
-        onCommitBounds={setBounds}
+        onSelect={(post) => setPick({ id: post.id, forPost: focus?.post ?? null })}
+        onCommitBounds={(next) => {
+          setBounds(next);
+          if (focus) setPinnedPost(focus.post);
+        }}
+        focus={focusPoint}
       />
       {!selected && (feed.isError || posts.length === 0) ? (
         <Card

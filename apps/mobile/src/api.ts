@@ -12,6 +12,7 @@ import {
 } from './apiSchemas';
 import { appVersionHeaders } from './appVersion';
 import { reportError } from './crash/reporter';
+import { recordRequest, requestPath } from './net/timings';
 import type { Account, AppNotification, Post } from './types';
 
 export const siteUrl = process.env.EXPO_PUBLIC_SITE_URL ?? 'http://localhost:3000';
@@ -99,15 +100,32 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
   const headers: Record<string, string> = { ...appVersionHeaders() };
   if (init.body !== undefined) headers['content-type'] = 'application/json';
   if (init.token) headers.authorization = `Bearer ${init.token}`;
-  const response = await fetchWithTimeout(
-    `${apiUrl}${path}`,
-    {
-      method: init.method ?? 'GET',
-      headers,
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    },
-    init.timeoutMs,
-  );
+  const method = init.method ?? 'GET';
+  const url = `${apiUrl}${path}`;
+  const started = Date.now();
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      url,
+      {
+        method,
+        headers,
+        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      },
+      init.timeoutMs,
+    );
+  } catch (error) {
+    recordRequest({ method, path: requestPath(url), status: 0, ms: Date.now() - started, bytes: 0 });
+    throw error;
+  }
+  const bytes = Number(response.headers.get('content-length') ?? 0);
+  recordRequest({
+    method,
+    path: requestPath(url),
+    status: response.status,
+    ms: Date.now() - started,
+    bytes: Number.isFinite(bytes) ? bytes : 0,
+  });
   if (response.status === 204) return undefined as T;
   let payload: unknown;
   try {
