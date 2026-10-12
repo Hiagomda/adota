@@ -15,10 +15,13 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
+import { registerAdoptionChat } from './adoptionChat.js';
 import {
   anonymizeUser,
   createDevUser,
   findUserByFirebaseUid,
+  grantOwnerRole,
+  isOwnerEmail,
   profileByHandle,
   updateProfile,
 } from './accounts.js';
@@ -169,7 +172,11 @@ export async function registerRoutes(
       z.object({ handle: z.string().trim().min(1).max(40) }),
       request.params,
     );
-    return profileByHandle(db, pool, handle, request.user?.id ?? null);
+    const profile = await profileByHandle(db, pool, handle, request.user?.id ?? null);
+    return {
+      ...profile,
+      avatarUrl: profile.avatarUrl ? publicMediaUrl(env, profile.avatarUrl, 'thumb') : null,
+    };
   });
 
   app.post('/users/:id/follow', async (request) => {
@@ -733,6 +740,7 @@ export async function registerRoutes(
     };
   });
 
+  registerAdoptionChat(app, { env, pool });
   await registerStaffRoutes(app, { env, pool });
 }
 
@@ -780,6 +788,8 @@ async function resolveUser(
     await ensureFirebaseApp(env);
     const admin = await import('firebase-admin');
     const decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
+    const owner = isOwnerEmail(decoded.email);
+    if (owner) await grantOwnerRole(pool, decoded.uid);
     const existing = await findUserByFirebaseUid(pool, decoded.uid);
     if (existing) return existing;
     const email = decoded.email ?? `${decoded.uid}@firebase.local`;
@@ -789,10 +799,16 @@ async function resolveUser(
         ?.replace(/[^a-z0-9]/g, '')
         .slice(0, 16) || 'pessoa';
     await pool.query(
-      `INSERT INTO users (firebase_uid, name, handle, city) VALUES ($1, $2, $3, 'Belém')
+      `INSERT INTO users (firebase_uid, name, handle, city, role) VALUES ($1, $2, $3, 'Belém', $4)
        ON CONFLICT (firebase_uid) DO NOTHING`,
-      [decoded.uid, decoded.name ?? 'Pessoa', `${handle}${decoded.uid.slice(0, 4)}`],
+      [
+        decoded.uid,
+        decoded.name ?? 'Pessoa',
+        `${handle}${decoded.uid.slice(0, 4)}`,
+        owner ? 'admin' : 'user',
+      ],
     );
+    if (owner) await grantOwnerRole(pool, decoded.uid);
     return findUserByFirebaseUid(pool, decoded.uid);
   } catch {
     return null;

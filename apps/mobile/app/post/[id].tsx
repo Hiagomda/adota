@@ -44,7 +44,7 @@ import { distanceLabel, formatKm, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { PostEditor } from '../../src/post/PostEditor';
-import { useSession } from '../../src/session';
+import { isTeamRole, useSession } from '../../src/session';
 import {
   contentMaxWidth,
   motion,
@@ -221,14 +221,16 @@ export default function PostScreen() {
 
   const following = nextStatus[item.status];
   const isAuthor = userId === item.author.id;
-  const canOwn = isAuthor || user?.role === 'admin';
+  const canOwn = isAuthor || isTeamRole(user?.role);
   const canMoveStatus = canOwn || item.viewerWillHelp;
-  const helpingNow = item.viewerWillHelp && item.status !== 'for_adoption';
+  const forAdoption = item.status === 'for_adoption';
+  const adopted = item.status === 'adopted';
+  const adoptionContact = forAdoption || adopted;
+  const helpingNow = item.viewerWillHelp && !adoptionContact;
   const footerHeight =
     spacing.lg + SHARE_BUTTON + footerPad + (helpingNow ? size.control + spacing.sm * 2 : 0);
   const fosterList = fosters.data?.fosters ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
-  const forAdoption = item.status === 'for_adoption';
   const speciesName = speciesLabel[item.animal.species] ?? 'bichinho';
   const animalLines = [
     item.animal.healthNotes ? { icon: 'activity' as const, text: item.animal.healthNotes } : null,
@@ -275,22 +277,27 @@ export default function PostScreen() {
     setHelpOpen(true);
   }
 
-  function onAdoptPress() {
+  function openAdoptionChat() {
+    if (!item) return;
     if (!token) {
-      setNote('Entre na sua conta para adotar.');
+      setNote('Entre na sua conta para conversar sobre a adoção.');
+      return;
+    }
+    setAdoptOpen(false);
+    router.push(`/chat/${item.id}`);
+  }
+
+  function onAdoptPress() {
+    if (!item) return;
+    if (!token) {
+      setNote('Entre na sua conta para conversar sobre a adoção.');
+      return;
+    }
+    if (isAuthor) {
+      router.push(`/chat/${item.id}`);
       return;
     }
     setAdoptOpen(true);
-  }
-
-  function confirmAdoption() {
-    if (!item) return;
-    setAdoptOpen(false);
-    void act(`/posts/${item.id}/adoption-term`, 'POST', {
-      body: 'Aceito cuidar do animal, manter a castração e avisar a pessoa que resgatou sobre a adaptação.',
-    }).then((ok) => {
-      if (ok) setNote('Termo registrado. A adoção ainda depende de vocês, fora do app.');
-    });
   }
 
   function share() {
@@ -465,7 +472,7 @@ export default function PostScreen() {
                   />
                 </View>
               </Card>
-              {item.author.phone ? (
+              {item.author.phone && !adoptionContact ? (
                 <Card
                   padding="none"
                   elevation="none"
@@ -518,15 +525,6 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {forAdoption && !item.viewerWillHelp ? (
-              <Button
-                title="Eu vou ajudar"
-                icon="heart"
-                variant="outline"
-                fullWidth
-                onPress={onHelpPress}
-              />
-            ) : null}
             {canMoveStatus && following ? (
               <Button
                 title={`Marcar como ${statusLabel[following]}`}
@@ -760,19 +758,31 @@ export default function PostScreen() {
           <View style={styles.footerCta}>
             <Button
               title={
-                forAdoption ? 'Quero adotar' : helpingNow ? 'Não consegui' : 'Eu vou ajudar'
+                adoptionContact && isAuthor
+                  ? 'Ver conversas'
+                  : forAdoption
+                    ? 'Quero adotar'
+                    : adopted
+                      ? 'Conversar'
+                      : helpingNow
+                        ? 'Não consegui'
+                        : 'Eu vou ajudar'
               }
-              icon={helpingNow ? 'x' : 'heart'}
+              icon={adoptionContact ? 'message-circle' : helpingNow ? 'x' : 'heart'}
               variant={helpingNow ? 'outline' : 'secondary'}
               size="lg"
               fullWidth
               loading={helpingNow && leaving}
               onPress={
-                forAdoption
-                  ? onAdoptPress
-                  : helpingNow
-                    ? () => void leaveRescue('could_not')
-                    : onHelpPress
+                adoptionContact && isAuthor
+                  ? () => router.push(`/chat/${item.id}`)
+                  : forAdoption
+                    ? onAdoptPress
+                    : adopted
+                      ? openAdoptionChat
+                      : helpingNow
+                        ? () => void leaveRescue('could_not')
+                        : onHelpPress
               }
             />
           </View>
@@ -942,16 +952,17 @@ export default function PostScreen() {
       <BottomSheet visible={adoptOpen} onClose={() => setAdoptOpen(false)} title="Quero adotar">
         <View style={styles.help}>
           <AppText color="textSecondary">
-            Você se compromete a cuidar do animal, manter a castração e avisar quem o resgatou sobre
-            a adaptação. A adoção em si combinam fora do app: o Égua, adota! nunca recebe dinheiro.
+            A conversa fica neste app, só entre você e quem cuida do animal. O telefone continua
+            oculto. Quando vocês combinarem, quem cuida marca o animal como adotado. O Égua, adota!
+            não recebe dinheiro.
           </AppText>
           <Button
-            title="Aceitar o termo e adotar"
-            icon="file-text"
+            title="Abrir conversa"
+            icon="message-circle"
             variant="secondary"
             size="lg"
             fullWidth
-            onPress={confirmAdoption}
+            onPress={openAdoptionChat}
           />
           <Button title="Agora não" variant="ghost" fullWidth onPress={() => setAdoptOpen(false)} />
         </View>

@@ -11,6 +11,23 @@ type Database = NodePgDatabase;
 
 type ProfilePatch = z.infer<typeof updateMeSchema>;
 
+/** The account Hiago uses on the phone. The dev login is a different row. */
+const ownerEmail = 'hiago.yan@hotmail.com';
+
+export function isOwnerEmail(email: string | undefined): boolean {
+  return email?.trim().toLowerCase() === ownerEmail;
+}
+
+/** The installed app treats role `admin` as the team. Do not demote a superadmin. */
+export async function grantOwnerRole(pool: Pool, firebaseUid: string): Promise<void> {
+  await pool.query(
+    `UPDATE users SET role = 'admin'
+     WHERE firebase_uid = $1 AND deleted_at IS NULL
+       AND role NOT IN ('admin', 'superadmin')`,
+    [firebaseUid],
+  );
+}
+
 export async function findUserByFirebaseUid(
   pool: Pool,
   firebaseUid: string,

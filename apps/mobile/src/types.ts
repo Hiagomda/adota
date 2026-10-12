@@ -69,7 +69,7 @@ export interface Post {
 export interface AppNotification {
   id: string;
   type: string;
-  payload: { title?: string; body?: string; postId?: string };
+  payload: { title?: string; body?: string; postId?: string; adopterId?: string };
   readAt: string | null;
   createdAt: string;
 }

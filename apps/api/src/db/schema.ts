@@ -120,6 +120,25 @@ export const adoptionTerms = pgTable(
   (table) => [unique().on(table.postId, table.userId)],
 );
 
+export const adoptionThreads = pgTable(
+  'adoption_threads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id').notNull(),
+    adopterId: uuid('adopter_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.postId, table.adopterId)],
+);
+
+export const adoptionMessages = pgTable('adoption_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  threadId: uuid('thread_id').notNull(),
+  senderId: uuid('sender_id').notNull(),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const volunteerProfiles = pgTable('volunteer_profiles', {
   userId: uuid('user_id').primaryKey(),
   isTransportAvailable: boolean('is_transport_available').notNull().default(false),

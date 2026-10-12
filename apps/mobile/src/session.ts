@@ -14,6 +14,11 @@ import { reportError, setReporterUser } from './crash/reporter';
 import { queryClient } from './queryClient';
 import type { Account } from './types';
 
+/** The team, in the app: admin and superadmin. Reviewers are not included. */
+export function isTeamRole(role: string | undefined): boolean {
+  return role === 'admin' || role === 'superadmin';
+}
+
 const tokenKey = 'egua-token';
 const flagKey = 'egua-flags';
 

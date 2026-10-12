@@ -27,6 +27,7 @@ interface Profile {
   id: string;
   name: string;
   handle: string;
+  avatarUrl?: string | null;
   verified: boolean;
   role: string;
   counts: { posts: number; helped: number; followers: number; following: number };
@@ -124,7 +125,7 @@ export default function UserScreen() {
         ) : (
           <>
             <View style={styles.head}>
-              <Avatar name={person.name} size="xl" verified={person.verified} />
+              <Avatar name={person.name} uri={person.avatarUrl} size="xl" verified={person.verified} />
               <View style={styles.headText}>
                 <AppText variant="h1" numberOfLines={2}>
                   {person.name}

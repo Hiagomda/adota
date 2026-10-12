@@ -26,7 +26,7 @@ import { useAnimalGps } from '../src/place/gps';
 import { PlacePicker } from '../src/place/PlacePicker';
 import { isOfflineError, preparePhoto, publishAlert } from '../src/place/publish';
 import { permissionOutcome } from '../src/permissions';
-import { useSession } from '../src/session';
+import { isTeamRole, useSession } from '../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
 
@@ -120,7 +120,7 @@ export default function DonateScreen() {
       router.push({ pathname: '/login', params: { returnTo: '/doar' } });
       return;
     }
-    if (me.data?.role !== 'admin') {
+    if (!isTeamRole(me.data?.role)) {
       setMessage('Só a equipe pode publicar um pedido com Pix.');
       return;
     }
@@ -213,7 +213,7 @@ export default function DonateScreen() {
             <AppText color="textSecondary">Carregando seu perfil…</AppText>
           ) : me.isError || !me.data ? (
             <Notice message="Não consegui carregar seu perfil. Volte e tente de novo." />
-          ) : me.data.role !== 'admin' ? (
+          ) : !isTeamRole(me.data.role) ? (
             <Notice message="Pedido com Pix só a equipe publica. As campanhas abertas continuam no início." />
           ) : (
             <>
@@ -335,7 +335,7 @@ export default function DonateScreen() {
               />
             </>
           )}
-          {message && (!token || me.data?.role !== 'admin') ? <Notice message={message} /> : null}
+          {message && (!token || !isTeamRole(me.data?.role)) ? <Notice message={message} /> : null}
         </View>
       </ScrollView>
     </SafeAreaView>
