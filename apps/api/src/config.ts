@@ -6,15 +6,20 @@ import { z } from 'zod';
 const srcDir = dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: resolve(srcDir, '../../../.env') });
 
+/** Blank lines in `.env` are unset, not an empty secret. */
+function blankAsUnset(value: unknown): unknown {
+  return typeof value === 'string' && value.trim() === '' ? undefined : value;
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3010),
   DATABASE_URL: z.string().min(1).default('postgres://patinha:patinha@localhost:5435/patinha'),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
   AUTH_DEV_MODE: z.enum(['true', 'false']).optional(),
-  FIREBASE_PROJECT_ID: z.string().min(1).optional(),
-  FIREBASE_CLIENT_EMAIL: z.string().email().optional(),
-  FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
+  FIREBASE_PROJECT_ID: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  FIREBASE_CLIENT_EMAIL: z.preprocess(blankAsUnset, z.string().email().optional()),
+  FIREBASE_PRIVATE_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   MINIO_ENDPOINT: z.string().min(1).default('http://localhost:9000'),
   // Host the phone can reach. Empty means the internal endpoint, which only works on the same machine.
   MINIO_PUBLIC_ENDPOINT: z.preprocess(
@@ -28,6 +33,11 @@ const envSchema = z.object({
   IMGPROXY_KEY: z.string().default(''),
   IMGPROXY_SALT: z.string().default(''),
   WEB_ORIGIN: z.string().min(1).default('http://localhost:3000'),
+  ADMIN_ORIGIN: z.string().min(1).default('http://localhost:3020'),
+  /** 32 bytes, base64. Encrypts TOTP secrets. Absent means staff login stays closed. */
+  ADMIN_TOTP_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /** Comma-separated IPs. Empty means the staff API does not filter by address. */
+  ADMIN_IP_ALLOWLIST: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   /** How many reverse proxies sit in front of the API. 1 is Caddy or Coolify. */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
 });

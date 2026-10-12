@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, ScrollView, StyleSheet, View } from 'react-native';
 import { AppModal, AppText, Button } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { spacing, useTheme } from '../theme';
@@ -121,14 +121,14 @@ export function UpdatePrompt() {
             : 'Tem uma versão nova do Égua, adota!. Quer baixar e abrir agora?'}
       </AppText>
       {native && offer?.kind === 'native' && offer.notes.length > 0 ? (
-        <View style={styles.notes}>
+        <ScrollView style={styles.notesScroll} contentContainerStyle={styles.notes}>
           <AppText variant="bodyStrong">O que mudou</AppText>
           {offer.notes.map((note) => (
-            <AppText key={note} color="textSecondary">
-              {`• ${note}`}
+            <AppText key={note} variant="caption" color="textSecondary">
+              {note}
             </AppText>
           ))}
-        </View>
+        </ScrollView>
       ) : null}
       {busy ? (
         <View style={styles.busy} accessibilityRole="progressbar">
@@ -164,6 +164,7 @@ export function UpdatePrompt() {
 }
 
 const styles = StyleSheet.create({
+  notesScroll: { maxHeight: 96 },
   notes: { gap: spacing.xs },
   actions: { gap: spacing.sm, paddingTop: spacing.sm },
   busy: {

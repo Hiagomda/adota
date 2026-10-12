@@ -1,3 +1,4 @@
+import { isOperator } from './authz.js';
 import { HttpError } from './http.js';
 import type { SessionUser } from './session.js';
 
@@ -6,7 +7,7 @@ export function canSeeExactPlace(
   authorId: string,
   viewerWillHelp: boolean,
 ): boolean {
-  return viewer !== null && (viewer.id === authorId || viewer.role === 'admin' || viewerWillHelp);
+  return viewer !== null && (viewer.id === authorId || isOperator(viewer.role) || viewerWillHelp);
 }
 
 /** Street, GPS accuracy and the reference stay with the people allowed to see the exact pin. */
@@ -33,6 +34,6 @@ export function assertHelpRequest(
   input: { type: string; helpRequest?: unknown },
 ): void {
   if (!input.helpRequest) return;
-  if (input.type === 'help_request' && user.verified) return;
-  throw new HttpError(403, 'Só perfis verificados podem publicar pedidos de ajuda com Pix.');
+  if (input.type === 'help_request' && isOperator(user.role)) return;
+  throw new HttpError(403, 'Só a equipe pode publicar pedidos de ajuda com Pix.');
 }

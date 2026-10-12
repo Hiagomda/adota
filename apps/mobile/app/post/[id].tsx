@@ -40,7 +40,8 @@ import {
   Touchable,
 } from '../../src/components/ui';
 import { AnimalDiary } from '../../src/diary';
-import { formatKm, formatWhen } from '../../src/format';
+import { distanceLabel, formatKm, formatWhen } from '../../src/format';
+import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { PostEditor } from '../../src/post/PostEditor';
 import { useSession } from '../../src/session';
@@ -83,6 +84,7 @@ export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
+  const here = useViewerLocation();
   const user = useSession((state) => state.user);
   const userId = user?.id;
   const client = useQueryClient();
@@ -368,7 +370,10 @@ export default function PostScreen() {
               <View style={styles.place}>
                 <Icon name="map-pin" size="sm" color={colors.textSecondary} />
                 <AppText variant="bodySmall" color="textSecondary" style={styles.placeText}>
-                  {item.approxLabel} ·{' '}
+                  {item.approxLabel}
+                  {distanceLabel(here, item.location)
+                    ? ` · ${distanceLabel(here, item.location)} · `
+                    : ' · '}
                   {item.location.exact ? 'ponto exato' : 'ponto aproximado, cerca de 500 m'}
                 </AppText>
               </View>

@@ -19,6 +19,35 @@ export interface MapBounds {
   north: number;
 }
 
+export function normalizeBounds(bounds: MapBounds): MapBounds {
+  return {
+    west: Math.min(bounds.west, bounds.east),
+    east: Math.max(bounds.west, bounds.east),
+    south: Math.min(bounds.south, bounds.north),
+    north: Math.max(bounds.south, bounds.north),
+  };
+}
+
+/** True when the camera moved enough that the loaded paws no longer cover the view. */
+export function boundsMoved(previous: MapBounds | null, next: MapBounds): boolean {
+  if (!previous) return true;
+  const span = Math.max(next.east - next.west, next.north - next.south, 0.0001);
+  const slack = span * 0.2;
+  return (
+    Math.abs(previous.west - next.west) > slack ||
+    Math.abs(previous.east - next.east) > slack ||
+    Math.abs(previous.north - next.north) > slack ||
+    Math.abs(previous.south - next.south) > slack
+  );
+}
+
+/** Rejects an empty or world-sized box so a bad camera event cannot wipe the feed. */
+export function usableMapBounds(bounds: MapBounds): boolean {
+  const width = bounds.east - bounds.west;
+  const height = bounds.north - bounds.south;
+  return width > 0.00005 && height > 0.00005 && width < 3 && height < 3;
+}
+
 /** Whole Belém box, so paws load before the camera reports its own edges. */
 export const belemBounds: MapBounds = {
   west: -48.62753,

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { reportError } from '../crash/reporter';
 import type { MapPoint } from '../map/geo';
 import { openAppSettings, permissionOutcome } from '../permissions';
+import { readDeviceFix } from './deviceLocation';
 
 export type GpsStatus = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout' | 'weak';
 
@@ -14,7 +15,6 @@ export interface GpsFix extends MapPoint {
 /** What the screen can offer the user to get out of the current state. */
 export type GpsFixAction = { label: string; run: () => Promise<void> } | null;
 
-const timeoutMs = 12_000;
 const weakAccuracyM = 50;
 
 const searching = 'Buscando sua localização para indicar onde o animal está.';
@@ -47,28 +47,27 @@ export function useAnimalGps() {
         setMessage('Permissão negada. Mova o mapa até o local do animal.');
         return;
       }
-      const position = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
-        new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('timeout')), timeoutMs);
-        }),
-      ]);
-      const accuracy = position.coords.accuracy ?? 0;
-      const next = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy,
-      };
-      setFix(next);
-      if (!accuracy || accuracy > weakAccuracyM) {
-        setStatus('weak');
+      let latest: GpsFix | null = null;
+      const found = await readDeviceFix((next) => {
+        latest = next;
+        setFix(next);
+        const accuracy = next.accuracy;
+        if (!accuracy || accuracy > weakAccuracyM) {
+          setStatus('weak');
+          setMessage(
+            `Sinal fraco${accuracy ? `, margem de ${Math.round(accuracy)} m` : ''}. Ajuste o ponto no mapa.`,
+          );
+          return;
+        }
+        setStatus('ready');
         setMessage(
-          `Sinal fraco${accuracy ? `, margem de ${Math.round(accuracy)} m` : ''}. Ajuste o ponto no mapa.`,
+          `GPS com margem de ${Math.round(accuracy)} m. Mova o mapa se o ponto não estiver exato.`,
         );
-        return;
+      });
+      if (!found || !latest) {
+        setStatus('timeout');
+        setMessage('O GPS demorou demais. Escolha o ponto no mapa.');
       }
-      setStatus('ready');
-      setMessage(`GPS com margem de ${Math.round(accuracy)} m. Mova o mapa se o ponto não estiver exato.`);
     } catch (error) {
       const code =
         typeof error === 'object' && error !== null && 'code' in error

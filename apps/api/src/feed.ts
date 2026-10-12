@@ -10,6 +10,7 @@ import {
 } from '@patinha/shared';
 import type { Pool, PoolClient } from 'pg';
 import type { Env } from './config.js';
+import { isOperator } from './authz.js';
 import { HttpError } from './http.js';
 import { assertOwnedMedia, ownedMediaKey } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
@@ -218,9 +219,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const openingStatus = input.type === 'adoption' ? 'for_adoption' : 'open';
     const animal = await client.query<{ id: string }>(
       `INSERT INTO animals (species, size, sex, age_estimate, health_notes, temperament, status, name)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         input.species,
         input.size,
@@ -228,6 +230,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.ageEstimate ?? null,
         input.healthNotes ?? null,
         input.temperament ?? null,
+        openingStatus,
         input.name?.trim() || null,
       ],
     );
@@ -238,7 +241,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
          author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status,
          accuracy_m, address_text, reference_point
        ) VALUES (
-         $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, 'open', $9, $10,
+         $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $14, $9, $10,
          $11, $12, $13
        ) RETURNING id`,
       [
@@ -255,6 +258,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.accuracyM ?? null,
         input.addressText ?? null,
         input.referencePoint ?? null,
+        openingStatus,
       ],
     );
     const postId = post.rows[0]?.id;
@@ -349,7 +353,7 @@ export async function updatePost(
   );
   const post = current.rows[0];
   if (!post) throw new HttpError(404, 'Esse resgate não existe.');
-  if (user.id !== post.author_id && user.role !== 'admin') {
+  if (user.id !== post.author_id && !isOperator(user.role)) {
     throw new HttpError(403, 'Só quem publicou pode editar esse resgate.');
   }
   const description = stripControls(input.description.trim());
@@ -414,7 +418,7 @@ export async function deletePost(pool: Pool, postId: string, user: SessionUser) 
   );
   const post = current.rows[0];
   if (!post) throw new HttpError(404, 'Esse resgate não existe.');
-  if (user.id !== post.author_id && user.role !== 'admin') {
+  if (user.id !== post.author_id && !isOperator(user.role)) {
     throw new HttpError(403, 'Só quem publicou pode excluir esse resgate.');
   }
   await pool.query(`UPDATE posts SET hidden = true WHERE id = $1 OR parent_post_id = $1`, [postId]);
@@ -596,7 +600,7 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
           url: publicMediaUrl(env, item.url, 'full'),
           thumbUrl: publicMediaUrl(env, item.url, 'thumb'),
           storageKey:
-            viewer && (viewer.id === row.author_id || viewer.role === 'admin') ? item.url : null,
+            viewer && (viewer.id === row.author_id || isOperator(viewer.role)) ? item.url : null,
         })),
       counts: { likes: row.like_count, comments: row.comment_count },
       liked: row.liked,
@@ -606,7 +610,10 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         ? {
             kind: helpRow.kind,
             goalAmount: helpRow.goal_amount,
-            pixKey: publicPixKey(row.author_verified, helpRow.pix_key),
+            pixKey: publicPixKey(
+              row.author_verified || isOperator(row.author_role),
+              helpRow.pix_key,
+            ),
             deadline: helpRow.deadline?.toISOString() ?? null,
             paymentNotice:
               'O app não intermedia pagamento. O Pix é só um dado do perfil verificado.',
@@ -622,7 +629,7 @@ async function canChange(
   postId: string,
   user: SessionUser,
 ): Promise<boolean> {
-  if (user.role === 'admin' || user.id === authorId) return true;
+  if (isOperator(user.role) || user.id === authorId) return true;
   const help = await pool.query(
     `SELECT 1 FROM responses WHERE post_id = $1 AND user_id = $2 AND kind = 'will_help'`,
     [postId, user.id],

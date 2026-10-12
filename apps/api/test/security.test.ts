@@ -30,6 +30,7 @@ const env: Env = {
   IMGPROXY_KEY: '',
   IMGPROXY_SALT: '',
   WEB_ORIGIN: 'http://localhost:3000',
+  ADMIN_ORIGIN: 'http://localhost:3020',
 };
 
 function user(role: string, verified = false): SessionUser {
@@ -112,15 +113,15 @@ describe('malicious input', () => {
     expect(publicPixKey(true, 'ong@pix')).toBe('ong@pix');
   });
 
-  it('blocks pix on a rescue and on an unverified account', () => {
+  it('blocks pix requests except from an admin', () => {
     expect(() =>
       assertHelpRequest(user('user'), { type: 'rescue_alert', helpRequest: { kind: 'food' } }),
     ).toThrow(HttpError);
     expect(() =>
-      assertHelpRequest(user('ngo', true), { type: 'rescue_alert', helpRequest: { kind: 'food' } }),
+      assertHelpRequest(user('ngo', true), { type: 'help_request', helpRequest: { kind: 'food' } }),
     ).toThrow(HttpError);
     expect(() =>
-      assertHelpRequest(user('ngo', true), { type: 'help_request', helpRequest: { kind: 'food' } }),
+      assertHelpRequest(user('admin'), { type: 'help_request', helpRequest: { kind: 'food' } }),
     ).not.toThrow();
   });
 });

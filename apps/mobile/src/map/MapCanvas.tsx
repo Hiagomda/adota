@@ -23,8 +23,9 @@ import {
 } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, Chip, IconButton } from '../components/ui';
+import { AppText, IconButton } from '../components/ui';
 import { reportError } from '../crash/reporter';
+import { ensureDeviceWatch, readDeviceFix } from '../place/deviceLocation';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permissions';
 import type { Post } from '../types';
 import { radius, size, spacing, useTheme } from '../theme';
@@ -35,7 +36,14 @@ import {
   type CameraState,
   type LngLat,
 } from './cameraPolicy';
-import { belem, mapStyleUrl, type MapBounds } from './geo';
+import {
+  belem,
+  boundsMoved,
+  mapStyleUrl,
+  normalizeBounds,
+  usableMapBounds,
+  type MapBounds,
+} from './geo';
 import { mapColors } from './layerColors';
 import { insideServiceArea, serviceCamera, serviceOutline } from './serviceArea';
 
@@ -50,7 +58,6 @@ const cameraBounds = {
   sw: [serviceCamera.west, serviceCamera.south] as [number, number],
 };
 
-const GPS_TIMEOUT_MS = 12_000;
 const FOLLOW_DISTANCE_M = 25;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
@@ -84,7 +91,7 @@ export function MapCanvas({
   /** Space left for the tab bar, or for the selected-animal card when it is open. */
   controlsBottom: number;
   onSelect: (post: Post) => void;
-  /** Called for the first view and when the user asks to search the area they panned to. */
+  /** Called when the camera settles on an area, so the paws for that view can load. */
   onCommitBounds?: (bounds: MapBounds) => void;
 }) {
   const { colors, shadows } = useTheme();
@@ -96,20 +103,41 @@ export function MapCanvas({
   const [gps, setGps] = useState<GpsHud>('loading');
   const framedPin = useRef<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [styleReady, setStyleReady] = useState(false);
+  const [pinsReady, setPinsReady] = useState(false);
+  /** Our own camera moves are reported as user gestures on Android. Ignore those. */
+  const programmaticUntil = useRef(Number.POSITIVE_INFINITY);
+  const opened = useRef(false);
+  const committed = useRef<MapBounds | null>(null);
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     commitRef.current = onCommitBounds;
   }, [onCommitBounds]);
 
+  useEffect(() => {
+    if (!styleReady) return;
+    const timer = setTimeout(() => setPinsReady(true), 250);
+    return () => clearTimeout(timer);
+  }, [styleReady]);
+
+  useEffect(() => {
+    programmaticUntil.current = Date.now() + 1500;
+    const backup = setTimeout(() => setStyleReady(true), 2000);
+    return () => {
+      clearTimeout(backup);
+      if (commitTimer.current) clearTimeout(commitTimer.current);
+    };
+  }, []);
+
   const apply = useCallback((event: CameraEvent) => {
     const step = reduceCamera(policy.current, event);
     const changed =
-      step.state.follow !== policy.current.follow ||
-      step.state.offer !== policy.current.offer ||
-      step.state.armed !== policy.current.armed;
+      step.state.follow !== policy.current.follow || step.state.armed !== policy.current.armed;
     policy.current = step.state;
     if (changed) setHud(step.state);
     if (step.move) {
+      programmaticUntil.current = Date.now() + 1000;
       camera.current?.setCamera({
         centerCoordinate: step.move.center,
         zoomLevel: step.move.zoom,
@@ -143,20 +171,21 @@ export function MapCanvas({
           apply({ type: 'gpsUnavailable' });
           return;
         }
-        const position = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('timeout')), GPS_TIMEOUT_MS);
-          }),
-        ]);
-        if (!active) return;
-        const point: LngLat = [position.coords.longitude, position.coords.latitude];
-        setGps('ready');
-        apply({
-          type: 'gps',
-          point,
-          inside: insideServiceArea({ longitude: point[0], latitude: point[1] }),
+        ensureDeviceWatch();
+        let got = false;
+        const found = await readDeviceFix((fix) => {
+          if (!active) return;
+          got = true;
+          setGps('ready');
+          const point: LngLat = [fix.longitude, fix.latitude];
+          apply({
+            type: 'gps',
+            point,
+            inside: insideServiceArea(fix),
+          });
         });
+        if (!active || got || found) return;
+        setGps('timeout');
       } catch (error) {
         if (!active) return;
         const text = error instanceof Error ? error.message.toLowerCase() : '';
@@ -247,17 +276,19 @@ export function MapCanvas({
       if (west === undefined || south === undefined || east === undefined || north === undefined) {
         return;
       }
-      const bounds = { west, south, east, north };
-      const fromUser = event.properties.isUserInteraction === true;
-      const before = policy.current.loaded;
-      const step = apply({ type: 'region', bounds, fromUser });
-      if (!fromUser) {
+      const bounds = normalizeBounds({ west, south, east, north });
+      const fromUser =
+        event.properties.isUserInteraction === true &&
+        opened.current &&
+        Date.now() > programmaticUntil.current;
+      opened.current = true;
+      apply({ type: 'region', bounds, fromUser });
+      if (!usableMapBounds(bounds) || !boundsMoved(committed.current, bounds)) return;
+      if (commitTimer.current) clearTimeout(commitTimer.current);
+      commitTimer.current = setTimeout(() => {
+        committed.current = bounds;
         commitRef.current?.(bounds);
-        return;
-      }
-      if (step.state.loaded && step.state.loaded !== before && !step.state.offer) {
-        commitRef.current?.(step.state.loaded);
-      }
+      }, 350);
     },
     [apply],
   );
@@ -297,13 +328,6 @@ export function MapCanvas({
     apply({ type: 'locate' });
   }
 
-  function acceptSearch() {
-    const offer = policy.current.offer;
-    if (!offer) return;
-    apply({ type: 'acceptSearch' });
-    commitRef.current?.(offer);
-  }
-
   const gpsHint =
     gps === 'denied'
       ? 'Sem a localização, o mapa abre em Belém.'
@@ -333,6 +357,7 @@ export function MapCanvas({
         zoomEnabled
         rotateEnabled
         pitchEnabled
+        onDidFinishLoadingStyle={() => setStyleReady(true)}
         onRegionDidChange={onRegionDidChange}
       >
         <Camera
@@ -353,53 +378,40 @@ export function MapCanvas({
           />
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
-        <Images images={pawImages} />
-        <ShapeSource
-          key={posts.map((post) => post.id).join(',')}
-          id="alerts"
-          shape={shape}
-          onPress={onPinPress}
-        >
-          <CircleLayer
-            id="pin-hit"
-            style={{
-              circleRadius: 36,
-              circleColor: '#000000',
-              circleOpacity: 0.01,
-            }}
-          />
-          <SymbolLayer
-            id="pins"
-            style={{
-              iconImage: [
-                'match',
-                ['get', 'urgency'],
-                'high',
-                'pawHigh',
-                'medium',
-                'pawMedium',
-                'low',
-                'pawLow',
-                'pawMedium',
-              ],
-              iconSize: ['case', ['==', ['get', 'selected'], true], 0.62, 0.55],
-              iconAllowOverlap: true,
-              iconIgnorePlacement: true,
-            }}
-          />
-        </ShapeSource>
+        {styleReady ? <Images images={pawImages} /> : null}
+        {pinsReady ? (
+          <ShapeSource id="alerts" shape={shape} onPress={onPinPress}>
+            <CircleLayer
+              id="pin-hit"
+              style={{
+                circleRadius: 36,
+                circleColor: '#000000',
+                circleOpacity: 0.01,
+              }}
+            />
+            <SymbolLayer
+              id="pins"
+              style={{
+                iconImage: [
+                  'match',
+                  ['get', 'urgency'],
+                  'high',
+                  'pawHigh',
+                  'medium',
+                  'pawMedium',
+                  'low',
+                  'pawLow',
+                  'pawMedium',
+                ],
+                iconSize: ['case', ['==', ['get', 'selected'], true], 0.62, 0.55],
+                iconAllowOverlap: true,
+                iconIgnorePlacement: true,
+              }}
+            />
+          </ShapeSource>
+        ) : null}
       </MapView>
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-        {hud.offer ? (
-          <View
-            pointerEvents="box-none"
-            style={[styles.search, { top: insets.top + spacing.huge }]}
-          >
-            <View style={[styles.searchChip, shadows.md, { backgroundColor: colors.surface }]}>
-              <Chip label="Buscar nesta área" icon="search" onPress={acceptSearch} />
-            </View>
-          </View>
-        ) : null}
         {gpsHint ? (
           <View
             pointerEvents="none"
@@ -425,8 +437,6 @@ export function MapCanvas({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  search: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  searchChip: { borderRadius: radius.pill },
   hint: {
     position: 'absolute',
     left: spacing.lg,

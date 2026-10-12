@@ -7,6 +7,7 @@
     "start": "tsx src/index.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "create-superadmin": "tsx scripts/create-superadmin.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

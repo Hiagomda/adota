@@ -2,8 +2,23 @@ import { HttpError } from './http.js';
 import type { SessionUser } from './session.js';
 
 /** Roles stored today. `ong` in the product language is `ngo` in the database. */
-export const roles = ['user', 'protector', 'ngo', 'moderator', 'admin'] as const;
+export const roles = [
+  'user',
+  'protector',
+  'ngo',
+  'moderator',
+  'support',
+  'ong_reviewer',
+  'finance_reviewer',
+  'admin',
+  'superadmin',
+] as const;
 export type Role = (typeof roles)[number];
+
+/** Full operators. Reviewers and moderators are not included. */
+export function isOperator(role: string): boolean {
+  return role === 'admin' || role === 'superadmin';
+}
 
 export function requireUser(user: SessionUser | null): SessionUser {
   if (!user) throw new HttpError(401, 'Entre na sua conta para continuar.');
@@ -21,7 +36,7 @@ export function requireRole(user: SessionUser | null, allowed: readonly Role[]):
 
 export function requireAdmin(user: SessionUser | null): SessionUser {
   const current = requireUser(user);
-  if (current.role !== 'admin') {
+  if (!isOperator(current.role)) {
     throw new HttpError(403, 'Só a equipe da Égua, adota! pode fazer isso.');
   }
   return current;

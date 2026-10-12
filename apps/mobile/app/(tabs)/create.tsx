@@ -48,7 +48,15 @@ const suggestions = [
 const kindOptions = [
   { value: 'rescue_alert', label: 'Resgate' },
   { value: 'lost', label: 'Perdido' },
+  { value: 'adoption', label: 'Adoção' },
 ] as const;
+
+const adoptionSuggestions = [
+  'Já está em casa e procura um lar definitivo.',
+  'Vacinado e castrado, pronto para adoção.',
+  'Dócil com pessoas e outros animais.',
+  'Filhote que precisa de uma família.',
+];
 
 const speciesOptions = [
   { value: 'dog', label: 'Cachorro' },
@@ -115,18 +123,20 @@ export default function CreateScreen() {
   const [animalName, setAnimalName] = useState('');
   const [description, setDescription] = useState('');
   const [reference, setReference] = useState('');
-  const [kind, setKind] = useState<'rescue_alert' | 'lost'>(
-    askedKind === 'lost' ? 'lost' : 'rescue_alert',
+  const [kind, setKind] = useState<'rescue_alert' | 'lost' | 'adoption'>(
+    askedKind === 'lost' ? 'lost' : askedKind === 'adoption' ? 'adoption' : 'rescue_alert',
   );
   const [appliedKind, setAppliedKind] = useState(askedKind);
   if (askedKind !== appliedKind) {
     setAppliedKind(askedKind);
-    if (askedKind === 'lost') setKind('lost');
+    if (askedKind === 'lost' || askedKind === 'adoption') setKind(askedKind);
   }
   const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>('dog');
   const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [sex, setSex] = useState<'male' | 'female' | 'unknown'>('unknown');
-  const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>('high');
+  const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>(
+    askedKind === 'adoption' ? 'low' : 'high',
+  );
   const [manual, setManual] = useState<MapPoint | null>(null);
   const [moved, setMoved] = useState(false);
   const [message, setMessageState] = useState<{ text: string; settings: boolean } | null>(() =>
@@ -287,7 +297,9 @@ export default function CreateScreen() {
           () => undefined,
         );
         setMessage(
-          'Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.',
+          kind === 'adoption'
+            ? 'Sem internet. A adoção ficou neste aparelho e sai sozinha quando a rede voltar.'
+            : 'Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.',
         );
         return;
       }
@@ -407,7 +419,10 @@ export default function CreateScreen() {
                 accessibilityLabel="Tipo de publicação"
                 options={kindOptions}
                 value={kind}
-                onChange={setKind}
+                onChange={(value) => {
+                  setKind(value);
+                  if (value === 'adoption') setUrgency('low');
+                }}
               />
               <Input
                 label="Nome"
@@ -478,7 +493,7 @@ export default function CreateScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.suggestionRow}
                 >
-                  {suggestions.map((text) => (
+                  {(kind === 'adoption' ? adoptionSuggestions : suggestions).map((text) => (
                     <Chip
                       key={text}
                       label={text}

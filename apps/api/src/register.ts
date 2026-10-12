@@ -47,6 +47,7 @@ import {
   type createQueue,
 } from './notify.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
+import { registerStaffRoutes } from './staff/routes.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
 import { stripControls } from './text.js';
 
@@ -731,6 +732,8 @@ export async function registerRoutes(
       adopted: adopted.rows[0]?.total ?? 0,
     };
   });
+
+  await registerStaffRoutes(app, { env, pool });
 }
 
 async function toggle(

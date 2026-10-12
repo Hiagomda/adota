@@ -65,7 +65,8 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   });
   await app.register(cors, {
-    origin: env.NODE_ENV === 'production' ? [env.WEB_ORIGIN] : true,
+    origin: env.NODE_ENV === 'production' ? [env.WEB_ORIGIN, env.ADMIN_ORIGIN] : true,
+    credentials: true,
   });
   await app.register(rateLimit, {
     global: true,

@@ -23,10 +23,8 @@ export interface CameraState {
   armed: boolean;
   /** Last fix inside the service area. The puck uses this; the camera does not. */
   user: LngLat | null;
-  /** Bounds whose rescues are loaded. */
+  /** Last settled view. The map loads paws for these edges. */
   loaded: MapBounds | null;
-  /** User panned away from `loaded` and has not asked to search yet. */
-  offer: MapBounds | null;
 }
 
 export const initialCameraState: CameraState = {
@@ -36,7 +34,6 @@ export const initialCameraState: CameraState = {
   armed: false,
   user: null,
   loaded: null,
-  offer: null,
 };
 
 export type CameraMove = {
@@ -53,28 +50,11 @@ export type CameraEvent =
   | { type: 'pin'; point: LngLat }
   | { type: 'dismissPin' }
   | { type: 'data' }
-  | { type: 'region'; bounds: MapBounds; fromUser: boolean }
-  | { type: 'acceptSearch' };
+  | { type: 'region'; bounds: MapBounds; fromUser: boolean };
 
 export interface CameraStep {
   state: CameraState;
   move: CameraMove | null;
-}
-
-/** True when the view moved far enough that the loaded rescues no longer cover it. */
-export function boundsDiffer(previous: MapBounds, next: MapBounds): boolean {
-  const span = Math.max(
-    Math.abs(previous.east - previous.west),
-    Math.abs(previous.north - previous.south),
-    0.0001,
-  );
-  const slack = span * 0.12;
-  return (
-    Math.abs(previous.west - next.west) > slack ||
-    Math.abs(previous.east - next.east) > slack ||
-    Math.abs(previous.north - next.north) > slack ||
-    Math.abs(previous.south - next.south) > slack
-  );
 }
 
 /**
@@ -132,21 +112,10 @@ export function reduceCamera(state: CameraState, event: CameraEvent): CameraStep
     case 'data':
       return { state, move: null };
     case 'region': {
-      if (!event.fromUser && state.loaded === null) {
-        return { state: { ...state, loaded: event.bounds, offer: null }, move: null };
-      }
-      if (!event.fromUser) return { state, move: null };
-      const next = { ...state, follow: false, armed: false, userMoved: true };
-      if (state.loaded && boundsDiffer(state.loaded, event.bounds)) {
-        return { state: { ...next, offer: event.bounds }, move: null };
-      }
-      if (!state.loaded)
-        return { state: { ...next, loaded: event.bounds, offer: null }, move: null };
-      return { state: next, move: null };
-    }
-    case 'acceptSearch': {
-      if (!state.offer) return { state, move: null };
-      return { state: { ...state, loaded: state.offer, offer: null }, move: null };
+      const next = event.fromUser
+        ? { ...state, follow: false, armed: false, userMoved: true }
+        : state;
+      return { state: { ...next, loaded: event.bounds }, move: null };
     }
     default: {
       const unreachable: never = event;

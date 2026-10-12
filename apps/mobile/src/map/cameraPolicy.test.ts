@@ -90,22 +90,20 @@ describe('map camera', () => {
     assert.equal(at(closed.state, moved).move, null);
   });
 
-  it('offers a search when the user pans away and does not move the camera to accept it', () => {
+  it('loads the area as soon as the camera settles, including a pan', () => {
     const opened = reduceCamera(initialCameraState, {
       type: 'region',
       bounds: view,
       fromUser: false,
     });
     assert.equal(opened.move, null);
+    assert.equal(opened.state.userMoved, false);
     assert.deepEqual(opened.state.loaded, view);
     const pan = reduceCamera(opened.state, { type: 'region', bounds: far, fromUser: true });
     assert.equal(pan.move, null);
-    assert.deepEqual(pan.state.loaded, view);
-    assert.deepEqual(pan.state.offer, far);
-    const accepted = reduceCamera(pan.state, { type: 'acceptSearch' });
-    assert.equal(accepted.move, null);
-    assert.deepEqual(accepted.state.loaded, far);
-    assert.equal(accepted.state.offer, null);
+    assert.equal(pan.state.userMoved, true);
+    assert.equal(pan.state.follow, false);
+    assert.deepEqual(pan.state.loaded, far);
   });
 
   it('a denied or disabled GPS leaves the camera on the city default', () => {

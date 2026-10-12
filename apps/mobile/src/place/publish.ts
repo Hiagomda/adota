@@ -9,7 +9,7 @@ export const alertDraftSchema = z.object({
   token: z.string().min(1),
   photos: z.array(z.string().min(1)).min(1).max(5),
   description: z.string().min(1),
-  kind: z.enum(['rescue_alert', 'lost', 'help_request']),
+  kind: z.enum(['rescue_alert', 'lost', 'adoption', 'help_request']),
   species: z.enum(['dog', 'cat', 'other']),
   size: z.enum(['small', 'medium', 'large']).default('medium'),
   sex: z.enum(['male', 'female', 'unknown']).default('unknown'),

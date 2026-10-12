@@ -120,8 +120,8 @@ export default function DonateScreen() {
       router.push({ pathname: '/login', params: { returnTo: '/doar' } });
       return;
     }
-    if (!me.data?.verified) {
-      setMessage('Só um perfil verificado pode publicar um pedido com Pix.');
+    if (me.data?.role !== 'admin') {
+      setMessage('Só a equipe pode publicar um pedido com Pix.');
       return;
     }
     const pix = pixKey.trim();
@@ -200,7 +200,7 @@ export default function DonateScreen() {
       >
         <View style={styles.column}>
           <AppText color="textSecondary">
-            O pedido mostra a chave Pix do perfil verificado. O app não recebe nem repassa dinheiro.
+            Só a equipe publica pedido com Pix. O app não recebe nem repassa dinheiro.
           </AppText>
           {!token ? (
             <Button
@@ -213,17 +213,8 @@ export default function DonateScreen() {
             <AppText color="textSecondary">Carregando seu perfil…</AppText>
           ) : me.isError || !me.data ? (
             <Notice message="Não consegui carregar seu perfil. Volte e tente de novo." />
-          ) : !me.data.verified ? (
-            <>
-              <Notice message="Só perfil verificado pode publicar um pedido com Pix. Peça a verificação em Ajustes." />
-              <Button
-                title="Pedir verificação"
-                icon="shield"
-                variant="outline"
-                fullWidth
-                onPress={() => router.push('/settings')}
-              />
-            </>
+          ) : me.data.role !== 'admin' ? (
+            <Notice message="Pedido com Pix só a equipe publica. As campanhas abertas continuam no início." />
           ) : (
             <>
               <View style={styles.group}>
@@ -344,7 +335,7 @@ export default function DonateScreen() {
               />
             </>
           )}
-          {message && (!token || !me.data?.verified) ? <Notice message={message} /> : null}
+          {message && (!token || me.data?.role !== 'admin') ? <Notice message={message} /> : null}
         </View>
       </ScrollView>
     </SafeAreaView>

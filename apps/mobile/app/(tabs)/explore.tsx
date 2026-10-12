@@ -6,7 +6,8 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../../src/api';
 import { AppText, Button, Card, Icon, StatusPill, Touchable } from '../../src/components/ui';
-import { formatWhen } from '../../src/format';
+import { distanceLabel, formatWhen } from '../../src/format';
+import { useViewerLocation } from '../../src/place/deviceLocation';
 import { MapCanvas } from '../../src/map/MapCanvas';
 import { belemBounds, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
@@ -31,6 +32,7 @@ export default function ExploreScreen() {
   const router = useRouter();
   const focused = useIsFocused();
   const token = useSession((state) => state.token);
+  const here = useViewerLocation();
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const search = `?status=open&limit=100&west=${bounds.west}&south=${bounds.south}&east=${bounds.east}&north=${bounds.north}`;
@@ -128,7 +130,9 @@ export default function ExploreScreen() {
                   {selected.referencePoint || selected.addressText || selected.approxLabel}
                 </AppText>
                 <AppText variant="caption" color="textSecondary">
-                  {formatWhen(selected.createdAt)}
+                  {[formatWhen(selected.createdAt), distanceLabel(here, selected.location)]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </AppText>
               </View>
             </Touchable>

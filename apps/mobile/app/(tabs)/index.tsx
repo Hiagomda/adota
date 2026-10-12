@@ -33,7 +33,8 @@ import {
   type IconName,
 } from '../../src/components/ui';
 import { onFeedRefresh } from '../../src/feedRefresh';
-import { formatWhen } from '../../src/format';
+import { distanceKmBetween, distanceLabel, formatWhen } from '../../src/format';
+import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
@@ -70,6 +71,12 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
+function placeDistance(post: Post, here: DeviceFix | null): string {
+  const place = placeOf(post.approxLabel);
+  const away = distanceLabel(here, post.location);
+  return away ? `${place} · ${away}` : place;
+}
+
 interface OrgSummary {
   id: string;
   name: string;
@@ -102,7 +109,13 @@ function collectOrgs(posts: Post[]): OrgSummary[] {
   return [...byId.values()].sort((a, b) => b.rescues - a.rescues).slice(0, MAX_ORGS);
 }
 
-const Stories = memo(function Stories({ posts }: { posts: Post[] }) {
+const Stories = memo(function Stories({
+  posts,
+  here,
+}: {
+  posts: Post[];
+  here: DeviceFix | null;
+}) {
   const router = useRouter();
   if (posts.length === 0) return null;
   return (
@@ -115,18 +128,19 @@ const Stories = memo(function Stories({ posts }: { posts: Post[] }) {
       >
         {posts.map((post) => {
           const place = placeOf(post.approxLabel);
+          const label = placeDistance(post, here);
           return (
             <Touchable
               key={post.id}
               accessibilityRole="button"
-              accessibilityLabel={`Resgate urgente em ${place}`}
+              accessibilityLabel={`Resgate urgente em ${label}`}
               pressedScale={0.94}
               onPress={() => router.push(`/story/${post.id}`)}
               style={styles.story}
             >
               <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="urgent" />
-              <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-                {place}
+              <AppText variant="caption" color="textSecondary" numberOfLines={2}>
+                {label}
               </AppText>
             </Touchable>
           );
@@ -167,8 +181,10 @@ export default function HomeScreen() {
   const client = useQueryClient();
   const listRef = useRef<FlashListRef<Post>>(null);
   const adoptionY = useRef(0);
+  const campaignY = useRef(0);
   const [seek, setSeek] = useState('');
   const [lens, setLens] = useState<HomeLens>('all');
+  const here = useViewerLocation();
 
   const feed = useQuery({
     queryKey: ['posts', token],
@@ -214,7 +230,12 @@ export default function HomeScreen() {
     (post) => post.helpRequest?.kind !== 'transport' && keep(post),
   );
   const featured = storyPosts[0] ?? feedPosts[0] ?? null;
-  const nearbyPosts = feedPosts.filter((post) => post.id !== featured?.id).slice(0, 8);
+  const nearbyPosts = feedPosts
+    .filter((post) => post.id !== featured?.id)
+    .sort((a, b) =>
+      here ? distanceKmBetween(here, a.location) - distanceKmBetween(here, b.location) : 0,
+    )
+    .slice(0, 8);
   const resumePosts = feedPosts.filter((post) => post.saved || post.viewerWillHelp);
   const city = me.data?.city?.trim() || 'Belém';
   const levelProgress = volunteer.data
@@ -409,7 +430,7 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Doar"
             pressedScale={0.94}
-            onPress={() => router.push('/doar')}
+            onPress={() => scrollTo(campaignY.current)}
             style={styles.shortcut}
           >
             <View style={[styles.lensCircle, { backgroundColor: colors.infoSoft }]}>
@@ -442,8 +463,8 @@ export default function HomeScreen() {
               <AppText variant="display" color="onMedia" numberOfLines={2}>
                 {animalHeadline(featured.animal)}
               </AppText>
-              <AppText variant="body" color="onMedia" numberOfLines={1}>
-                {placeOf(featured.approxLabel)}
+              <AppText variant="body" color="onMedia" numberOfLines={2}>
+                {placeDistance(featured, here)}
               </AppText>
               <View style={[styles.cta, { backgroundColor: colors.secondary }]}>
                 <AppText variant="button" numberOfLines={1} style={{ color: colors.onSecondary }}>
@@ -454,7 +475,7 @@ export default function HomeScreen() {
           </Touchable>
         ) : null}
 
-        <Stories posts={storyPosts.filter((post) => post.id !== featured?.id)} />
+        <Stories posts={storyPosts.filter((post) => post.id !== featured?.id)} here={here} />
 
         {nearbyPosts.length > 0 ? (
           <View>
@@ -466,7 +487,7 @@ export default function HomeScreen() {
                   index={index}
                   photoUri={post.media[0]?.thumbUrl ?? post.media[0]?.url}
                   title={animalHeadline(post.animal)}
-                  subtitle={placeOf(post.approxLabel)}
+                  subtitle={placeDistance(post, here)}
                   status={post.status}
                   urgency={post.urgency}
                   onPress={() => openPost(post.id)}
@@ -499,7 +520,9 @@ export default function HomeScreen() {
         <View onLayout={(event) => (adoptionY.current = event.nativeEvent.layout.y)}>
           <SectionHeader
             title="Animais esperando por você"
-            subtitle="Resgatados e prontos para um lar"
+            subtitle="Prontos para um lar"
+            actionLabel="Publicar"
+            onAction={() => router.push({ pathname: '/create', params: { kind: 'adoption' } })}
           />
           {adoption.isLoading ? (
             <SkeletonRail width={size.animalLarge.width} height={size.animalLarge.height} />
@@ -515,7 +538,9 @@ export default function HomeScreen() {
               compact
               pose="home"
               title="Nenhum bichinho para adoção agora"
-              body="Quando um resgate chegar a essa fase, ele aparece aqui."
+              body="Quando um resgate chegar a essa fase, ou alguém publicar para adoção, ele aparece aqui."
+              actionLabel="Publicar para adoção"
+              onAction={() => router.push({ pathname: '/create', params: { kind: 'adoption' } })}
             />
           ) : (
             <Rail>
@@ -525,7 +550,7 @@ export default function HomeScreen() {
                   index={index}
                   photoUri={post.media[0]?.thumbUrl ?? post.media[0]?.url}
                   title={animalHeadline(post.animal)}
-                  subtitle={[placeOf(post.approxLabel), sexLabel[post.animal.sex]]
+                  subtitle={[placeDistance(post, here), sexLabel[post.animal.sex]]
                     .filter(Boolean)
                     .join(' · ')}
                   status={post.status}
@@ -555,12 +580,12 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        <View>
+        <View onLayout={(event) => (campaignY.current = event.nativeEvent.layout.y)}>
           <SectionHeader
             title="Campanhas"
-            subtitle="Pedidos de ajuda de perfis verificados"
-            actionLabel="Pedir doação"
-            onAction={() => router.push('/doar')}
+            subtitle="Pedidos da equipe. O app não recebe o dinheiro."
+            actionLabel={me.data?.role === 'admin' ? 'Pedir doação' : undefined}
+            onAction={me.data?.role === 'admin' ? () => router.push('/doar') : undefined}
           />
           {campaigns.isLoading ? (
             <SkeletonRail
@@ -589,7 +614,7 @@ export default function HomeScreen() {
                     key={post.id}
                     index={index}
                     kind={post.helpRequest.kind}
-                    place={placeOf(post.approxLabel)}
+                    place={placeDistance(post, here)}
                     goalAmount={post.helpRequest.goalAmount}
                     deadline={post.helpRequest.deadline}
                     createdAt={post.createdAt}

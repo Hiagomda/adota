@@ -3,6 +3,8 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { animalHeadline } from '../animalLabels';
+import { distanceLabel } from '../format';
+import { useViewerLocation } from '../place/deviceLocation';
 import {
   motion,
   radius,
@@ -60,6 +62,8 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
     openTimer.current = setTimeout(() => onOpen(post.id), DOUBLE_TAP_MS);
   }
 
+  const here = useViewerLocation();
+  const away = distanceLabel(here, post.location);
   const likes = post.counts.likes === 1 ? '1 curtida' : `${post.counts.likes} curtidas`;
   const comments =
     post.counts.comments === 1 ? '1 comentário' : `${post.counts.comments} comentários`;
@@ -170,10 +174,10 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
               <Icon name="map-pin" size="sm" color={colors.onMedia} />
               <AppText
                 variant="bodySmall"
-                numberOfLines={1}
+                numberOfLines={2}
                 style={[styles.placeText, { color: colors.onMedia }]}
               >
-                {post.approxLabel}
+                {away ? `${post.approxLabel} · ${away}` : post.approxLabel}
               </AppText>
             </View>
           </View>

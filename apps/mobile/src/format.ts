@@ -11,6 +11,30 @@ export function formatWhen(iso: string): string {
   return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
 }
 
+export function distanceKmBetween(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = toRad(to.latitude - from.latitude);
+  const longitudeDelta = toRad(to.longitude - from.longitude);
+  const fromLat = toRad(from.latitude);
+  const toLat = toRad(to.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLat) * Math.cos(toLat) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+/** Distance from the person to the animal, or an empty string when the phone has no fix yet. */
+export function distanceLabel(
+  from: { latitude: number; longitude: number } | null,
+  to: { latitude: number; longitude: number },
+): string {
+  if (!from) return '';
+  return formatKm(distanceKmBetween(from, to));
+}
+
 export function formatKm(km: number): string {
   if (!Number.isFinite(km) || km < 0) return '';
   if (km < 1) {
