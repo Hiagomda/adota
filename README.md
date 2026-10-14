@@ -29,6 +29,8 @@ As portas do host evitam o Postgres, o Redis e a porta 3001 que já estão em us
 
 A imagem oficial `minio/minio` saiu do Docker Hub. O Compose usa `bitnamilegacy/minio:2025.7.23`, o mesmo servidor MinIO, e cria o bucket `patinha-media` na subida.
 
+No teste e em produção, as fotos podem ir para o Cloudflare R2 em vez do MinIO. Preencha `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_BUCKET` juntos. O app continua pedindo o link assinado à API e envia a foto direto para o R2. O imgproxy precisa de `R2_S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com` e `R2_S3_REGION=auto`. Sem essas variáveis, o armazenamento continua no MinIO.
+
 As credenciais locais estão no `.env.example`. Copie para `.env` se quiser sobrescrever os padrões. Sem esse arquivo, a API usa os mesmos valores do Docker Compose.
 
 O imgproxy local aceita URLs sem assinatura. Antes de produção, defina `IMGPROXY_KEY` e `IMGPROXY_SALT` em hexadecimal.

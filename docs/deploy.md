@@ -19,7 +19,7 @@ ufw enable
 
 4. Instale fail2ban e deixe a jail `sshd` ativa.
 5. Clone o repositório em `/opt/patinha`.
-6. Crie `/opt/patinha/.env` com `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `IMGPROXY_KEY`, `IMGPROXY_SALT` e `FIREBASE_PROJECT_ID`. `AUTH_DEV_MODE` fica `false`.
+6. Crie `/opt/patinha/.env` com `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `IMGPROXY_KEY`, `IMGPROXY_SALT` e `FIREBASE_PROJECT_ID`. `AUTH_DEV_MODE` fica `false`. Para gravar as fotos no Cloudflare R2, preencha também `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_S3_ENDPOINT` (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`) e `R2_S3_REGION=auto`.
 7. Suba a stack: `docker compose -f docker-compose.prod.yml up -d --build`.
 8. Rode a migração: `docker compose -f docker-compose.prod.yml exec -T api pnpm --filter @patinha/api db:migrate`.
 9. No Uptime Kuma, em `127.0.0.1:3002`, monitore `https://api.eguaadota.app/health` e `https://app.eguaadota.app`.

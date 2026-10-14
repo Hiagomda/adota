@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Env } from '../src/config.js';
-import { publicMediaUrl, uploadEndpoint } from '../src/media.js';
+import { loadEnv, type Env } from '../src/config.js';
+import { publicMediaUrl, storageBucket, uploadEndpoint } from '../src/media.js';
 
 describe('upload endpoint', () => {
   it('uses the public host when the phone cannot reach the internal one', () => {
@@ -16,6 +16,25 @@ describe('upload endpoint', () => {
     expect(uploadEndpoint({ MINIO_ENDPOINT: 'http://localhost:9000' })).toBe(
       'http://localhost:9000',
     );
+  });
+
+  it('sends the phone straight to Cloudflare R2 when the bucket is configured', () => {
+    const env = {
+      MINIO_ENDPOINT: 'http://minio:9000',
+      MINIO_BUCKET: 'patinha-media',
+      R2_ACCOUNT_ID: 'abc123',
+      R2_ACCESS_KEY_ID: 'key',
+      R2_SECRET_ACCESS_KEY: 'secret',
+      R2_BUCKET: 'patinha-media',
+    };
+    expect(uploadEndpoint(env)).toBe('https://abc123.r2.cloudflarestorage.com');
+    expect(storageBucket(env)).toBe('patinha-media');
+  });
+});
+
+describe('R2 config', () => {
+  it('rejects a half-set Cloudflare account', () => {
+    expect(() => loadEnv({ NODE_ENV: 'test', R2_ACCOUNT_ID: 'abc123' })).toThrow(/R2 needs/);
   });
 });
 
