@@ -12,6 +12,7 @@ export function MapCanvas({
   selectedId,
   tracking,
   onSelect,
+  onDismiss,
   onCommitBounds,
   focus,
 }: {
@@ -21,6 +22,7 @@ export function MapCanvas({
   /** Native map uses this to clear the tab bar. The web preview has no floating locate button. */
   controlsBottom?: number;
   onSelect: (post: Post) => void;
+  onDismiss?: () => void;
   onCommitBounds?: (bounds: MapBounds) => void;
   focus?: [number, number] | null;
 }) {
@@ -30,6 +32,7 @@ export function MapCanvas({
   const postsRef = useRef(posts);
   const selectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
+  const onDismissRef = useRef(onDismiss);
   const onBoundsRef = useRef(onCommitBounds);
   const trackingRef = useRef(tracking);
 
@@ -37,6 +40,7 @@ export function MapCanvas({
     postsRef.current = posts;
     selectedRef.current = selectedId;
     onSelectRef.current = onSelect;
+    onDismissRef.current = onDismiss;
     onBoundsRef.current = onCommitBounds;
     trackingRef.current = tracking;
   });
@@ -93,7 +97,10 @@ export function MapCanvas({
         image.style.display = 'block';
         image.style.pointerEvents = 'none';
         element.replaceChildren(image);
-        element.onclick = () => onSelectRef.current(post);
+        element.onclick = (event) => {
+          event.stopPropagation();
+          onSelectRef.current(post);
+        };
         return new maplibregl.Marker({ element, anchor: 'center' })
           .setLngLat([post.location.longitude, post.location.latitude])
           .addTo(map);
@@ -110,6 +117,7 @@ export function MapCanvas({
     };
     if (map.isStyleLoaded()) start();
     map.on('styledata', start);
+    map.on('click', () => onDismissRef.current?.());
     map.on('moveend', () => {
       draw();
       reportBounds();
@@ -122,16 +130,27 @@ export function MapCanvas({
     };
   }, []);
 
+  const pinKey = `${selectedId ?? ''}:${posts
+    .map(
+      (post) =>
+        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
+    )
+    .join('|')}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     map.fire('moveend');
-  }, [posts, selectedId]);
+  }, [pinKey]);
 
   useEffect(() => {
-    if (!focus) return;
-    mapRef.current?.easeTo({ center: focus, zoom: 15, duration: 600 });
-  }, [focus]);
+    if (!focus || !tracking) return;
+    const move = () => mapRef.current?.easeTo({ center: focus, zoom: 15, duration: 600 });
+    move();
+    const timers = [600, 1400].map((delay) => setTimeout(move, delay));
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [focus, tracking]);
 
   return (
     <View

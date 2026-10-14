@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -16,6 +16,8 @@ import { useOverlay } from './useOverlay';
 export interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
+  /** Fires after the sheet has left the screen, so a navigation is not covered by the modal. */
+  onClosed?: () => void;
   title?: string;
   children: ReactNode;
 }
@@ -24,12 +26,24 @@ const CLOSE_DRAG = 90;
 const HIDDEN_OFFSET = 480;
 
 /** Sheet that slides up, closes by tapping the backdrop, dragging the handle down or with Android back. */
-export function BottomSheet({ visible, onClose, title, children }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, onClosed, title, children }: BottomSheetProps) {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const duration = useMotionDuration();
   const { mounted, progress } = useOverlay(visible);
   const drag = useSharedValue(0);
+  const onClosedRef = useRef(onClosed);
+  const sawOpen = useRef(false);
+  onClosedRef.current = onClosed;
+  useEffect(() => {
+    if (mounted) {
+      sawOpen.current = true;
+      return;
+    }
+    if (!sawOpen.current) return;
+    sawOpen.current = false;
+    onClosedRef.current?.();
+  }, [mounted]);
 
   const pan = Gesture.Pan()
     .onUpdate((event) => {

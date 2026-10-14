@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadPost, messageFrom, siteUrl } from '../../src/api';
+import { requestMapFocus } from '../../src/map/focusRequest';
 import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
   AnimalCard,
@@ -91,7 +92,6 @@ export default function PostScreen() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [adoptOpen, setAdoptOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editSession, setEditSession] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -283,21 +283,7 @@ export default function PostScreen() {
       setNote('Entre na sua conta para conversar sobre a adoção.');
       return;
     }
-    setAdoptOpen(false);
     router.push(`/chat/${item.id}`);
-  }
-
-  function onAdoptPress() {
-    if (!item) return;
-    if (!token) {
-      setNote('Entre na sua conta para conversar sobre a adoção.');
-      return;
-    }
-    if (isAuthor) {
-      router.push(`/chat/${item.id}`);
-      return;
-    }
-    setAdoptOpen(true);
   }
 
   function share() {
@@ -388,16 +374,14 @@ export default function PostScreen() {
                 title="Mostrar no mapa"
                 icon="map"
                 variant="secondary"
-                onPress={() =>
-                  router.push({
-                    pathname: '/explore',
-                    params: {
-                      post: item.id,
-                      lat: String(item.location.latitude),
-                      lng: String(item.location.longitude),
-                    },
-                  })
-                }
+                onPress={() => {
+                  requestMapFocus({
+                    postId: item.id,
+                    latitude: item.location.latitude,
+                    longitude: item.location.longitude,
+                  });
+                  router.navigate('/explore');
+                }}
               />
             </View>
 
@@ -535,7 +519,8 @@ export default function PostScreen() {
                 onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: following })}
               />
             ) : null}
-            {canOwn && (item.status === 'on_the_way' || item.status === 'not_found') &&
+            {canOwn &&
+            (item.status === 'on_the_way' || item.status === 'not_found') &&
             following !== 'open' ? (
               <Button
                 title="Voltar para aberto"
@@ -777,7 +762,7 @@ export default function PostScreen() {
                 adoptionContact && isAuthor
                   ? () => router.push(`/chat/${item.id}`)
                   : forAdoption
-                    ? onAdoptPress
+                    ? openAdoptionChat
                     : adopted
                       ? openAdoptionChat
                       : helpingNow
@@ -946,25 +931,6 @@ export default function PostScreen() {
             onPress={() => void confirmHelp()}
           />
           <Button title="Agora não" variant="ghost" fullWidth onPress={() => setHelpOpen(false)} />
-        </View>
-      </BottomSheet>
-
-      <BottomSheet visible={adoptOpen} onClose={() => setAdoptOpen(false)} title="Quero adotar">
-        <View style={styles.help}>
-          <AppText color="textSecondary">
-            A conversa fica neste app, só entre você e quem cuida do animal. O telefone continua
-            oculto. Quando vocês combinarem, quem cuida marca o animal como adotado. O Égua, adota!
-            não recebe dinheiro.
-          </AppText>
-          <Button
-            title="Abrir conversa"
-            icon="message-circle"
-            variant="secondary"
-            size="lg"
-            fullWidth
-            onPress={openAdoptionChat}
-          />
-          <Button title="Agora não" variant="ghost" fullWidth onPress={() => setAdoptOpen(false)} />
         </View>
       </BottomSheet>
     </View>

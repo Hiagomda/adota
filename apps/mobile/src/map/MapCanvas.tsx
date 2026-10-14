@@ -10,7 +10,6 @@ import {
   UserLocation,
   type CameraRef,
   type OnPressEvent,
-  type ShapeSourceRef,
 } from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import {
@@ -40,6 +39,7 @@ import {
 import {
   belem,
   boundsMoved,
+  cameraFramesPoint,
   mapStyleUrl,
   normalizeBounds,
   usableMapBounds,
@@ -84,6 +84,7 @@ export function MapCanvas({
   tracking,
   controlsBottom,
   onSelect,
+  onDismiss,
   onCommitBounds,
   focus,
 }: {
@@ -93,6 +94,8 @@ export function MapCanvas({
   /** Space left for the tab bar, or for the selected-animal card when it is open. */
   controlsBottom: number;
   onSelect: (post: Post) => void;
+  /** Tap on the map, away from a paw, closes the selected card. */
+  onDismiss?: () => void;
   /** Called when the camera settles on an area, so the paws for that view can load. */
   onCommitBounds?: (bounds: MapBounds) => void;
   /** Opens the camera on this pin, ahead of the GPS center. */
@@ -101,15 +104,21 @@ export function MapCanvas({
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const camera = useRef<CameraRef>(null);
-  const pins = useRef<ShapeSourceRef>(null);
   const policy = useRef<CameraState>(initialCameraState);
   const commitRef = useRef(onCommitBounds);
+  const dismissRef = useRef(onDismiss);
+  const pressedPin = useRef(false);
   const [hud, setHud] = useState(initialCameraState);
   const [gps, setGps] = useState<GpsHud>('loading');
   const framedPin = useRef<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [styleReady, setStyleReady] = useState(false);
   const [pinsReady, setPinsReady] = useState(false);
+  const [sprite, setSprite] = useState(0);
+  const focusRef = useRef(focus);
+  const trackingRef = useRef(tracking);
+  const landed = useRef(false);
+  const lastKick = useRef(0);
   /** Our own camera moves are reported as user gestures on Android. Ignore those. */
   const programmaticUntil = useRef(Number.POSITIVE_INFINITY);
   const opened = useRef(false);
@@ -118,7 +127,16 @@ export function MapCanvas({
 
   useEffect(() => {
     commitRef.current = onCommitBounds;
-  }, [onCommitBounds]);
+    dismissRef.current = onDismiss;
+    focusRef.current = focus;
+    trackingRef.current = tracking;
+  }, [focus, onCommitBounds, onDismiss, tracking]);
+
+  const sawTracking = useRef(tracking);
+  useEffect(() => {
+    if (tracking && !sawTracking.current) setSprite((value) => value + 1);
+    sawTracking.current = tracking;
+  }, [tracking]);
 
   useEffect(() => {
     if (!styleReady) return;
@@ -183,6 +201,8 @@ export function MapCanvas({
           got = true;
           setGps('ready');
           const point: LngLat = [fix.longitude, fix.latitude];
+          const pending = focusRef.current;
+          if (pending) apply({ type: 'pin', point: pending });
           apply({
             type: 'gps',
             point,
@@ -240,10 +260,26 @@ export function MapCanvas({
     };
   }, [apply, hud.follow]);
 
+  // setCamera before the style exists, or while this tab is frozen, is ignored.
+  // The default center is Belém, so keep trying once the map is actually on screen.
   useEffect(() => {
-    if (!focus) return;
-    apply({ type: 'pin', point: focus });
-  }, [apply, focus]);
+    landed.current = false;
+  }, [focus]);
+
+  useEffect(() => {
+    if (!focus || !styleReady || !tracking) return;
+    const point = focus;
+    const kick = () => {
+      if (landed.current) return;
+      lastKick.current = Date.now();
+      apply({ type: 'pin', point });
+    };
+    kick();
+    const timers = [600, 1400, 2400].map((delay) => setTimeout(kick, delay));
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [apply, focus, styleReady, tracking]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -258,26 +294,32 @@ export function MapCanvas({
     apply({ type: 'pin', point: [post.location.longitude, post.location.latitude] });
   }, [apply, posts, selectedId]);
 
-  const shape = useMemo(
+  // Same paw data must keep the same GeoJSON object. A fresh array on every
+  // parent render blanks the icons on Android until the style draws them again.
+  const pinKey = posts
+    .map(
+      (post) =>
+        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
+    )
+    .sort()
+    .join('|');
+  const shape = useMemo<GeoJSON.FeatureCollection>(
     () => ({
-      type: 'FeatureCollection' as const,
+      type: 'FeatureCollection',
       features: posts.map((post) => ({
-        type: 'Feature' as const,
+        type: 'Feature',
         id: post.id,
-        properties: { id: post.id, urgency: post.urgency, selected: post.id === selectedId },
+        properties: { id: post.id, urgency: post.urgency },
         geometry: {
-          type: 'Point' as const,
+          type: 'Point',
           coordinates: [post.location.longitude, post.location.latitude],
         },
       })),
     }),
-    [posts, selectedId],
+    // pinKey already lists every field drawn on the map.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pinKey],
   );
-
-  useEffect(() => {
-    if (!pinsReady) return;
-    pins.current?.setNativeProps({ shape });
-  }, [pinsReady, shape]);
 
   const onRegionDidChange = useCallback<
     NonNullable<ComponentProps<typeof MapView>['onRegionDidChange']>
@@ -298,6 +340,15 @@ export function MapCanvas({
         Date.now() > programmaticUntil.current;
       opened.current = true;
       apply({ type: 'region', bounds, fromUser });
+      const aim = focusRef.current;
+      if (aim) {
+        const framed = cameraFramesPoint(bounds, { longitude: aim[0], latitude: aim[1] });
+        if (framed) landed.current = true;
+        else if (trackingRef.current && Date.now() > lastKick.current + 700) {
+          lastKick.current = Date.now();
+          apply({ type: 'pin', point: aim });
+        }
+      }
       if (!usableMapBounds(bounds) || !boundsMoved(committed.current, bounds)) return;
       if (commitTimer.current) clearTimeout(commitTimer.current);
       commitTimer.current = setTimeout(() => {
@@ -313,10 +364,23 @@ export function MapCanvas({
       const id = event.features[0]?.properties?.id;
       if (typeof id !== 'string') return;
       const post = posts.find((item) => item.id === id);
-      if (post) onSelect(post);
+      if (!post) return;
+      // The map press fires too. Mark this so that tap keeps the card open.
+      pressedPin.current = true;
+      onSelect(post);
     },
     [onSelect, posts],
   );
+
+  const onMapPress = useCallback(() => {
+    setTimeout(() => {
+      if (pressedPin.current) {
+        pressedPin.current = false;
+        return;
+      }
+      dismissRef.current?.();
+    }, 40);
+  }, []);
 
   async function onLocate() {
     if (gps === 'blocked' || gps === 'denied') {
@@ -373,6 +437,7 @@ export function MapCanvas({
         rotateEnabled
         pitchEnabled
         onDidFinishLoadingStyle={() => setStyleReady(true)}
+        onPress={onMapPress}
         onRegionDidChange={onRegionDidChange}
       >
         <Camera
@@ -393,9 +458,9 @@ export function MapCanvas({
           />
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
-        {styleReady ? <Images images={pawImages} /> : null}
+        {styleReady ? <Images key={`${sprite}:${pinKey}`} images={pawImages} /> : null}
         {pinsReady ? (
-          <ShapeSource id="alerts" ref={pins} shape={shape} onPress={onPinPress}>
+          <ShapeSource id="alerts" shape={shape} onPress={onPinPress}>
             <CircleLayer
               id="pin-hit"
               style={{
@@ -418,7 +483,7 @@ export function MapCanvas({
                   'pawLow',
                   'pawMedium',
                 ],
-                iconSize: ['case', ['==', ['get', 'selected'], true], 0.62, 0.55],
+                iconSize: 0.55,
                 iconAllowOverlap: true,
                 iconIgnorePlacement: true,
               }}

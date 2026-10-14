@@ -284,8 +284,8 @@ export default function AdoptionChatScreen() {
             >
               {(messages.data?.messages.length ?? 0) === 0 ? (
                 <AppText color="textSecondary">
-                  Escreva a primeira mensagem. O telefone continua oculto, e a conversa fica só
-                  entre vocês dois.
+                  Escreva a primeira mensagem. A conversa fica só entre vocês dois, o telefone
+                  continua oculto e o app não recebe dinheiro.
                 </AppText>
               ) : (
                 (messages.data?.messages ?? []).map((item) => (
@@ -362,6 +362,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   composer: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
