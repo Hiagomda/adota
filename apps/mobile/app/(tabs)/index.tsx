@@ -12,10 +12,12 @@ import {
   AppText,
   Avatar,
   Badge,
+  Chip,
   EmptyState,
   ErrorState,
   IconButton,
   SearchBar,
+  SectionHeader,
   SkeletonCard,
   Touchable,
 } from '../../src/components/ui';
@@ -23,7 +25,7 @@ import { onFeedRefresh } from '../../src/feedRefresh';
 import { distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
-import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
+import { screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 
 const emptyPosts: Post[] = [];
@@ -62,31 +64,38 @@ const Stories = memo(function Stories({ posts, here }: { posts: Post[]; here: De
   const router = useRouter();
   if (posts.length === 0) return null;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.stories}
-    >
-      {posts.map((post) => {
-        const place = placeOf(post.approxLabel);
-        const label = placeDistance(post, here);
-        return (
-          <Touchable
-            key={post.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Resgate urgente em ${label}`}
-            pressedScale={0.94}
-            onPress={() => router.push(`/story/${post.id}`)}
-            style={styles.story}
-          >
-            <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="urgent" />
-            <AppText variant="caption" color="textSecondary" numberOfLines={2}>
-              {label}
-            </AppText>
-          </Touchable>
-        );
-      })}
-    </ScrollView>
+    <View>
+      <SectionHeader
+        title="Urgentes agora"
+        actionLabel="Ver no mapa"
+        onAction={() => router.navigate('/explore')}
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.stories}
+      >
+        {posts.map((post) => {
+          const place = placeOf(post.approxLabel);
+          const label = placeDistance(post, here);
+          return (
+            <Touchable
+              key={post.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Resgate urgente em ${label}`}
+              pressedScale={0.94}
+              onPress={() => router.push(`/story/${post.id}`)}
+              style={styles.story}
+            >
+              <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="urgent" />
+              <AppText variant="caption" color="textSecondary" numberOfLines={2}>
+                {label}
+              </AppText>
+            </Touchable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 });
 
@@ -273,26 +282,14 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
       >
-        {lenses.map((item) => {
-          const selected = lens === item.id;
-          return (
-            <Touchable
-              key={item.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={item.label}
-              onPress={() => setLens(item.id)}
-              style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.surface }]}
-            >
-              <AppText
-                variant="bodySmallStrong"
-                style={{ color: selected ? colors.onPrimary : colors.text }}
-              >
-                {item.label}
-              </AppText>
-            </Touchable>
-          );
-        })}
+        {lenses.map((item) => (
+          <Chip
+            key={item.id}
+            label={item.label}
+            selected={lens === item.id}
+            onPress={() => setLens(item.id)}
+          />
+        ))}
       </ScrollView>
       <Stories posts={storyPosts} here={here} />
     </View>
@@ -357,17 +354,12 @@ const styles = StyleSheet.create({
   mastRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroText: { flex: 1 },
   unread: { position: 'absolute', top: spacing.xs, right: spacing.xs },
+  // Vertical padding keeps the chips' 4 px hit slop inside the scroll view.
   chips: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.xs,
     gap: spacing.sm,
     alignItems: 'center',
-  },
-  chip: {
-    minHeight: size.touch,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
   },
   stories: {
     paddingHorizontal: spacing.lg,
