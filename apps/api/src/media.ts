@@ -1,7 +1,9 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -144,4 +146,32 @@ function signImgproxy(path: string, keyHex: string, saltHex: string): string {
   hmac.update(salt);
   hmac.update(path);
   return hmac.digest('base64url');
+}
+
+/** Every photo this person uploaded lives under uploads/<userId>/. Used by "Excluir conta". */
+export async function deleteUserUploads(
+  env: Env,
+  storage: S3Client,
+  userId: string,
+): Promise<number> {
+  let removed = 0;
+  let token: string | undefined;
+  do {
+    const page = await storage.send(
+      new ListObjectsV2Command({
+        Bucket: env.MINIO_BUCKET,
+        Prefix: `uploads/${userId}/`,
+        ContinuationToken: token,
+      }),
+    );
+    const keys = (page.Contents ?? []).flatMap((item) => (item.Key ? [{ Key: item.Key }] : []));
+    if (keys.length > 0) {
+      await storage.send(
+        new DeleteObjectsCommand({ Bucket: env.MINIO_BUCKET, Delete: { Objects: keys } }),
+      );
+      removed += keys.length;
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return removed;
 }

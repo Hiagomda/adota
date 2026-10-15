@@ -192,6 +192,69 @@ describe('posts', () => {
     expect(saved.rows[0]?.total).toBe(1);
   });
 
+  it('deletes what identifies or locates a person who deletes the account', async () => {
+    const goneId = await insertUser('gone@egua.local', 'gone');
+    const friendId = await insertUser('friend@egua.local', 'friend');
+    await pool.query(
+      `UPDATE users SET phone = '91999990000', base_location =
+         ST_SetSRID(ST_MakePoint(-48.48, -1.45), 4326)::geography WHERE id = $1`,
+      [goneId],
+    );
+    await pool.query(
+      `INSERT INTO fosters (user_id, capacity, species_accepted, sizes_accepted, location, radius_km, available)
+       VALUES ($1, 1, '{cat}', '{small}', ST_SetSRID(ST_MakePoint(-48.48, -1.45), 4326)::geography, 5, true)`,
+      [goneId],
+    );
+    await pool.query(`INSERT INTO follows (follower_id, followed_id) VALUES ($1, $2), ($2, $1)`, [
+      goneId,
+      friendId,
+    ]);
+    const created = await createAlert(app, 'gone@egua.local', 'Cachorro atrás da escola.');
+    const postId = created.json().id as string;
+    await app.inject({
+      method: 'POST',
+      url: `/posts/${postId}/comments`,
+      headers: { authorization: 'Bearer dev:gone@egua.local' },
+      payload: { body: 'Meu telefone é 91999990000.' },
+    });
+
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: '/me',
+      headers: { authorization: 'Bearer dev:gone@egua.local' },
+    });
+    expect(deleted.statusCode).toBe(204);
+
+    const user = await pool.query(
+      `SELECT name, phone, base_location, firebase_uid, deleted_at FROM users WHERE id = $1`,
+      [goneId],
+    );
+    expect(user.rows[0]).toMatchObject({
+      name: 'Conta excluída',
+      phone: null,
+      base_location: null,
+    });
+    expect(user.rows[0]?.firebase_uid).toBe(`deleted:${goneId}`);
+    expect(user.rows[0]?.deleted_at).not.toBeNull();
+    const leftovers = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM fosters WHERE user_id = $1) AS fosters,
+         (SELECT count(*)::int FROM follows WHERE follower_id = $1 OR followed_id = $1) AS follows,
+         (SELECT count(*)::int FROM posts WHERE author_id = $1 AND hidden = false) AS posts,
+         (SELECT count(*)::int FROM comments WHERE user_id = $1 AND body LIKE '%9199999%') AS comments`,
+      [goneId],
+    );
+    expect(leftovers.rows[0]).toEqual({ fosters: 0, follows: 0, posts: 0, comments: 0 });
+
+    // The old session no longer opens anything.
+    const after = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: { authorization: 'Bearer dev:gone@egua.local' },
+    });
+    expect(after.statusCode).toBe(401);
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');

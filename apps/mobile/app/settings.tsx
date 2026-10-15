@@ -362,7 +362,7 @@ export default function SettingsScreen() {
       <ConfirmDialog
         visible={confirmDelete}
         title="Excluir sua conta?"
-        message="Seu perfil é anonimizado e seu telefone, foto e avisos são apagados. Isso não pode ser desfeito."
+        message="Apagamos seu perfil, telefone, localização, fotos, Casa Amiga, conquistas e avisos. Seus resgates e comentários saem do app. Isso não pode ser desfeito."
         confirmLabel="Excluir minha conta"
         destructive
         loading={deleting}

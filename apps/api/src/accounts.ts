@@ -205,21 +205,79 @@ export async function updateProfile(
   }
 }
 
-export async function anonymizeUser(pool: Pool, userId: string): Promise<void> {
-  await pool.query(
-    `UPDATE users
-     SET name = 'Conta excluída',
-         handle = $2,
-         avatar_url = NULL,
-         phone = NULL,
-         whatsapp_opt_in = false,
-         fcm_tokens = '{}',
-         firebase_uid = $3,
-         deleted_at = now()
-     WHERE id = $1`,
-    [userId, `deleted_${userId.slice(0, 8)}`, `deleted:${userId}`],
-  );
+/**
+ * "Excluir conta" (LGPD). One transaction removes what identifies or locates the person:
+ * profile, home location, Casa Amiga, volunteer data, follows, likes, notifications, their
+ * rescues and comments (hidden) and the text of their chat messages. The row itself stays,
+ * renamed, so other people's rescue history and moderation reports keep their links.
+ * Returns the Firebase uid so the caller can also remove the sign-in account.
+ */
+export async function anonymizeUser(pool: Pool, userId: string): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const before = await client.query<{ firebase_uid: string }>(
+      `SELECT firebase_uid FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      [userId],
+    );
+    const firebaseUid = before.rows[0]?.firebase_uid ?? null;
+    await client.query(
+      `UPDATE users
+       SET name = 'Conta excluída',
+           handle = $2,
+           avatar_url = NULL,
+           phone = NULL,
+           whatsapp_opt_in = false,
+           fcm_tokens = '{}',
+           city = NULL,
+           base_location = NULL,
+           notifications_enabled = false,
+           firebase_uid = $3,
+           deleted_at = COALESCE(deleted_at, now())
+       WHERE id = $1`,
+      [userId, `deleted_${userId.replace(/-/g, '')}`, `deleted:${userId}`],
+    );
+    for (const table of personalTables) {
+      await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+    }
+    await client.query(`DELETE FROM follows WHERE follower_id = $1 OR followed_id = $1`, [userId]);
+    await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
+    await client.query(`UPDATE posts SET hidden = true WHERE author_id = $1`, [userId]);
+    await client.query(
+      `UPDATE comments SET hidden = true, body = 'Comentário apagado.' WHERE user_id = $1`,
+      [userId],
+    );
+    await client.query(
+      `UPDATE adoption_messages SET body = 'Mensagem apagada.' WHERE sender_id = $1`,
+      [userId],
+    );
+    await client.query('COMMIT');
+    return firebaseUid && !firebaseUid.startsWith('deleted:') ? firebaseUid : null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
+
+/** Rows that only describe this person. Fixed names, never user input. */
+const personalTables = [
+  'fosters',
+  'volunteer_profiles',
+  'user_xp_history',
+  'user_badges',
+  'post_follows',
+  'likes',
+  'saves',
+  'story_views',
+  'notifications',
+  'adoption_terms',
+  'verification_requests',
+  'staff_totp',
+  'staff_recovery_codes',
+  'admin_sessions',
+] as const;
 
 interface UserRow {
   id: string;

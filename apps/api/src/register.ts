@@ -41,7 +41,12 @@ import {
 import { ensureFirebaseApp, firebaseChecksRevocation, isTokenRejection } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
-import { publicMediaUrl, presignUploads, verifyUploadedImages } from './media.js';
+import {
+  deleteUserUploads,
+  publicMediaUrl,
+  presignUploads,
+  verifyUploadedImages,
+} from './media.js';
 import { assertOwnedMedia } from './mediaPolicy.js';
 import {
   enqueueRescueAlert,
@@ -155,7 +160,20 @@ export async function registerRoutes(
 
   app.delete('/me', async (request, reply) => {
     const user = requireUser(request.user);
-    await anonymizeUser(pool, user.id);
+    const firebaseUid = await anonymizeUser(pool, user.id);
+    // The account is already gone from the app. Photos and the sign-in record follow; a failure
+    // there is logged for a manual cleanup instead of failing the request.
+    await deleteUserUploads(env, storage, user.id).catch(
+      bestEffort(request, 'delete-account:photos'),
+    );
+    if (firebaseUid && firebaseChecksRevocation(env)) {
+      await ensureFirebaseApp(env);
+      const admin = await import('firebase-admin');
+      await admin
+        .auth()
+        .deleteUser(firebaseUid)
+        .catch(bestEffort(request, 'delete-account:firebase'));
+    }
     return reply.code(204).send();
   });
 
