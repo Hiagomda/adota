@@ -7,7 +7,7 @@ O site em `http://localhost:3000` lista alertas reais de Belém. O app Expo entr
 ## Requisitos
 
 - Node.js 22 ou mais recente (o CI usa Node 22)
-- pnpm 10
+- pnpm 9.15.9 (o pnpm 10 não instala este lockfile)
 - Docker
 
 ## Subir a infra
