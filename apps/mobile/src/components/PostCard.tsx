@@ -12,7 +12,7 @@ import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { animalHeadline } from '../animalLabels';
 import { distanceLabel } from '../format';
 import { useViewerLocation } from '../place/deviceLocation';
-import { motion, radius, spacing, useMotionDuration, useTheme } from '../theme';
+import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../theme';
 import type { Post } from '../types';
 import { AppText, Avatar, Badge, Button, Icon, PhotoScrim, StatusPill, Touchable } from './ui';
 
@@ -141,6 +141,8 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
               <Icon name="camera" size="xl" color={colors.textDisabled} />
             </Pressable>
           )}
+          {/* Both edges carry text over the photo: author on top, name and place at the bottom. */}
+          <PhotoScrim edge="top" stop={0.7} />
           <PhotoScrim stop={0.5} />
           <View style={styles.overlay} pointerEvents="box-none">
             <Touchable
@@ -200,21 +202,47 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
         <AppText numberOfLines={3} style={styles.description}>
           {post.description}
         </AppText>
-        <AppText variant="bodySmall" color="textSecondary" style={styles.counts}>
-          {likes} · {comments}
-          {post.liked ? ' · você curtiu' : ''}
-        </AppText>
-        {post.status === 'open' ? (
-          <View style={styles.help}>
+        <View style={styles.actions}>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel={`${post.liked ? 'Descurtir' : 'Curtir'}. ${likes}`}
+            accessibilityState={{ selected: post.liked }}
+            pressedScale={0.92}
+            onPress={() => onLike(post)}
+            style={styles.action}
+          >
+            <Icon
+              name="heart"
+              size="md"
+              color={post.liked ? colors.onSecondarySoft : colors.text}
+            />
+            <AppText
+              variant="bodySmallStrong"
+              style={{ color: post.liked ? colors.onSecondarySoft : colors.text }}
+            >
+              {post.counts.likes}
+            </AppText>
+          </Touchable>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel={`${comments}. Abrir resgate`}
+            pressedScale={0.92}
+            onPress={() => onOpen(post.id)}
+            style={styles.action}
+          >
+            <Icon name="message-circle" size="md" color={colors.text} />
+            <AppText variant="bodySmallStrong">{post.counts.comments}</AppText>
+          </Touchable>
+          <View style={styles.spacer} />
+          {post.status === 'open' ? (
             <Button
-              title="Eu vou ajudar"
+              title="Vou ajudar"
               icon="heart"
               variant="secondary"
-              fullWidth
               onPress={() => onOpen(post.id)}
             />
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </View>
     </Animated.View>
   );
@@ -256,6 +284,22 @@ const styles = StyleSheet.create({
   placeText: { flex: 1 },
   heart: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   description: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  counts: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs },
-  help: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingRight: spacing.lg,
+  },
+  // 44 px targets; the inner padding lines the first icon up with the text above.
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: size.touch,
+    minWidth: size.touch,
+    paddingHorizontal: spacing.sm,
+  },
+  spacer: { flex: 1 },
 });
