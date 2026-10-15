@@ -16,53 +16,28 @@ const extensions: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-type R2Env = Pick<Env, 'R2_ACCOUNT_ID' | 'R2_ACCESS_KEY_ID' | 'R2_SECRET_ACCESS_KEY' | 'R2_BUCKET'>;
-
-export function usesR2(env: R2Env): boolean {
-  return Boolean(
-    env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET,
-  );
-}
-
-/** S3 API host. R2 uses the account endpoint; MinIO stays on the internal address. */
-export function storageEndpoint(env: R2Env & Pick<Env, 'MINIO_ENDPOINT'>): string {
-  if (env.R2_ACCOUNT_ID && usesR2(env)) {
-    return `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-  }
-  return env.MINIO_ENDPOINT;
-}
-
-export function storageBucket(env: R2Env & Pick<Env, 'MINIO_BUCKET'>): string {
-  return usesR2(env) && env.R2_BUCKET ? env.R2_BUCKET : env.MINIO_BUCKET;
-}
-
 /** Address baked into the presigned upload URL. The API itself keeps using the internal endpoint. */
-export function uploadEndpoint(
-  env: R2Env & Pick<Env, 'MINIO_ENDPOINT' | 'MINIO_PUBLIC_ENDPOINT'>,
-): string {
-  if (usesR2(env)) return storageEndpoint(env);
+export function uploadEndpoint(env: Pick<Env, 'MINIO_ENDPOINT' | 'MINIO_PUBLIC_ENDPOINT'>): string {
   const pub = env.MINIO_PUBLIC_ENDPOINT?.replace(/\/$/, '');
   return pub && pub.length > 0 ? pub : env.MINIO_ENDPOINT;
 }
 
+/** Photos live in MinIO on the VPS. No CDN or outside bucket sits in front of them. */
 export function createStorage(env: Env): S3Client {
-  return storageClient(env, storageEndpoint(env));
+  return storageClient(env, env.MINIO_ENDPOINT);
 }
 
 function storageClient(env: Env, endpoint: string): S3Client {
-  const r2 = usesR2(env);
   return new S3Client({
-    region: r2 ? 'auto' : 'us-east-1',
+    region: 'us-east-1',
     endpoint,
-    // MinIO needs path-style. R2's S3 API uses the virtual host from the SDK default.
-    forcePathStyle: !r2,
-    // SDK 3.729+ signs a checksum R2 rejects on presigned PUT.
+    forcePathStyle: true,
+    // SDK 3.729+ adds a checksum to presigned PUTs that the phone's plain upload does not send.
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
     credentials: {
-      accessKeyId: r2 && env.R2_ACCESS_KEY_ID ? env.R2_ACCESS_KEY_ID : env.MINIO_ACCESS_KEY,
-      secretAccessKey:
-        r2 && env.R2_SECRET_ACCESS_KEY ? env.R2_SECRET_ACCESS_KEY : env.MINIO_SECRET_KEY,
+      accessKeyId: env.MINIO_ACCESS_KEY,
+      secretAccessKey: env.MINIO_SECRET_KEY,
     },
   });
 }
@@ -74,7 +49,7 @@ export async function presignUploads(
   files: { contentType: string; bytes: number }[],
 ): Promise<{ key: string; uploadUrl: string; contentType: string }[]> {
   const endpoint = uploadEndpoint(env);
-  const signer = endpoint === storageEndpoint(env) ? storage : storageClient(env, endpoint);
+  const signer = endpoint === env.MINIO_ENDPOINT ? storage : storageClient(env, endpoint);
   const uploads = [];
   for (const file of files) {
     const extension = extensions[file.contentType];
@@ -85,7 +60,7 @@ export async function presignUploads(
     const uploadUrl = await getSignedUrl(
       signer,
       new PutObjectCommand({
-        Bucket: storageBucket(env),
+        Bucket: env.MINIO_BUCKET,
         Key: key,
         ContentType: file.contentType,
         ContentLength: file.bytes,
@@ -118,7 +93,7 @@ async function verifyOneUpload(env: Env, storage: S3Client, url: string): Promis
   try {
     const object = await storage.send(
       new GetObjectCommand({
-        Bucket: storageBucket(env),
+        Bucket: env.MINIO_BUCKET,
         Key: url,
         Range: 'bytes=0-31',
       }),
@@ -139,7 +114,7 @@ async function verifyOneUpload(env: Env, storage: S3Client, url: string): Promis
   }
   if (!bytes || sniffImage(bytes) !== expected) {
     await storage
-      .send(new DeleteObjectCommand({ Bucket: storageBucket(env), Key: url }))
+      .send(new DeleteObjectCommand({ Bucket: env.MINIO_BUCKET, Key: url }))
       .catch(() => undefined);
     throw new HttpError(400, 'A foto enviada não é uma imagem válida.');
   }
@@ -153,7 +128,7 @@ export function publicMediaUrl(env: Env, stored: string, variant: 'full' | 'thum
   // re-encode of a live thumb went from 59 557 B JPEG to 48 156 B WebP.
   const frame = variant === 'thumb' ? 'rs:fill:480:600' : 'rs:fit:1080:1350';
   const processing = `${frame}/q:80/f:webp`;
-  const source = Buffer.from(`s3://${storageBucket(env)}/${stored}`).toString('base64url');
+  const source = Buffer.from(`s3://${env.MINIO_BUCKET}/${stored}`).toString('base64url');
   const path = `/${processing}/${source}`;
   const signature =
     env.IMGPROXY_KEY && env.IMGPROXY_SALT

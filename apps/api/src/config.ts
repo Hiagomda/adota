@@ -29,11 +29,6 @@ const envSchema = z.object({
   MINIO_ACCESS_KEY: z.string().min(1).default('patinha'),
   MINIO_SECRET_KEY: z.string().min(1).default('patinha-secret'),
   MINIO_BUCKET: z.string().min(1).default('patinha-media'),
-  // All four together switch photo storage from MinIO to Cloudflare R2. Leave them unset locally.
-  R2_ACCOUNT_ID: z.preprocess(blankAsUnset, z.string().min(1).optional()),
-  R2_ACCESS_KEY_ID: z.preprocess(blankAsUnset, z.string().min(1).optional()),
-  R2_SECRET_ACCESS_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
-  R2_BUCKET: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   IMGPROXY_URL: z.string().min(1).default('http://localhost:8080'),
   IMGPROXY_KEY: z.string().default(''),
   IMGPROXY_SALT: z.string().default(''),
@@ -51,18 +46,6 @@ export type Env = z.infer<typeof envSchema> & { authDevMode: boolean };
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = envSchema.parse(source);
-  const r2 = [
-    parsed.R2_ACCOUNT_ID,
-    parsed.R2_ACCESS_KEY_ID,
-    parsed.R2_SECRET_ACCESS_KEY,
-    parsed.R2_BUCKET,
-  ];
-  const r2Set = r2.filter((value) => value !== undefined).length;
-  if (r2Set !== 0 && r2Set !== 4) {
-    throw new Error(
-      'R2 needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET together.',
-    );
-  }
   const authDevMode =
     parsed.AUTH_DEV_MODE === 'true' ||
     (parsed.AUTH_DEV_MODE === undefined && parsed.NODE_ENV !== 'production');
