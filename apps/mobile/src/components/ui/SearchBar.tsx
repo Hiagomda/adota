@@ -22,14 +22,7 @@ export function SearchBar({
 }: SearchBarProps) {
   const { colors, shadows } = useTheme();
   return (
-    <View
-      style={[
-        styles.bar,
-        shadows.sm,
-        { backgroundColor: colors.surface },
-        style,
-      ]}
-    >
+    <View style={[styles.bar, shadows.sm, { backgroundColor: colors.surface }, style]}>
       <Icon name="search" color={colors.textSecondary} />
       <TextInput
         value={value}

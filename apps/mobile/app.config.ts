@@ -20,7 +20,10 @@ function gitCommit(): string | null {
   const fromEnv = process.env.EXPO_PUBLIC_GIT_SHA;
   if (fromEnv) return fromEnv.slice(0, 12);
   try {
-    return execSync('git rev-parse --short=12 HEAD', { cwd: appDir, stdio: ['ignore', 'pipe', 'ignore'] })
+    return execSync('git rev-parse --short=12 HEAD', {
+      cwd: appDir,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .toString()
       .trim();
   } catch {

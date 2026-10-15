@@ -20,7 +20,14 @@ const COMPACT_MASCOT = 88;
 const PATTERN_OPACITY = 0.1;
 
 /** Shared frame of the empty and error states: mascot, text and action on a textured panel. */
-export function StateLayout({ pose, title, body, action, compact = false, alert = false }: StateLayoutProps) {
+export function StateLayout({
+  pose,
+  title,
+  body,
+  action,
+  compact = false,
+  alert = false,
+}: StateLayoutProps) {
   const { colors, shadows } = useTheme();
   const duration = useMotionDuration();
   return (

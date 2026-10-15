@@ -20,7 +20,11 @@ const kinds: Record<string, { label: string; icon: IconName; tone: Tone }> = {
   vet: { label: 'Cuidados de saúde', icon: 'activity', tone: 'error' },
   castration: { label: 'Castração', icon: 'scissors', tone: 'info' },
 };
-const fallbackKind = { label: 'Pedido de ajuda', icon: 'heart' as IconName, tone: 'secondary' as Tone };
+const fallbackKind = {
+  label: 'Pedido de ajuda',
+  icon: 'heart' as IconName,
+  tone: 'secondary' as Tone,
+};
 
 const DAY_MS = 86_400_000;
 const MAX_STAGGER = 6;

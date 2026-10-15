@@ -58,13 +58,7 @@ function placeDistance(post: Post, here: DeviceFix | null): string {
   return away ? `${place} · ${away}` : place;
 }
 
-const Stories = memo(function Stories({
-  posts,
-  here,
-}: {
-  posts: Post[];
-  here: DeviceFix | null;
-}) {
+const Stories = memo(function Stories({ posts, here }: { posts: Post[]; here: DeviceFix | null }) {
   const router = useRouter();
   if (posts.length === 0) return null;
   return (
@@ -254,7 +248,9 @@ export default function HomeScreen() {
           <View>
             <IconButton
               icon="bell"
-              accessibilityLabel={unreadNotifications ? 'Notificações. Você tem novidades' : 'Notificações'}
+              accessibilityLabel={
+                unreadNotifications ? 'Notificações. Você tem novidades' : 'Notificações'
+              }
               onPress={() => router.push('/alerts')}
             />
             {unreadNotifications ? (

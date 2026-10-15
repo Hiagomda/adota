@@ -26,7 +26,11 @@ export function Avatar({ name, uri, size = 'md', ring, verified = false }: Avata
       style={[
         circle,
         ring
-          ? { borderWidth: 2, borderColor: ring === 'light' ? colors.onHero : colors.error, padding: 2 }
+          ? {
+              borderWidth: 2,
+              borderColor: ring === 'light' ? colors.onHero : colors.error,
+              padding: 2,
+            }
           : null,
         { width: dimension + (ring ? 8 : 0), height: dimension + (ring ? 8 : 0) },
       ]}

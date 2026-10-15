@@ -51,12 +51,7 @@ export function MarajoaraPattern({ color, opacity = 0.1 }: { color: string; opac
       <Defs>
         <MarajoaraPatternDef color={color} />
       </Defs>
-      <Rect
-        width="100%"
-        height="100%"
-        fill={`url(#${MARAJOARA_PATTERN_ID})`}
-        opacity={opacity}
-      />
+      <Rect width="100%" height="100%" fill={`url(#${MARAJOARA_PATTERN_ID})`} opacity={opacity} />
     </Svg>
   );
 }

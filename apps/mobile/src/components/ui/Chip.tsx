@@ -26,11 +26,7 @@ export function Chip({
   multiline = false,
 }: ChipProps) {
   const { colors } = useTheme();
-  const foreground = disabled
-    ? colors.textDisabled
-    : selected
-      ? colors.onPrimary
-      : colors.text;
+  const foreground = disabled ? colors.textDisabled : selected ? colors.onPrimary : colors.text;
   return (
     <Touchable
       accessibilityRole="button"

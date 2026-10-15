@@ -15,7 +15,10 @@ export function useOverlay(visible: boolean) {
 
   useEffect(() => {
     if (visible) {
-      progress.value = withTiming(1, { duration: duration(motion.base), easing: Easing.out(Easing.cubic) });
+      progress.value = withTiming(1, {
+        duration: duration(motion.base),
+        easing: Easing.out(Easing.cubic),
+      });
       return;
     }
     progress.value = withTiming(

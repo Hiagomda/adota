@@ -21,7 +21,10 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS saves_post_id_idx ON saves (post_id);
   });
 
   it('splits the feed migration into one concurrent index each', () => {
-    const sql = readFileSync(new URL('../db/migrations/0009_feed_indexes.sql', import.meta.url), 'utf8');
+    const sql = readFileSync(
+      new URL('../db/migrations/0009_feed_indexes.sql', import.meta.url),
+      'utf8',
+    );
     const statements = sqlStatements(sql);
     expect(statements).toHaveLength(5);
     expect(statements.every((part) => part.includes('CREATE INDEX CONCURRENTLY'))).toBe(true);

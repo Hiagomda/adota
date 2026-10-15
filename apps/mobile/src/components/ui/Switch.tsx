@@ -12,7 +12,13 @@ export interface SwitchProps {
 }
 
 /** A labelled row: the whole row toggles, the native switch is only the visual. */
-export function Switch({ label, value, onValueChange, description, disabled = false }: SwitchProps) {
+export function Switch({
+  label,
+  value,
+  onValueChange,
+  description,
+  disabled = false,
+}: SwitchProps) {
   const { colors } = useTheme();
   return (
     <Touchable

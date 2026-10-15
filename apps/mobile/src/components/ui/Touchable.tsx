@@ -67,7 +67,9 @@ export function Touchable({
         );
       } else if (haptic) {
         void Haptics.impactAsync(
-          haptic === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
+          haptic === 'medium'
+            ? Haptics.ImpactFeedbackStyle.Medium
+            : Haptics.ImpactFeedbackStyle.Light,
         ).catch(() => undefined);
       }
       onPress?.(event);

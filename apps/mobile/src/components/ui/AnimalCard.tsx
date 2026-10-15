@@ -121,7 +121,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  info: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: spacing.xs },
+  info: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    gap: spacing.xs,
+  },
   place: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   placeText: { flex: 1 },
 });

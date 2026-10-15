@@ -18,11 +18,15 @@ export function Badge(props: BadgeProps) {
       <View
         accessible
         accessibilityLabel={props.accessibilityLabel}
-        style={[styles.dot, { backgroundColor: tone === 'neutral' ? colors.secondary : foreground }]}
+        style={[
+          styles.dot,
+          { backgroundColor: tone === 'neutral' ? colors.secondary : foreground },
+        ]}
       />
     );
   }
-  const text = props.kind === 'count' ? (props.count > 99 ? '99+' : String(props.count)) : props.label;
+  const text =
+    props.kind === 'count' ? (props.count > 99 ? '99+' : String(props.count)) : props.label;
   return (
     <View style={[styles.pill, { backgroundColor: background }]}>
       <AppText variant="caption" style={{ color: foreground }}>

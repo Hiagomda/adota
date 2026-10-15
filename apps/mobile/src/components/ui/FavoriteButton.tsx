@@ -22,10 +22,7 @@ export function FavoriteButton({ active, onPress, accessibilityLabel }: Favorite
       haptic={active ? false : 'light'}
       pressedScale={0.9}
       onPress={onPress}
-      style={[
-        styles.base,
-        { backgroundColor: active ? colors.secondary : colors.mediaScrim },
-      ]}
+      style={[styles.base, { backgroundColor: active ? colors.secondary : colors.mediaScrim }]}
     >
       <Animated.View
         key={active ? 'on' : 'off'}

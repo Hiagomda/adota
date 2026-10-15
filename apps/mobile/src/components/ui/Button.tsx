@@ -38,7 +38,8 @@ function resolveColors(
 ): ButtonColors {
   if (disabled) {
     return {
-      background: variant === 'ghost' || variant === 'outline' ? 'transparent' : colors.surfaceMuted,
+      background:
+        variant === 'ghost' || variant === 'outline' ? 'transparent' : colors.surfaceMuted,
       foreground: colors.textDisabled,
       border: variant === 'outline' ? colors.border : 'transparent',
     };
@@ -102,7 +103,11 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
-      haptic={variant === 'primary' || variant === 'secondary' || variant === 'destructive' ? 'light' : false}
+      haptic={
+        variant === 'primary' || variant === 'secondary' || variant === 'destructive'
+          ? 'light'
+          : false
+      }
       onPress={onPress}
       style={({ pressed }) => {
         const palette = resolveColors(colors, variant, pressed, disabled);
@@ -149,5 +154,10 @@ const styles = StyleSheet.create({
   medium: { minHeight: size.control },
   large: { minHeight: size.control + spacing.sm, paddingHorizontal: spacing.xxl },
   full: { alignSelf: 'stretch' },
-  content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
 });

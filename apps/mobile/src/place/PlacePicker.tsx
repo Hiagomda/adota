@@ -51,7 +51,10 @@ export function PlacePicker({
   return (
     <View
       onLayout={(event) => {
-        const next = Math.max(210, Math.min(260, Math.round(event.nativeEvent.layout.width * 0.68)));
+        const next = Math.max(
+          210,
+          Math.min(260, Math.round(event.nativeEvent.layout.width * 0.68)),
+        );
         setMapHeight((current) => (current === next ? current : next));
       }}
       style={[styles.frame, { height: mapHeight }]}
@@ -91,7 +94,12 @@ export function PlacePicker({
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer
             id="service-outline-line"
-            style={{ lineColor: mapColors.areaOutline, lineWidth: 3, lineJoin: 'round', lineCap: 'round' }}
+            style={{
+              lineColor: mapColors.areaOutline,
+              lineWidth: 3,
+              lineJoin: 'round',
+              lineCap: 'round',
+            }}
           />
         </ShapeSource>
         {circle ? (

@@ -34,7 +34,9 @@ export function AppModal({ visible, onClose, title, children, dismissable = true
       onRequestClose={dismissable ? onClose : undefined}
     >
       <View style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }, backdrop]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }, backdrop]}
+        >
           {dismissable ? (
             <Pressable
               accessibilityRole="button"

@@ -27,11 +27,7 @@ export function Input({
 }: InputProps) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
-  const borderColor = error
-    ? colors.error
-    : focused
-      ? colors.primary
-      : colors.border;
+  const borderColor = error ? colors.error : focused ? colors.primary : colors.border;
   return (
     <View style={styles.wrapper}>
       <AppText variant="caption" color="textSecondary">

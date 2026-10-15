@@ -1,17 +1,18 @@
 import { Image } from 'expo-image';
 import { memo, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { animalHeadline } from '../animalLabels';
 import { distanceLabel } from '../format';
 import { useViewerLocation } from '../place/deviceLocation';
-import {
-  motion,
-  radius,
-  spacing,
-  useMotionDuration,
-  useTheme,
-} from '../theme';
+import { motion, radius, spacing, useMotionDuration, useTheme } from '../theme';
 import type { Post } from '../types';
 import { AppText, Avatar, Badge, Button, Icon, PhotoScrim, StatusPill, Touchable } from './ui';
 
@@ -155,7 +156,11 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
                 size="sm"
                 verified={post.author.verified}
               />
-              <AppText variant="bodySmallStrong" numberOfLines={1} style={{ color: colors.onMedia, flex: 1 }}>
+              <AppText
+                variant="bodySmallStrong"
+                numberOfLines={1}
+                style={{ color: colors.onMedia, flex: 1 }}
+              >
                 {post.author.name}
               </AppText>
             </Touchable>
@@ -240,7 +245,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  caption: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: spacing.xs },
+  caption: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    gap: spacing.xs,
+  },
   place: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   placeText: { flex: 1 },
   heart: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },

@@ -25,7 +25,9 @@ export function ErrorState({
       body={body}
       compact={compact}
       alert
-      action={onRetry ? <Button title={retryLabel} icon="refresh-cw" onPress={onRetry} /> : undefined}
+      action={
+        onRetry ? <Button title={retryLabel} icon="refresh-cw" onPress={onRetry} /> : undefined
+      }
     />
   );
 }
