@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
   type NativeScrollEvent,
@@ -81,7 +82,7 @@ const SHARE_BUTTON = size.control + spacing.sm;
 export default function PostScreen() {
   useLightStatusBar();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors, shadows } = useTheme();
+  const { colors, dark, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
@@ -89,6 +90,9 @@ export default function PostScreen() {
   const user = useSession((state) => state.user);
   const userId = user?.id;
   const client = useQueryClient();
+  const focused = useIsFocused();
+  // Once the photo scrolls away the floating buttons would sit on top of the text.
+  const [solidBar, setSolidBar] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -103,6 +107,11 @@ export default function PostScreen() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const { width } = useWindowDimensions();
   const galleryHeight = Math.min(Math.round(width * 1.25), size.galleryMax);
+  const solidBarAt = galleryHeight - size.sheetOverlap - insets.top - size.touch;
+  useEffect(() => {
+    // useLightStatusBar keeps light icons for the photo; over the solid bar they follow the theme.
+    if (focused) setStatusBarStyle(solidBar && !dark ? 'dark' : 'light');
+  }, [dark, focused, solidBar]);
   const footerPad = Math.max(insets.bottom, spacing.lg);
   const post = useQuery({
     queryKey: ['post', id, token],
@@ -297,10 +306,19 @@ export default function PostScreen() {
     });
   }
 
+  const away = distanceLabel(here, item.location);
+  const placeLine = away ? `${item.approxLabel} · ${away}` : item.approxLabel;
+  const placePrecision = item.location.exact ? 'Ponto exato' : 'Ponto aproximado, cerca de 500 m';
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={(event) => {
+          const next = event.nativeEvent.contentOffset.y > solidBarAt;
+          setSolidBar((current) => (current === next ? current : next));
+        }}
         contentContainerStyle={{ paddingBottom: footerHeight + spacing.xl }}
       >
         <View
@@ -363,30 +381,36 @@ export default function PostScreen() {
                 <StatusPill status={item.status} />
                 <StatusPill urgency={item.urgency} />
               </View>
-              <View style={styles.place}>
-                <Icon name="map-pin" size="sm" color={colors.textSecondary} />
-                <AppText variant="bodySmall" color="textSecondary" style={styles.placeText}>
-                  {item.approxLabel}
-                  {distanceLabel(here, item.location)
-                    ? ` · ${distanceLabel(here, item.location)} · `
-                    : ' · '}
-                  {item.location.exact ? 'ponto exato' : 'ponto aproximado, cerca de 500 m'}
+            </View>
+
+            {/* One coral action per screen: the place is a quiet row, the footer keeps the CTA. */}
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel={`Ver no mapa. ${placeLine}. ${placePrecision}`}
+              pressedScale={0.98}
+              onPress={() => {
+                requestMapFocus({
+                  postId: item.id,
+                  latitude: item.location.latitude,
+                  longitude: item.location.longitude,
+                });
+                router.navigate('/explore');
+              }}
+              style={[styles.place, { backgroundColor: colors.surfaceMuted }]}
+            >
+              <View style={[styles.placeIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="map-pin" size="md" color={colors.onPrimarySoft} />
+              </View>
+              <View style={styles.placeText}>
+                <AppText variant="bodySmallStrong" numberOfLines={2}>
+                  {placeLine}
+                </AppText>
+                <AppText variant="caption" color="textSecondary">
+                  {placePrecision}
                 </AppText>
               </View>
-              <Button
-                title="Mostrar no mapa"
-                icon="map"
-                variant="secondary"
-                onPress={() => {
-                  requestMapFocus({
-                    postId: item.id,
-                    latitude: item.location.latitude,
-                    longitude: item.location.longitude,
-                  });
-                  router.navigate('/explore');
-                }}
-              />
-            </View>
+              <Icon name="chevron-right" size="md" color={colors.primary} />
+            </Touchable>
 
             <View style={styles.chips}>
               <InfoChip label={speciesName} icon="heart" tone="primary" />
@@ -709,13 +733,25 @@ export default function PostScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.topBar, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
+      <View
+        style={[
+          styles.topBar,
+          { paddingTop: insets.top + spacing.sm },
+          solidBar ? [shadows.sm, { backgroundColor: colors.surfaceRaised }] : null,
+        ]}
+        pointerEvents="box-none"
+      >
         <IconButton
           icon="arrow-left"
-          variant="glass"
+          variant={solidBar ? 'ghost' : 'glass'}
           accessibilityLabel="Voltar"
           onPress={() => router.back()}
         />
+        {solidBar ? (
+          <AppText variant="h3" numberOfLines={1} style={styles.topTitle}>
+            {animalHeadline(item.animal)}
+          </AppText>
+        ) : null}
         <FavoriteButton
           active={item.liked}
           accessibilityLabel={`${item.liked ? 'Descurtir' : 'Curtir'}. ${item.counts.likes} curtidas`}
@@ -966,8 +1002,22 @@ const styles = StyleSheet.create({
   column: { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center', gap: spacing.xl },
   titleBlock: { gap: spacing.sm },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  place: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  placeText: { flex: 1 },
+  place: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: size.touch,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+  },
+  placeIcon: {
+    width: size.touch,
+    height: size.touch,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeText: { flex: 1, gap: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   section: { gap: spacing.md },
   author: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -982,12 +1032,17 @@ const styles = StyleSheet.create({
   secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   topBar: {
     position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.md,
   },
+  topTitle: { flex: 1 },
   note: { position: 'absolute', left: spacing.lg, right: spacing.lg, borderRadius: radius.md },
   footer: {
     position: 'absolute',
