@@ -255,6 +255,27 @@ describe('posts', () => {
     expect(after.statusCode).toBe(401);
   });
 
+  it('limits writes per account, not per shared carrier IP', async () => {
+    await insertUser('author@egua.local', 'author');
+    await insertUser('busy@egua.local', 'busy');
+    await insertUser('neighbour@egua.local', 'neighbour');
+    const created = await createAlert(app, 'author@egua.local', 'Cachorro na parada de ônibus.');
+    const postId = created.json().id as string;
+    const save = (email: string) =>
+      app.inject({
+        method: 'POST',
+        url: `/posts/${postId}/save`,
+        headers: { authorization: `Bearer dev:${email}` },
+      });
+
+    for (let index = 0; index < 30; index += 1) {
+      expect((await save('busy@egua.local')).statusCode).toBe(200);
+    }
+    expect((await save('busy@egua.local')).statusCode).toBe(429);
+    // Same IP in this test, different person: still allowed.
+    expect((await save('neighbour@egua.local')).statusCode).toBe(200);
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');

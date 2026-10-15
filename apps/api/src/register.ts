@@ -87,6 +87,28 @@ const verificationSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+/**
+ * Write limits count per account, after the session is resolved: many phones in Belém share one
+ * carrier IP (CGNAT), so an IP count would block neighbours. Without a session it falls back to
+ * the IP. The global per-IP limit in app.ts still runs first as a flood guard.
+ */
+function perAccount(max: number) {
+  return {
+    config: {
+      rateLimit: {
+        max,
+        timeWindow: '1 minute',
+        hook: 'preHandler' as const,
+        keyGenerator: (request: FastifyRequest) =>
+          request.user ? `user:${request.user.id}` : `ip:${request.ip}`,
+      },
+    },
+  };
+}
+const writeLimit = perAccount(30);
+/** Actions that change XP, verification or the account itself. */
+const strictLimit = perAccount(5);
+
 export async function registerRoutes(
   app: FastifyInstance,
   deps: { env: Env; pool: Pool; queue: RescueQueue; storage: S3Client },
@@ -123,17 +145,17 @@ export async function registerRoutes(
     return volunteerStatus(pool, user.id);
   });
 
-  app.put('/volunteers/settings', async (request) => {
+  app.put('/volunteers/settings', writeLimit, async (request) => {
     const user = requireUser(request.user);
     return saveVolunteerSettings(pool, user.id, parse(volunteerSettingsSchema, request.body));
   });
 
-  app.post('/volunteers/actions/claim-xp', async (request) => {
+  app.post('/volunteers/actions/claim-xp', strictLimit, async (request) => {
     const user = requireUser(request.user);
     return claimVolunteerXp(pool, user.id, parse(claimVolunteerXpSchema, request.body));
   });
 
-  app.patch('/me', async (request) => {
+  app.patch('/me', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const patch = parse(updateMeSchema, request.body);
     if (patch.avatarUrl?.startsWith('uploads/')) {
@@ -146,7 +168,7 @@ export async function registerRoutes(
     return publicUser(fresh);
   });
 
-  app.post('/me/fcm-token', async (request) => {
+  app.post('/me/fcm-token', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const { token } = parse(z.object({ token: z.string().min(8).max(512) }), request.body);
     await pool.query(
@@ -158,7 +180,7 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.delete('/me', async (request, reply) => {
+  app.delete('/me', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const firebaseUid = await anonymizeUser(pool, user.id);
     // The account is already gone from the app. Photos and the sign-in record follow; a failure
@@ -177,7 +199,7 @@ export async function registerRoutes(
     return reply.code(204).send();
   });
 
-  app.post('/me/verification', async (request, reply) => {
+  app.post('/me/verification', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const body = parse(verificationSchema, request.body);
     await pool.query(
@@ -199,7 +221,7 @@ export async function registerRoutes(
     };
   });
 
-  app.post('/users/:id/follow', async (request) => {
+  app.post('/users/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode seguir a própria conta.');
@@ -210,7 +232,7 @@ export async function registerRoutes(
     return { following: true };
   });
 
-  app.delete('/users/:id/follow', async (request) => {
+  app.delete('/users/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM follows WHERE follower_id = $1 AND followed_id = $2`, [
@@ -220,7 +242,7 @@ export async function registerRoutes(
     return { following: false };
   });
 
-  app.post('/users/:id/block', async (request) => {
+  app.post('/users/:id/block', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode bloquear a própria conta.');
@@ -235,7 +257,7 @@ export async function registerRoutes(
     return { blocked: true };
   });
 
-  app.delete('/users/:id/block', async (request) => {
+  app.delete('/users/:id/block', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, [user.id, id]);
@@ -344,7 +366,7 @@ export async function registerRoutes(
     },
   );
 
-  app.patch('/posts/:id', async (request) => {
+  app.patch('/posts/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(updatePostSchema, request.body);
@@ -354,7 +376,7 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.delete('/posts/:id', async (request) => {
+  app.delete('/posts/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await deletePost(pool, id, user);
@@ -382,7 +404,7 @@ export async function registerRoutes(
     },
   );
 
-  app.patch('/posts/:id/status', async (request) => {
+  app.patch('/posts/:id/status', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ status: animalStatusSchema }), request.body);
@@ -518,10 +540,10 @@ export async function registerRoutes(
     },
   );
 
-  app.post('/posts/:id/like', async (request) => toggle(pool, 'likes', request));
-  app.post('/posts/:id/save', async (request) => toggle(pool, 'saves', request));
+  app.post('/posts/:id/like', writeLimit, async (request) => toggle(pool, 'likes', request));
+  app.post('/posts/:id/save', writeLimit, async (request) => toggle(pool, 'saves', request));
 
-  app.post('/posts/:id/follow', async (request) => {
+  app.post('/posts/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(
@@ -531,14 +553,14 @@ export async function registerRoutes(
     return { following: true };
   });
 
-  app.delete('/posts/:id/follow', async (request) => {
+  app.delete('/posts/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM post_follows WHERE user_id = $1 AND post_id = $2`, [user.id, id]);
     return { following: false };
   });
 
-  app.post('/posts/:id/story-view', async (request) => {
+  app.post('/posts/:id/story-view', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(
@@ -596,7 +618,7 @@ export async function registerRoutes(
     };
   });
 
-  app.post('/fosters', async (request) => {
+  app.post('/fosters', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const body = parse(fosterSchema, request.body);
     await pool.query(
@@ -622,7 +644,7 @@ export async function registerRoutes(
     return { available: true };
   });
 
-  app.post('/posts/:id/adoption-term', async (request, reply) => {
+  app.post('/posts/:id/adoption-term', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(adoptionSchema, request.body);
