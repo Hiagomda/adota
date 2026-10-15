@@ -23,7 +23,7 @@ pnpm lint                         # prettier --check + eslint + expo lint + next
 pnpm test                         # vitest (api, shared) + node:test (mobile)
 ```
 
-- Os testes de integração da API (`*.integration.test.ts`) precisam do Docker rodando. Sem Docker eles falham com `ECONNREFUSED 5435`; os de unidade passam.
+- Os testes de integração da API (`*.integration.test.ts`) precisam do Docker rodando (`docker compose up -d postgres redis minio`). Sem Docker eles falham com `ECONNREFUSED 5435`; os de unidade passam. Eles dão TRUNCATE no banco local `patinha`: rode `pnpm db:seed` depois se precisar dos dados de exemplo.
 - Os testes do mobile são arquivos `*.test.ts` listados no script `test` de `apps/mobile/package.json`. Ao criar um, inclua-o lá. Eles rodam em Node puro, então só testam módulos sem import de React Native ou Expo.
 - Type-check do mobile com erro em rota (`/chat/...` não é atribuível): o `.expo/types/router.d.ts` local está velho. Ele é gerado ao rodar `npx expo start`.
 - Rode o Prettier pela raiz. Dentro de `apps/mobile` ele não lê o `.prettierignore` e reformata `serviceArea.ts` (polígono de Belém) em milhares de linhas.
@@ -74,7 +74,9 @@ download/                     página de download servida pelo container `downlo
 - Autorização e validação sempre no servidor (`requireUser`, `requireRole`, schemas Zod). Nenhum segredo no repositório.
 - Banco só por migração nova e reversível (arquivo em `db/migrations` + reverso em `db/down`), com aviso de backup antes.
 - Nada de `catch {}` vazio. Erro esperado: trate e explique. Erro de "melhor esforço" (push, geocode): registre no log. Na API, falha do servidor nunca vira 401, porque o app desloga em 401.
-- Privacidade: feed e API pública devolvem localização aproximada (grade de ~500 m). A exata vai só para o autor, a equipe e quem respondeu "vou ajudar". Telefone nunca aparece no feed.
+- Rate limit: o global (600/min por IP) roda antes da autenticação. Rota de escrita nova usa `writeLimit` ou `strictLimit` de `register.ts`, que contam por conta, porque muitos celulares dividem o mesmo IP da operadora.
+- Excluir conta (`anonymizeUser`): tabela nova com dado pessoal entra em `personalTables` ou ganha tratamento ali.
+- Privacidade: feed e API pública devolvem localização aproximada (grade de ~500 m). Casa Amiga é casa de alguém: só autor, equipe e quem vai ajudar veem a lista, em km inteiros. A exata vai só para o autor, a equipe e quem respondeu "vou ajudar". Telefone nunca aparece no feed.
 - Proibido vender animais. PIX só aparece em pedido de ajuda de perfil verificado.
 - Antes de instalar biblioteca, diga qual, por quê e o impacto no tamanho. Para pacotes Expo use `pnpm expo install` dentro de `apps/mobile`.
 - Código, tabelas e commits em inglês (Conventional Commits). Textos da interface em português do Brasil.
