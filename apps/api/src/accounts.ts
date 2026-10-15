@@ -3,6 +3,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { updateMeSchema } from '@patinha/shared';
 import type { z } from 'zod';
+import type { Env } from './config.js';
 import { users } from './db/schema.js';
 import { HttpError } from './http.js';
 import { rowsOf, type SessionUser } from './session.js';
@@ -11,11 +12,18 @@ type Database = NodePgDatabase;
 
 type ProfilePatch = z.infer<typeof updateMeSchema>;
 
-/** The account Hiago uses on the phone. The dev login is a different row. */
-const ownerEmail = 'hiago.yan@hotmail.com';
-
-export function isOwnerEmail(email: string | undefined): boolean {
-  return email?.trim().toLowerCase() === ownerEmail;
+/**
+ * The owner accounts come from OWNER_EMAILS. Firebase lets anyone sign up with any address,
+ * so the address only counts once Firebase has verified it.
+ */
+export function isOwnerToken(
+  env: Pick<Env, 'OWNER_EMAILS'>,
+  token: { email?: string; email_verified?: boolean },
+): boolean {
+  if (token.email_verified !== true || !token.email) return false;
+  const email = token.email.trim().toLowerCase();
+  const owners = (env.OWNER_EMAILS ?? '').split(',').map((item) => item.trim().toLowerCase());
+  return owners.includes(email);
 }
 
 /** The installed app treats role `admin` as the team. Do not demote a superadmin. */

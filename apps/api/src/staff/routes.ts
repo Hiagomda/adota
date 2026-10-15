@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
-import { findUserByFirebaseUid, grantOwnerRole, isOwnerEmail } from '../accounts.js';
+import { findUserByFirebaseUid, grantOwnerRole, isOwnerToken } from '../accounts.js';
 import type { Env } from '../config.js';
 import { ensureFirebaseApp, firebaseChecksRevocation } from '../firebaseAdmin.js';
 import { HttpError } from '../http.js';
@@ -291,7 +291,7 @@ async function identityFromBody(env: Env, pool: Pool, body: z.infer<typeof sessi
   const decoded = await admin
     .auth()
     .verifyIdToken(body.firebaseToken, firebaseChecksRevocation(env));
-  if (isOwnerEmail(decoded.email)) await grantOwnerRole(pool, decoded.uid);
+  if (isOwnerToken(env, decoded)) await grantOwnerRole(pool, decoded.uid);
   return findUserByFirebaseUid(pool, decoded.uid);
 }
 

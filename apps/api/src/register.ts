@@ -21,7 +21,7 @@ import {
   createDevUser,
   findUserByFirebaseUid,
   grantOwnerRole,
-  isOwnerEmail,
+  isOwnerToken,
   profileByHandle,
   updateProfile,
 } from './accounts.js';
@@ -788,7 +788,7 @@ async function resolveUser(
     await ensureFirebaseApp(env);
     const admin = await import('firebase-admin');
     const decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
-    const owner = isOwnerEmail(decoded.email);
+    const owner = isOwnerToken(env, decoded);
     if (owner) await grantOwnerRole(pool, decoded.uid);
     const existing = await findUserByFirebaseUid(pool, decoded.uid);
     if (existing) return existing;

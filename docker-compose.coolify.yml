@@ -83,6 +83,7 @@ services:
       REDIS_URL: redis://redis:6379
       AUTH_DEV_MODE: 'false'
       FIREBASE_PROJECT_ID: egua-adota
+      OWNER_EMAILS: hiago.yan@hotmail.com
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}

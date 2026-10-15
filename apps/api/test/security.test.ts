@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isOwnerToken } from '../src/accounts.js';
 import { buildApp } from '../src/app.js';
 import { requireRole, requireUser } from '../src/authz.js';
 import type { Env } from '../src/config.js';
@@ -74,6 +75,17 @@ describe('authorization', () => {
   it('refuses a role field on the profile update', () => {
     const parsed = updateMeSchema.safeParse({ name: 'Ana', role: 'admin' });
     expect(parsed.success).toBe(false);
+  });
+
+  it('makes the owner admin only after Firebase verified the address', () => {
+    const owners = { OWNER_EMAILS: 'dono@example.com, outra@example.com' };
+    expect(isOwnerToken(owners, { email: 'Dono@Example.com', email_verified: true })).toBe(true);
+    expect(isOwnerToken(owners, { email: 'outra@example.com', email_verified: true })).toBe(true);
+    // Anyone can create an e-mail account with the owner's address before verifying it.
+    expect(isOwnerToken(owners, { email: 'dono@example.com', email_verified: false })).toBe(false);
+    expect(isOwnerToken(owners, { email: 'dono@example.com' })).toBe(false);
+    expect(isOwnerToken(owners, { email: 'alguem@example.com', email_verified: true })).toBe(false);
+    expect(isOwnerToken({}, { email: 'dono@example.com', email_verified: true })).toBe(false);
   });
 });
 
