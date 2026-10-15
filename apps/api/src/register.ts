@@ -38,7 +38,7 @@ import {
   listPosts,
   updatePost,
 } from './feed.js';
-import { ensureFirebaseApp, firebaseChecksRevocation } from './firebaseAdmin.js';
+import { ensureFirebaseApp, firebaseChecksRevocation, isTokenRejection } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
 import { publicMediaUrl, presignUploads, verifyUploadedImages } from './media.js';
@@ -817,9 +817,8 @@ async function resolveUser(
   try {
     decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
   } catch (error) {
-    const code = firebaseAuthCode(error);
-    if (!code) throw error;
-    log.info({ code }, 'auth: Firebase rejected the token');
+    if (!isTokenRejection(error)) throw error;
+    log.info({ code: (error as { code: string }).code }, 'auth: Firebase rejected the token');
     return null;
   }
   const owner = isOwnerToken(env, decoded);
@@ -833,13 +832,6 @@ async function resolveUser(
     role: owner ? 'admin' : 'user',
   });
   return findUserByFirebaseUid(pool, decoded.uid);
-}
-
-/** `auth/id-token-expired`, `auth/argument-error`… Errors without that prefix are not about the token. */
-function firebaseAuthCode(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
-  const code = error.code;
-  return typeof code === 'string' && code.startsWith('auth/') ? code : null;
 }
 
 declare module 'fastify' {

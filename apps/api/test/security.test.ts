@@ -5,7 +5,7 @@ import { requireRole, requireUser } from '../src/authz.js';
 import type { Env } from '../src/config.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
-import { firebaseChecksRevocation } from '../src/firebaseAdmin.js';
+import { firebaseChecksRevocation, isTokenRejection } from '../src/firebaseAdmin.js';
 import { extensionKind, ownedMediaKey, sniffImage } from '../src/mediaPolicy.js';
 import { assertHelpRequest, publicPixKey, publicPlace } from '../src/privacy.js';
 import type { SessionUser } from '../src/session.js';
@@ -75,6 +75,25 @@ describe('authorization', () => {
   it('refuses a role field on the profile update', () => {
     const parsed = updateMeSchema.safeParse({ name: 'Ana', role: 'admin' });
     expect(parsed.success).toBe(false);
+  });
+
+  it('signs out only when Firebase rejects the token itself', () => {
+    const fail = (code: string, message = '') => Object.assign(new Error(message), { code });
+    expect(isTokenRejection(fail('auth/id-token-expired'))).toBe(true);
+    expect(isTokenRejection(fail('auth/id-token-revoked'))).toBe(true);
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'Firebase ID token has invalid signature.')),
+    ).toBe(true);
+    // Google's keys could not be downloaded: a server problem, the session stays.
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'Error fetching public keys for Google certs')),
+    ).toBe(false);
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'getaddrinfo EAI_AGAIN googleapis.com')),
+    ).toBe(false);
+    expect(isTokenRejection(fail('auth/internal-error'))).toBe(false);
+    expect(isTokenRejection(fail('ECONNREFUSED'))).toBe(false);
+    expect(isTokenRejection(new Error('database down'))).toBe(false);
   });
 
   it('makes the owner admin only after Firebase verified the address', () => {
