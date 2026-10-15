@@ -65,7 +65,7 @@ download/                     página de download servida pelo container `downlo
 - Não existe carona solidária ou transporte. Ainda há resíduos no app (selo "Piloto do Bem", estado `transport`) e no backend (coluna `is_transport_available`, `action_type 'transport'`, `helpKind 'transport'`, selo `good_pilot`). O app remove os visuais; os dados do backend ficam até o dono limpar.
 - Sem Cloudflare, CDN, proxy ou R2. As fotos ficam no MinIO da VPS e são servidas pelo imgproxy. Variáveis `R2_*` que sobraram são ignoradas.
 - Identidade "calor de casa paraense": turquesa `#1F7A7A`, coral `#F26B4E`, caramelo `#D98A3D`, fundo creme `#FFF8EE`, Baloo 2 nos títulos e Nunito no corpo. Mascote: vira-lata caramelo com coleira turquesa e plaquinha de patinha coral. Detalhes de Belém (marajoara sutil, fitinha do Círio, mangueira). Use sempre os tokens de `src/theme`, nunca hex solto. Branco sobre coral não passa contraste, então superfície coral usa texto escuro.
-- Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho. Existe "Minha localização" e deve existir "Buscar nesta área".
+- Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho. Existem "Minha localização" e "Buscar nesta área": movimentos do app (abertura, GPS, "Ver no mapa") carregam sozinhos; gesto da pessoa só mostra o botão (`onCommitBounds` recebe `fromUser`).
 - Admin do dono: o e-mail em `OWNER_EMAILS` vira admin só com `email_verified` do Firebase.
 
 ## Regras
@@ -88,4 +88,5 @@ download/                     página de download servida pelo container `downlo
 - `usesCleartextTraffic` está ligado porque API, MinIO e imgproxy são HTTP. O token Firebase trafega sem TLS até haver domínio com HTTPS.
 - O Traefik do Coolify responde "404 page not found" ou "no available server" quando o container está unhealthy ou parado, não só quando a rota não existe.
 - Typed routes: rotas novas só existem para o `tsc` depois de regenerar `.expo/types`.
+- Prévia web (`npx expo start --web`, com a API local e `EXPO_PUBLIC_API_URL=http://localhost:3010`): módulo nativo importado direto derruba o bundle inteiro, então ele precisa de variante `.web.ts(x)` (ex.: `googleNative.web.ts`, `MapCanvas.web.tsx`). No web não existe `Image.resolveAssetSource`. Login de teste: `sessionStorage["egua-token"] = "dev:<email do seed>"`.
 - MapLibre no New Architecture: os eventos de localização dele derrubavam o app em release. O patch em `patches/` corrige isso; não atualize o MapLibre sem testar um APK de release.
