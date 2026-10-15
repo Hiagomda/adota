@@ -113,8 +113,10 @@ export function MapCanvas({
   const framedPin = useRef<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [styleReady, setStyleReady] = useState(false);
-  const [pinsReady, setPinsReady] = useState(false);
   const [sprite, setSprite] = useState(0);
+  // Pins mount a beat after each sprite so MapLibre has the paw images before it draws them.
+  const [pinsSprite, setPinsSprite] = useState<number | null>(null);
+  const pinsReady = styleReady && pinsSprite === sprite;
   const focusRef = useRef(focus);
   const trackingRef = useRef(tracking);
   const landed = useRef(false);
@@ -140,8 +142,7 @@ export function MapCanvas({
 
   useEffect(() => {
     if (!styleReady) return;
-    setPinsReady(false);
-    const timer = setTimeout(() => setPinsReady(true), 250);
+    const timer = setTimeout(() => setPinsSprite(sprite), 250);
     return () => clearTimeout(timer);
   }, [styleReady, sprite]);
 
