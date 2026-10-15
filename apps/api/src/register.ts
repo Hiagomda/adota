@@ -452,6 +452,14 @@ export async function registerRoutes(
       const user = requireUser(request.user);
       const id = resourceId(request.params);
       const body = parse(commentSchema, request.body);
+      // Same visibility as GET /posts/:id/comments: no comments on a hidden or unpublished post.
+      const post = await pool.query<{ author_id: string }>(
+        `SELECT author_id FROM posts
+         WHERE id = $1 AND hidden = false AND review_status = 'published'`,
+        [id],
+      );
+      const postAuthorId = post.rows[0]?.author_id;
+      if (!postAuthorId) throw new HttpError(404, 'Esse resgate não está mais disponível.');
       let parentAuthorId: string | null = null;
       if (body.parentCommentId) {
         const parent = await pool.query<{ user_id: string }>(
@@ -463,12 +471,31 @@ export async function registerRoutes(
         if (!parentRow) throw new HttpError(404, 'Esse comentário não existe mais.');
         parentAuthorId = parentRow.user_id;
       }
+      // A block in either direction keeps both people out of each other's threads.
+      const others = [postAuthorId, parentAuthorId].filter(
+        (other): other is string => other !== null && other !== user.id,
+      );
+      if (others.length > 0) {
+        const blocked = await pool.query(
+          `SELECT 1 FROM blocks
+           WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[]))
+              OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))
+           LIMIT 1`,
+          [user.id, others],
+        );
+        if ((blocked.rowCount ?? 0) > 0) {
+          throw new HttpError(403, 'Você não pode comentar nesta conversa.');
+        }
+      }
       const inserted = await pool.query<{ id: string }>(
         `INSERT INTO comments (post_id, user_id, body, parent_comment_id)
          VALUES ($1, $2, $3, $4) RETURNING id`,
         [id, user.id, body.body, body.parentCommentId ?? null],
       );
-      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId);
+      // The comment is saved; a failed notification must not answer 500 and invite a duplicate.
+      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId).catch(
+        bestEffort(request, 'notify:comment'),
+      );
       return reply.code(201).send({ id: inserted.rows[0]?.id });
     },
   );

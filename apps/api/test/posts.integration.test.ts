@@ -163,6 +163,35 @@ describe('posts', () => {
     expect(author.fosters[0].distanceKm).toBe(1);
   });
 
+  it('refuses comments on a hidden rescue and from a blocked person', async () => {
+    const authorId = await insertUser('author@egua.local', 'author');
+    const blockedId = await insertUser('blocked@egua.local', 'blocked');
+    await insertUser('friend@egua.local', 'friend');
+    const created = await createAlert(app, 'author@egua.local', 'Gato preso no telhado.');
+    const postId = created.json().id as string;
+    const comment = (email: string) =>
+      app.inject({
+        method: 'POST',
+        url: `/posts/${postId}/comments`,
+        headers: { authorization: `Bearer dev:${email}` },
+        payload: { body: 'Posso ajudar amanhã cedo.' },
+      });
+
+    expect((await comment('friend@egua.local')).statusCode).toBe(201);
+
+    await pool.query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2)`, [
+      authorId,
+      blockedId,
+    ]);
+    expect((await comment('blocked@egua.local')).statusCode).toBe(403);
+
+    await pool.query(`UPDATE posts SET hidden = true WHERE id = $1`, [postId]);
+    expect((await comment('friend@egua.local')).statusCode).toBe(404);
+
+    const saved = await pool.query(`SELECT count(*)::int AS total FROM comments`);
+    expect(saved.rows[0]?.total).toBe(1);
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');
