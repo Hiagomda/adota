@@ -48,9 +48,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'egua',
   scheme: 'egua',
   version: release.version,
-  runtimeVersion: {
-    policy: 'appVersion',
-  },
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
@@ -85,14 +82,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
     favicon: './assets/favicon.png',
   },
-  updates: {
-    url: 'https://u.expo.dev/b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
-    checkAutomatically: 'NEVER',
-    fallbackToCacheTimeout: 0,
-    requestHeaders: {
-      'expo-channel-name': 'preview',
-    },
-  },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
     downloadPageUrl:
@@ -106,7 +95,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-dev-client',
-    'expo-updates',
     'expo-secure-store',
     [
       'expo-location',
