@@ -11,7 +11,7 @@ import {
   volunteerSettingsSchema,
 } from '@patinha/shared';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import { registerAdoptionChat } from './adoptionChat.js';
 import {
   anonymizeUser,
   createDevUser,
+  createFirebaseUser,
   findUserByFirebaseUid,
   grantOwnerRole,
   isOwnerToken,
@@ -89,7 +90,7 @@ export async function registerRoutes(
 
   app.decorateRequest('user', null);
   app.addHook('onRequest', async (request) => {
-    request.user = await resolveUser(env, pool, request.headers.authorization);
+    request.user = await resolveUser(env, pool, request.headers.authorization, request.log);
   });
 
   app.get('/auth/config', async () => ({
@@ -246,7 +247,9 @@ export async function registerRoutes(
       try {
         const address = await reverseAddress(query.latitude, query.longitude);
         return { address };
-      } catch {
+      } catch (error) {
+        // The address is a convenience; the pin alone is enough to publish.
+        request.log.warn({ err: error }, 'geocode: reverse lookup failed');
         return { address: null };
       }
     },
@@ -305,7 +308,9 @@ export async function registerRoutes(
         created.reviewStatus === 'published' &&
         !body.parentPostId
       ) {
-        await enqueueRescueAlert(queue, created.id, body.urgency).catch(() => undefined);
+        await enqueueRescueAlert(queue, created.id, body.urgency).catch(
+          bestEffort(request, 'queue:rescue-alert'),
+        );
       }
       if (body.parentPostId && created.reviewStatus === 'published') {
         await notifyDiaryNote(
@@ -314,7 +319,7 @@ export async function registerRoutes(
           body.parentPostId,
           user.id,
           stripControls(body.description),
-        ).catch(() => undefined);
+        ).catch(bestEffort(request, 'notify:diary-note'));
       }
       return reply.code(201).send(created);
     },
@@ -346,10 +351,12 @@ export async function registerRoutes(
       const body = parse(z.object({ outcome: leaveHelpOutcomeSchema }), request.body);
       const result = await leaveHelp(pool, id, user, body.outcome);
       if (result.changed) {
-        await notifyStatusChange(pool, env, id, result.status).catch(() => undefined);
+        await notifyStatusChange(pool, env, id, result.status).catch(
+          bestEffort(request, 'notify:status'),
+        );
       } else if (result.noted) {
         await notifyDiaryNote(pool, env, id, user.id, 'Não encontrei o animal.').catch(
-          () => undefined,
+          bestEffort(request, 'notify:diary-note'),
         );
       }
       return result;
@@ -361,7 +368,9 @@ export async function registerRoutes(
     const id = resourceId(request.params);
     const body = parse(z.object({ status: animalStatusSchema }), request.body);
     await changeStatus(pool, id, user, body.status);
-    await notifyStatusChange(pool, env, id, body.status).catch(() => undefined);
+    await notifyStatusChange(pool, env, id, body.status).catch(
+      bestEffort(request, 'notify:status'),
+    );
     return { status: body.status };
   });
 
@@ -705,7 +714,9 @@ export async function registerRoutes(
     const post = updated.rows[0];
     if (!post) throw new HttpError(404, 'Alerta não encontrado.');
     if (status === 'published' && post.type === 'rescue_alert') {
-      await enqueueRescueAlert(queue, id, post.urgency).catch(() => undefined);
+      await enqueueRescueAlert(queue, id, post.urgency).catch(
+        bestEffort(request, 'queue:rescue-alert'),
+      );
     }
     return { reviewStatus: status };
   });
@@ -763,6 +774,16 @@ async function toggle(
   return { active: true };
 }
 
+/**
+ * Notifications and queue jobs never undo the action the person already completed, but a
+ * failure still has to reach the logs.
+ */
+function bestEffort(request: FastifyRequest, where: string) {
+  return (error: unknown) => {
+    request.log.error({ err: error, where }, 'best-effort step failed');
+  };
+}
+
 function resourceId(params: unknown): string {
   return parse(z.object({ id: z.string().uuid() }), params).id;
 }
@@ -773,10 +794,16 @@ function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.o
   return result.data;
 }
 
+/**
+ * A token Firebase rejects means "signed out" and the route answers 401. Anything else (database,
+ * Firebase config, network to Google) is a server failure and must surface as 500: answering 401
+ * there would make the app drop a valid session.
+ */
 async function resolveUser(
   env: Env,
   pool: Pool,
   authorization: string | undefined,
+  log: FastifyBaseLogger,
 ): Promise<SessionUser | null> {
   if (!authorization?.startsWith('Bearer ')) return null;
   const token = authorization.slice('Bearer '.length);
@@ -784,35 +811,35 @@ async function resolveUser(
     return findUserByFirebaseUid(pool, token);
   }
   if (!env.FIREBASE_PROJECT_ID) return null;
+  await ensureFirebaseApp(env);
+  const admin = await import('firebase-admin');
+  let decoded: Awaited<ReturnType<ReturnType<typeof admin.auth>['verifyIdToken']>>;
   try {
-    await ensureFirebaseApp(env);
-    const admin = await import('firebase-admin');
-    const decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
-    const owner = isOwnerToken(env, decoded);
-    if (owner) await grantOwnerRole(pool, decoded.uid);
-    const existing = await findUserByFirebaseUid(pool, decoded.uid);
-    if (existing) return existing;
-    const email = decoded.email ?? `${decoded.uid}@firebase.local`;
-    const handle =
-      email
-        .split('@')[0]
-        ?.replace(/[^a-z0-9]/g, '')
-        .slice(0, 16) || 'pessoa';
-    await pool.query(
-      `INSERT INTO users (firebase_uid, name, handle, city, role) VALUES ($1, $2, $3, 'Belém', $4)
-       ON CONFLICT (firebase_uid) DO NOTHING`,
-      [
-        decoded.uid,
-        decoded.name ?? 'Pessoa',
-        `${handle}${decoded.uid.slice(0, 4)}`,
-        owner ? 'admin' : 'user',
-      ],
-    );
-    if (owner) await grantOwnerRole(pool, decoded.uid);
-    return findUserByFirebaseUid(pool, decoded.uid);
-  } catch {
+    decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
+  } catch (error) {
+    const code = firebaseAuthCode(error);
+    if (!code) throw error;
+    log.info({ code }, 'auth: Firebase rejected the token');
     return null;
   }
+  const owner = isOwnerToken(env, decoded);
+  if (owner) await grantOwnerRole(pool, decoded.uid);
+  const existing = await findUserByFirebaseUid(pool, decoded.uid);
+  if (existing) return existing;
+  await createFirebaseUser(pool, {
+    uid: decoded.uid,
+    name: decoded.name,
+    email: decoded.email,
+    role: owner ? 'admin' : 'user',
+  });
+  return findUserByFirebaseUid(pool, decoded.uid);
+}
+
+/** `auth/id-token-expired`, `auth/argument-error`… Errors without that prefix are not about the token. */
+function firebaseAuthCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  const code = error.code;
+  return typeof code === 'string' && code.startsWith('auth/') ? code : null;
 }
 
 declare module 'fastify' {

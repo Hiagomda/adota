@@ -257,8 +257,11 @@ async function sendPush(
       notification: { title, body },
       data: { postId, url: `egua://post/${postId}` },
     });
-  } catch {
-    // Push is best-effort. The in-app notification is already stored.
+  } catch (error) {
+    // Push is best-effort: the in-app notification is already stored. Log it for the VPS logs.
+    console.error(
+      JSON.stringify({ level: 'error', where: 'notify:push', postId, error: String(error) }),
+    );
   }
 }
 

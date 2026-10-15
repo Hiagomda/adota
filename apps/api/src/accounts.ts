@@ -71,6 +71,49 @@ export async function createDevUser(pool: Pool, email: string): Promise<SessionU
   return mapUser(row);
 }
 
+/** First @ for a new Firebase account: the e-mail name plus four characters of the uid. */
+export function firstHandle(email: string | undefined, uid: string): string {
+  const base =
+    (email ?? '')
+      .split('@')[0]
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 16) || 'pessoa';
+  return `${base}${uid
+    .slice(0, 4)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '0')}`;
+}
+
+/**
+ * First sign-in. Another account may already own the derived @ (handles are unique), which used
+ * to fail every later request of this person. On that collision, try a random suffix.
+ */
+export async function createFirebaseUser(
+  pool: Pool,
+  input: { uid: string; name: string | undefined; email: string | undefined; role: string },
+): Promise<void> {
+  const first = firstHandle(input.email, input.uid);
+  const candidates = [first, ...Array.from({ length: 4 }, () => `${first}${randomDigits()}`)];
+  for (const handle of candidates) {
+    try {
+      await pool.query(
+        `INSERT INTO users (firebase_uid, name, handle, city, role) VALUES ($1, $2, $3, 'Belém', $4)
+         ON CONFLICT (firebase_uid) DO NOTHING`,
+        [input.uid, input.name ?? 'Pessoa', handle, input.role],
+      );
+      return;
+    } catch (error) {
+      if (!isUnique(error)) throw error;
+    }
+  }
+  throw new Error(`No free handle for the new account after ${candidates.length} tries`);
+}
+
+function randomDigits(): string {
+  return String(Math.floor(Math.random() * 9000 + 1000));
+}
+
 export async function profileByHandle(
   db: Database,
   pool: Pool,
