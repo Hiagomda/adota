@@ -134,6 +134,35 @@ describe('posts', () => {
     expect(duplicate.statusCode).toBe(409);
   });
 
+  it('shows nearby Casas Amigas only to people who can see the exact pin', async () => {
+    await insertUser('author@egua.local', 'author');
+    await insertUser('stranger@egua.local', 'stranger');
+    const fosterId = await insertUser('foster@egua.local', 'foster');
+    await pool.query(
+      `INSERT INTO fosters (user_id, capacity, species_accepted, sizes_accepted, location, radius_km, available)
+       VALUES ($1, 2, '{dog}', '{medium}', ST_SetSRID(ST_MakePoint(-48.4790, -1.4520), 4326)::geography, 10, true)`,
+      [fosterId],
+    );
+    const created = await createAlert(app, 'author@egua.local', 'Cadela perto do mercado.');
+    const postId = created.json().id as string;
+    const list = (email?: string) =>
+      app.inject({
+        method: 'GET',
+        url: `/posts/${postId}/fosters`,
+        headers: email ? { authorization: `Bearer dev:${email}` } : {},
+      });
+
+    // Same shape for everyone, so older APKs keep working; strangers just get nobody.
+    expect((await list()).json()).toEqual({ fosters: [] });
+    expect((await list('stranger@egua.local')).json()).toEqual({ fosters: [] });
+
+    const author = (await list('author@egua.local')).json();
+    expect(author.fosters).toHaveLength(1);
+    expect(author.fosters[0].id).toBe(fosterId);
+    // About 470 m away: reported as whole kilometres, never the real distance.
+    expect(author.fosters[0].distanceKm).toBe(1);
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');

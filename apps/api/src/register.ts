@@ -26,7 +26,7 @@ import {
   profileByHandle,
   updateProfile,
 } from './accounts.js';
-import { requireAdmin, requireUser } from './authz.js';
+import { isOperator, requireAdmin, requireUser } from './authz.js';
 import type { Env } from './config.js';
 import {
   addResponse,
@@ -50,6 +50,7 @@ import {
   notifyStatusChange,
   type createQueue,
 } from './notify.js';
+import { fosterDistanceKm } from './privacy.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
 import { registerStaffRoutes } from './staff/routes.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
@@ -502,19 +503,34 @@ export async function registerRoutes(
     return { viewed: true };
   });
 
+  // Casa Amiga addresses are homes. Only the people allowed to see the exact pin of this rescue
+  // get the list, and only in whole kilometres, so distances from many posts cannot pin a house.
+  // Everyone else gets an empty list: same shape, so older APKs just hide the section.
   app.get('/posts/:id/fosters', async (request) => {
     const id = resourceId(request.params);
+    const viewer = request.user;
+    if (!viewer) return { fosters: [] };
     const result = await pool.query(
       `SELECT u.id, u.name, u.handle, u.verified, f.capacity,
               ST_Distance(f.location, p.location) AS meters
-       FROM fosters f
+       FROM posts p
+       JOIN fosters f ON ST_DWithin(f.location, p.location, f.radius_km * 1000)
        JOIN users u ON u.id = f.user_id
-       JOIN posts p ON p.id = $1
-       WHERE f.available = true
-         AND ST_DWithin(f.location, p.location, f.radius_km * 1000)
+       WHERE p.id = $1
+         AND f.available = true
+         AND u.deleted_at IS NULL
+         AND u.suspended = false
+         AND (
+           p.author_id = $2
+           OR $3::boolean
+           OR EXISTS (
+             SELECT 1 FROM responses r
+             WHERE r.post_id = p.id AND r.user_id = $2 AND r.kind = 'will_help'
+           )
+         )
        ORDER BY meters ASC
        LIMIT 10`,
-      [id],
+      [id, viewer.id, isOperator(viewer.role)],
     );
     return {
       fosters: rowsOf<{
@@ -530,7 +546,7 @@ export async function registerRoutes(
         handle: foster.handle,
         verified: foster.verified,
         capacity: foster.capacity,
-        distanceKm: Math.round((foster.meters / 1000) * 10) / 10,
+        distanceKm: fosterDistanceKm(foster.meters),
       })),
     };
   });

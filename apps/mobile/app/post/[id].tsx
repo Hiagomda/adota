@@ -115,9 +115,12 @@ export default function PostScreen() {
     enabled: Boolean(id),
   });
   const fosters = useQuery({
-    queryKey: ['fosters', id],
+    // The server lists Casas Amigas only to the author, the team and who said "vou ajudar".
+    queryKey: ['fosters', id, token],
     queryFn: () =>
-      api<{ fosters: { id: string; name: string; distanceKm: number }[] }>(`/posts/${id}/fosters`),
+      api<{ fosters: { id: string; name: string; distanceKm: number }[] }>(`/posts/${id}/fosters`, {
+        token,
+      }),
     enabled: Boolean(id),
   });
   const species = post.data?.animal.species;

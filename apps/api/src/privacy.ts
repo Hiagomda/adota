@@ -37,3 +37,8 @@ export function assertHelpRequest(
   if (input.type === 'help_request' && isOperator(user.role)) return;
   throw new HttpError(403, 'Só a equipe pode publicar pedidos de ajuda com Pix.');
 }
+
+/** Whole kilometres, never under 1: a Casa Amiga is a home and must not be located by distance. */
+export function fosterDistanceKm(meters: number): number {
+  return Math.max(1, Math.round(meters / 1000));
+}
