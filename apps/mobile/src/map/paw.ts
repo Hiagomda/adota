@@ -1,4 +1,4 @@
-import type { ImageSourcePropType } from 'react-native';
+import { Image, type ImageSourcePropType } from 'react-native';
 
 export type Urgency = 'low' | 'medium' | 'high';
 
@@ -10,10 +10,5 @@ export const pawSource: Record<Urgency, ImageSourcePropType> = {
 };
 
 export function pawUri(urgency: Urgency): string {
-  const asset = pawSource[urgency];
-  if (typeof asset === 'string') return asset;
-  if (typeof asset === 'object' && asset !== null && 'uri' in asset && typeof asset.uri === 'string') {
-    return asset.uri;
-  }
-  return '';
+  return Image.resolveAssetSource(pawSource[urgency])?.uri ?? '';
 }

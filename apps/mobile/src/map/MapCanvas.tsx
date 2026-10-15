@@ -140,9 +140,10 @@ export function MapCanvas({
 
   useEffect(() => {
     if (!styleReady) return;
+    setPinsReady(false);
     const timer = setTimeout(() => setPinsReady(true), 250);
     return () => clearTimeout(timer);
-  }, [styleReady]);
+  }, [styleReady, sprite]);
 
   useEffect(() => {
     programmaticUntil.current = Date.now() + 1500;
@@ -458,9 +459,9 @@ export function MapCanvas({
           />
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
-        {styleReady ? <Images key={`${sprite}:${pinKey}`} images={pawImages} /> : null}
+        {styleReady ? <Images key={sprite} images={pawImages} /> : null}
         {pinsReady ? (
-          <ShapeSource id="alerts" shape={shape} onPress={onPinPress}>
+          <ShapeSource key={sprite} id="alerts" shape={shape} onPress={onPinPress}>
             <CircleLayer
               id="pin-hit"
               style={{
