@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import type { Post } from '../types';
-import { belem, mapStyleUrl, type MapBounds } from './geo';
+import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { pawUri } from './paw';
@@ -23,7 +23,7 @@ export function MapCanvas({
   controlsBottom?: number;
   onSelect: (post: Post) => void;
   onDismiss?: () => void;
-  onCommitBounds?: (bounds: MapBounds) => void;
+  onCommitBounds?: (bounds: MapBounds, origin: BoundsOrigin) => void;
   focus?: [number, number] | null;
 }) {
   const host = useRef<HTMLElement | null>(null);
@@ -61,15 +61,18 @@ export function MapCanvas({
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-    const reportBounds = () => {
+    const reportBounds = (fromUser: boolean) => {
       if (!trackingRef.current) return;
       const bounds = map.getBounds();
-      onBoundsRef.current?.({
-        west: bounds.getWest(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        north: bounds.getNorth(),
-      });
+      onBoundsRef.current?.(
+        {
+          west: bounds.getWest(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          north: bounds.getNorth(),
+        },
+        { fromUser },
+      );
     };
     // O evento `load` não dispara se algum ícone do estilo falha.
     // `isStyleLoaded` basta para projetar o pino na tela.
@@ -113,14 +116,15 @@ export function MapCanvas({
       started = true;
       map.resize();
       draw();
-      reportBounds();
+      reportBounds(false);
     };
     if (map.isStyleLoaded()) start();
     map.on('styledata', start);
     map.on('click', () => onDismissRef.current?.());
-    map.on('moveend', () => {
+    // Only gestures carry the browser event; our own moves and redraws do not.
+    map.on('moveend', (event) => {
       draw();
-      reportBounds();
+      reportBounds(Boolean(event.originalEvent));
     });
     return () => {
       markers.current.forEach((marker) => marker.remove());
