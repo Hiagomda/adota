@@ -41,6 +41,8 @@ import {
   Skeleton,
   StatusPill,
   Touchable,
+  type ButtonVariant,
+  type IconName,
 } from '../../src/components/ui';
 import { AnimalDiary } from '../../src/diary';
 import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
@@ -49,6 +51,7 @@ import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
+import { notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
 import { PostEditor } from '../../src/post/PostEditor';
 import { isTeamRole, useSession } from '../../src/session';
@@ -59,7 +62,6 @@ import {
   radius,
   size,
   spacing,
-  statusLabel,
   useTheme,
 } from '../../src/theme';
 import { useLightStatusBar } from '../../src/useLightStatusBar';
@@ -108,6 +110,10 @@ export default function PostScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [helping, setHelping] = useState(false);
   const [helpBurst, setHelpBurst] = useState(0);
+  const [foundOpen, setFoundOpen] = useState(false);
+  const [troubleOpen, setTroubleOpen] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const [measuredFooter, setMeasuredFooter] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [comment, setComment] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; handle: string } | null>(null);
@@ -246,9 +252,13 @@ export default function PostScreen() {
   const forAdoption = item.status === 'for_adoption';
   const adopted = item.status === 'adopted';
   const adoptionContact = forAdoption || adopted;
-  const helpingNow = item.viewerWillHelp && !adoptionContact;
-  const footerHeight =
-    spacing.lg + SHARE_BUTTON + footerPad + (helpingNow ? size.control + spacing.sm * 2 : 0);
+  // The street part of the rescue: someone can still go, look, or step back.
+  const rescueOpen = openRescueStatuses.has(item.status);
+  const helpingNow = item.viewerWillHelp && rescueOpen;
+  const helpers = item.helpersCount ?? 0;
+  const othersGoing = Math.max(helpers - (item.viewerWillHelp ? 1 : 0), 0);
+  const missedVisits = notFoundVisits(item);
+  const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
   const fosterList = fosters.data?.homes ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
   const speciesName = speciesLabel[item.animal.species] ?? 'bichinho';
@@ -287,6 +297,25 @@ export default function PostScreen() {
     }
   }
 
+  async function markFound() {
+    if (marking) return;
+    setMarking(true);
+    const ok = await act(`/posts/${rescueId}/status`, 'PATCH', { status: 'rescued' });
+    setMarking(false);
+    setFoundOpen(false);
+    if (!ok) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      logBestEffort('post:found-haptic'),
+    );
+    setHelpBurst((count) => count + 1);
+    setNote('Égua, que alegria! Conte no diário como ele está.');
+  }
+
+  function stepBack(outcome: 'could_not' | 'not_found') {
+    setTroubleOpen(false);
+    void leaveRescue(outcome);
+  }
+
   function onHelpPress() {
     if (!item) return;
     if (item.viewerWillHelp) return;
@@ -296,6 +325,61 @@ export default function PostScreen() {
     }
     setHelpOpen(true);
   }
+
+  const contactBusy = whatsapp.busy === `/posts/${item.id}/contact`;
+  const cta: FooterAction =
+    adoptionContact && isAuthor
+      ? {
+          title: forAdoption ? 'Compartilhar para achar um lar' : 'Compartilhar',
+          icon: 'share-2',
+          variant: 'secondary',
+          onPress: share,
+          share: true,
+        }
+      : adoptionContact
+        ? {
+            title: forAdoption ? 'Quero adotar' : 'Falar no WhatsApp',
+            icon: 'message-circle',
+            variant: 'secondary',
+            loading: contactBusy,
+            onPress: () => talkToAuthor(),
+          }
+        : helpingNow
+          ? {
+              title: 'Encontrei o animal',
+              icon: 'check',
+              variant: 'secondary',
+              onPress: () => setFoundOpen(true),
+            }
+          : rescueOpen
+            ? {
+                title: item.status === 'not_found' ? 'Vou procurar' : 'Eu vou ajudar',
+                icon: item.status === 'not_found' ? 'search' : 'heart',
+                variant: 'secondary',
+                onPress: onHelpPress,
+              }
+            : canMoveStatus && following && nextStepAction[following]
+              ? {
+                  title: nextStepAction[following] ?? '',
+                  icon: 'arrow-right',
+                  variant: 'primary',
+                  onPress: () =>
+                    void act(`/posts/${item.id}/status`, 'PATCH', { status: following }),
+                }
+              : {
+                  title: 'Compartilhar',
+                  icon: 'share-2',
+                  variant: 'primary',
+                  onPress: share,
+                  share: true,
+                };
+  const footerLine = helpingNow
+    ? othersGoing > 0
+      ? `Você e mais ${othersGoing} a caminho · ponto exato liberado`
+      : 'Você está a caminho · ponto exato liberado'
+    : rescueOpen && helpers > 0
+      ? `${helpers} ${helpers === 1 ? 'pessoa' : 'pessoas'} a caminho`
+      : null;
 
   const postLink = `${siteUrl}/p/${item.id}`;
   // "a Mel" reads wrong without knowing the sex, so the name goes alone or "um gato".
@@ -408,6 +492,26 @@ export default function PostScreen() {
             </View>
 
             <RescueJourney type={item.type} status={item.status} />
+
+            {item.status === 'not_found' ? (
+              <View
+                accessibilityRole="summary"
+                style={[styles.missed, { backgroundColor: colors.warningSoft }]}
+              >
+                <Icon name="search" color={colors.onWarningSoft} />
+                <View style={styles.missedText}>
+                  <AppText variant="bodyStrong" style={{ color: colors.onWarningSoft }}>
+                    Não foi encontrado na última busca
+                  </AppText>
+                  <AppText variant="bodySmall" style={{ color: colors.onWarningSoft }}>
+                    {missedVisits > 1
+                      ? `${missedVisits} pessoas foram até o local e não acharam.`
+                      : 'Alguém foi até o local e não achou.'}{' '}
+                    Animal de rua costuma voltar ao mesmo canto: se passar por perto, dê uma olhada.
+                  </AppText>
+                </View>
+              </View>
+            ) : null}
 
             {/* One coral action per screen: the place is a quiet row, the footer keeps the CTA. */}
             <Touchable
@@ -570,23 +674,20 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {canMoveStatus && following ? (
+            {canOwn && !item.viewerWillHelp && item.status === 'on_the_way' ? (
               <Button
-                title={`Marcar como ${statusLabel[following]}`}
-                icon="arrow-right"
-                iconPosition="right"
+                title="O animal já está seguro"
+                icon="check"
                 variant="outline"
                 fullWidth
-                onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: following })}
+                onPress={() => setFoundOpen(true)}
               />
             ) : null}
-            {canOwn &&
-            (item.status === 'on_the_way' || item.status === 'not_found') &&
-            following !== 'open' ? (
+            {canOwn && (item.status === 'on_the_way' || item.status === 'not_found') ? (
               <Button
                 title="Voltar para aberto"
                 icon="rotate-ccw"
-                variant="outline"
+                variant="ghost"
                 fullWidth
                 onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: 'open' })}
               />
@@ -807,65 +908,52 @@ export default function PostScreen() {
           },
           { paddingBottom: footerPad },
         ]}
+        onLayout={(event) => setMeasuredFooter(event.nativeEvent.layout.height)}
       >
+        {footerLine ? (
+          <View style={styles.footerLine} accessibilityLiveRegion="polite">
+            <View
+              style={[
+                styles.footerDot,
+                { backgroundColor: helpingNow ? colors.success : colors.secondary },
+              ]}
+            />
+            <AppText variant="bodySmallStrong" color="textSecondary" style={styles.footerLineText}>
+              {footerLine}
+            </AppText>
+          </View>
+        ) : null}
         <View style={styles.footerRow}>
-          <IconButton
-            icon="share-2"
-            variant="tonal"
-            accessibilityLabel="Compartilhar"
-            onPress={share}
-            style={styles.share}
-          />
+          {cta.share ? null : (
+            <IconButton
+              icon="share-2"
+              variant="tonal"
+              accessibilityLabel="Compartilhar"
+              onPress={share}
+              style={styles.share}
+            />
+          )}
           <View style={styles.footerCta}>
             <Button
-              title={
-                adoptionContact && isAuthor
-                  ? forAdoption
-                    ? 'Compartilhar para achar um lar'
-                    : 'Compartilhar'
-                  : forAdoption
-                    ? 'Quero adotar'
-                    : adopted
-                      ? 'Falar no WhatsApp'
-                      : helpingNow
-                        ? 'Não consegui'
-                        : 'Eu vou ajudar'
-              }
-              icon={
-                adoptionContact && isAuthor
-                  ? 'share-2'
-                  : adoptionContact
-                    ? 'message-circle'
-                    : helpingNow
-                      ? 'x'
-                      : 'heart'
-              }
-              variant={helpingNow ? 'outline' : 'secondary'}
+              title={cta.title}
+              icon={cta.icon}
+              variant={cta.variant}
               size="lg"
               fullWidth
-              loading={(helpingNow && leaving) || whatsapp.busy === `/posts/${item.id}/contact`}
-              onPress={
-                adoptionContact && isAuthor
-                  ? share
-                  : adoptionContact
-                    ? talkToAuthor
-                    : helpingNow
-                      ? () => void leaveRescue('could_not')
-                      : onHelpPress
-              }
+              loading={cta.loading}
+              onPress={cta.onPress}
             />
             <PawBurst trigger={helpBurst} />
           </View>
         </View>
         {helpingNow ? (
           <Button
-            title="Não encontrei"
-            icon="search"
-            variant="outline"
-            size="lg"
+            title="Não deu certo?"
+            variant="ghost"
             fullWidth
             disabled={leaving}
-            onPress={() => void leaveRescue('not_found')}
+            loading={leaving}
+            onPress={() => setTroubleOpen(true)}
             style={styles.leaveSecond}
           />
         ) : null}
@@ -1004,8 +1092,8 @@ export default function PostScreen() {
       <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} title="Você vai ajudar?">
         <View style={styles.help}>
           <AppText color="textSecondary">
-            O ponto exato deste resgate passa a aparecer para você. O WhatsApp da pessoa só entra se
-            ela autorizou o contato. O app não recebe dinheiro.
+            O ponto exato deste resgate passa a aparecer para você. Quando chegar lá, conte aqui se
+            encontrou o animal. O app não recebe dinheiro.
           </AppText>
           <Button
             title={helping ? 'Confirmando...' : 'Confirmar, eu vou ajudar'}
@@ -1018,7 +1106,121 @@ export default function PostScreen() {
           <Button title="Agora não" variant="ghost" fullWidth onPress={() => setHelpOpen(false)} />
         </View>
       </BottomSheet>
+
+      <BottomSheet
+        visible={foundOpen}
+        onClose={() => setFoundOpen(false)}
+        title="Você está com o animal?"
+      >
+        <View style={styles.help}>
+          <AppText color="textSecondary">
+            O resgate passa para Resgatado e quem acompanha recebe o aviso. Depois conte no diário
+            como ele está.
+          </AppText>
+          <Button
+            title="Sim, está comigo"
+            icon="check"
+            variant="secondary"
+            size="lg"
+            loading={marking}
+            fullWidth
+            onPress={() => void markFound()}
+          />
+          <Button title="Ainda não" variant="ghost" fullWidth onPress={() => setFoundOpen(false)} />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={troubleOpen}
+        onClose={() => setTroubleOpen(false)}
+        title="O que aconteceu?"
+      >
+        <View style={styles.help}>
+          <OutcomeOption
+            icon="search"
+            title="Fui e não encontrei"
+            body={
+              othersGoing > 0
+                ? 'Fica no diário. Quem ainda está indo continua a busca.'
+                : 'Fica no diário, e o resgate aparece como Não encontrado para outra pessoa tentar.'
+            }
+            onPress={() => stepBack('not_found')}
+          />
+          <OutcomeOption
+            icon="x-circle"
+            title="Não vou conseguir ir"
+            body={
+              othersGoing > 0
+                ? 'Você sai do resgate. Quem ainda está indo continua.'
+                : 'Você sai, e o resgate volta para Aberto para outra pessoa ir.'
+            }
+            onPress={() => stepBack('could_not')}
+          />
+          <Button title="Voltar" variant="ghost" fullWidth onPress={() => setTroubleOpen(false)} />
+        </View>
+      </BottomSheet>
     </View>
+  );
+}
+
+/** The street part of a rescue, while someone can still go and look. */
+const openRescueStatuses = new Set(['open', 'on_the_way', 'not_found']);
+
+/** The footer's single action once the animal is safe, said as what happens next. */
+const nextStepAction: Record<string, string | undefined> = {
+  fostered: 'Foi para um lar temporário',
+  for_adoption: 'Colocar para adoção',
+};
+
+interface FooterAction {
+  title: string;
+  icon: IconName;
+  variant: ButtonVariant;
+  onPress: () => void;
+  loading?: boolean;
+  /** The action already shares, so the separate share button would repeat it. */
+  share?: boolean;
+}
+
+/** One answer in "O que aconteceu?": what it is and what it does to the rescue. */
+function OutcomeOption({
+  icon,
+  title,
+  body,
+  onPress,
+}: {
+  icon: IconName;
+  title: string;
+  body: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Touchable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={body}
+      haptic="light"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.option,
+        {
+          backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.optionIcon, { backgroundColor: colors.surfaceMuted }]}>
+        <Icon name={icon} color={colors.text} />
+      </View>
+      <View style={styles.optionText}>
+        <AppText variant="bodyStrong">{title}</AppText>
+        <AppText variant="bodySmall" color="textSecondary">
+          {body}
+        </AppText>
+      </View>
+      <Icon name="chevron-right" color={colors.textSecondary} />
+    </Touchable>
   );
 }
 
@@ -1116,7 +1318,41 @@ const styles = StyleSheet.create({
   },
   share: { width: SHARE_BUTTON, height: SHARE_BUTTON },
   footerCta: { flex: 1 },
-  leaveSecond: { marginTop: spacing.sm },
+  leaveSecond: { marginTop: spacing.xs },
+  footerLine: {
+    width: '100%',
+    maxWidth: contentMaxWidth,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  footerDot: { width: 8, height: 8, borderRadius: radius.pill },
+  footerLineText: { flex: 1 },
+  missed: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+  },
+  missedText: { flex: 1, gap: spacing.xs },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  optionIcon: {
+    width: size.touch,
+    height: size.touch,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionText: { flex: 1, gap: spacing.xs },
   commentList: { flexShrink: 1 },
   comment: { paddingVertical: spacing.sm },
   commentForm: { gap: spacing.md, paddingTop: spacing.md },
