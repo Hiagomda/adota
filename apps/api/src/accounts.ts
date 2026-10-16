@@ -268,6 +268,7 @@ const personalTables = [
   'user_xp_history',
   'user_badges',
   'post_follows',
+  'sightings',
   'likes',
   'saves',
   'story_views',

@@ -17,6 +17,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerContactRoutes } from './contact.js';
+import { registerSightingRoutes } from './sightings.js';
 import {
   anonymizeUser,
   createDevUser,
@@ -843,6 +844,7 @@ export async function registerRoutes(
 
   registerAdoptionChat(app, { env, pool });
   registerContactRoutes(app, { pool, contactLimit });
+  registerSightingRoutes(app, { env, pool, writeLimit });
   await registerStaffRoutes(app, { env, pool });
 }
 

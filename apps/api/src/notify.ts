@@ -237,6 +237,46 @@ export async function notifyDiaryNote(
   }
 }
 
+/** Someone saw the animal elsewhere: tell the author, who is going and who follows. */
+export async function notifySighting(
+  pool: Pool,
+  env: Env,
+  postId: string,
+  seerId: string,
+  label: string | null,
+  note: string,
+): Promise<void> {
+  const post = await pool.query<{ author_id: string; approx_label: string }>(
+    `SELECT author_id, approx_label FROM posts WHERE id = $1`,
+    [postId],
+  );
+  const rescue = post.rows[0];
+  if (!rescue) return;
+  const people = await pool.query<{ id: string; fcm_tokens: string[] }>(
+    `SELECT id, fcm_tokens FROM users WHERE id = $1
+     UNION
+     SELECT u.id, u.fcm_tokens FROM responses r JOIN users u ON u.id = r.user_id
+       WHERE r.post_id = $2 AND r.kind = 'will_help'
+     UNION
+     SELECT u.id, u.fcm_tokens FROM post_follows pf JOIN users u ON u.id = pf.user_id
+       WHERE pf.post_id = $2`,
+    [rescue.author_id, postId],
+  );
+  const title = 'Alguém viu o animal';
+  const where = label ?? 'perto do resgate';
+  const body = note
+    ? `Visto em ${where}: ${note.slice(0, 120)}`
+    : `Visto em ${where}. Veja no mapa.`;
+  for (const person of rowsOf<{ id: string; fcm_tokens: string[] }>(people)) {
+    if (person.id === seerId) continue;
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'sighting', $2::jsonb)`,
+      [person.id, JSON.stringify({ postId, title, body })],
+    );
+    await sendPush(env, person.fcm_tokens, title, body, postId);
+  }
+}
+
 export async function notifyComment(
   pool: Pool,
   env: Env,
