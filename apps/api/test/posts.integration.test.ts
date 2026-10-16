@@ -71,6 +71,14 @@ describe('posts', () => {
     await pool.end();
   });
 
+  it('refuses a new rescue outside the service area', async () => {
+    await insertUser('far@egua.local', 'far');
+    const created = await createAlert(app, 'far@egua.local', 'Gato na praça.', -23.5505, -46.6333);
+    expect(created.statusCode).toBe(400);
+    const stored = await pool.query(`SELECT count(*)::int AS total FROM posts`);
+    expect(stored.rows[0]?.total).toBe(0);
+  });
+
   it('keeps a post inside a radius and drops one outside it', async () => {
     await insertUser('near@egua.local', 'near');
     const created = await createAlert(app, 'near@egua.local', 'Cachorro na calçada.');

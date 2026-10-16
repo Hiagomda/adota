@@ -9,4 +9,5 @@ apps/mobile/.expo
 apps/web/next-env.d.ts
 apps/mobile/expo-env.d.ts
 apps/mobile/src/map/serviceArea.ts
+packages/shared/src/serviceArea.ts
 apps/web/app/mapa/serviceArea.ts
