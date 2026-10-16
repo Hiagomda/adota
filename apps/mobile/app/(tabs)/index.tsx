@@ -22,7 +22,7 @@ import {
   Touchable,
 } from '../../src/components/ui';
 import { onFeedRefresh } from '../../src/feedRefresh';
-import { distanceLabel } from '../../src/format';
+import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
 import { screenColumn, spacing, useTheme } from '../../src/theme';
@@ -31,6 +31,14 @@ import { logBestEffort } from '../../src/crash/bestEffort';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
+/** "Perto de mim agora": how far the urgent strip looks first. */
+const NEARBY_KM = 2;
+
+/** Rounds the phone's point to about 100 m, so the nearby query is not redone on every GPS tick. */
+function nearbyKey(here: DeviceFix | null): string | null {
+  if (!here) return null;
+  return `${here.latitude.toFixed(3)},${here.longitude.toFixed(3)}`;
+}
 
 type HomeLens = 'all' | 'dog' | 'cat' | 'urgent';
 
@@ -61,13 +69,21 @@ function placeDistance(post: Post, here: DeviceFix | null): string {
   return away ? `${place} · ${away}` : place;
 }
 
-const Stories = memo(function Stories({ posts, here }: { posts: Post[]; here: DeviceFix | null }) {
+const Stories = memo(function Stories({
+  posts,
+  here,
+  nearby,
+}: {
+  posts: Post[];
+  here: DeviceFix | null;
+  nearby: boolean;
+}) {
   const router = useRouter();
   if (posts.length === 0) return null;
   return (
     <View>
       <SectionHeader
-        title="Urgentes agora"
+        title={nearby ? `Urgentes a até ${NEARBY_KM} km de você` : 'Urgentes agora'}
         actionLabel="Ver no mapa"
         onAction={() => router.navigate('/explore')}
       />
@@ -130,6 +146,18 @@ export default function HomeScreen() {
     queryKey: ['stories', token],
     queryFn: () => loadFeed(token, '?urgency=high&status=open&limit=12'),
   });
+  const nearPoint = nearbyKey(here);
+  const nearbyStories = useQuery({
+    queryKey: ['stories', 'nearby', nearPoint, token],
+    queryFn: () => {
+      const [latitude, longitude] = (nearPoint ?? '').split(',');
+      return loadFeed(
+        token,
+        `?urgency=high&status=open&limit=12&latitude=${latitude}&longitude=${longitude}&radiusKm=${NEARBY_KM}`,
+      );
+    },
+    enabled: nearPoint !== null,
+  });
   const me = useQuery({
     queryKey: ['me', token],
     queryFn: () => loadMe(token ?? ''),
@@ -142,9 +170,16 @@ export default function HomeScreen() {
   });
 
   const keep = useCallback((post: Post) => matchesLens(post, lens, seek), [lens, seek]);
-  const storyPosts = (stories.data?.posts ?? emptyPosts).filter(
-    (post) => !post.helpRequest && keep(post),
-  );
+  // Close ones first when there are any; otherwise every urgent rescue in Belém.
+  const closePosts = (nearbyStories.data?.posts ?? emptyPosts)
+    .filter((post) => !post.helpRequest && keep(post))
+    .sort((a, b) =>
+      here ? distanceKmBetween(here, a.location) - distanceKmBetween(here, b.location) : 0,
+    );
+  const nearbyFirst = closePosts.length > 0;
+  const storyPosts = nearbyFirst
+    ? closePosts
+    : (stories.data?.posts ?? emptyPosts).filter((post) => !post.helpRequest && keep(post));
   const feedPosts = (feed.data?.posts ?? emptyPosts).filter(
     (post) => !post.helpRequest && post.type !== 'help_request' && keep(post),
   );
@@ -222,11 +257,12 @@ export default function HomeScreen() {
     failedCursor.current = null;
     void feed.refetch();
     void stories.refetch();
+    if (nearPoint) void nearbyStories.refetch();
     if (token) {
       void me.refetch();
       void notifications.refetch();
     }
-  }, [feed, me, notifications, stories, token]);
+  }, [feed, me, nearPoint, nearbyStories, notifications, stories, token]);
 
   useEffect(() => {
     return onFeedRefresh(() => {
@@ -297,7 +333,7 @@ export default function HomeScreen() {
         <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
       </ScrollView>
-      <Stories posts={storyPosts} here={here} />
+      <Stories posts={storyPosts} here={here} nearby={nearbyFirst} />
     </View>
   );
 
