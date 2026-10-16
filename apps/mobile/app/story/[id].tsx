@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadPost, messageFrom } from '../../src/api';
+import { useScreenReader } from '../../src/a11y/useScreenReader';
 import { AppText, Button, IconButton } from '../../src/components/ui';
+import { reportError } from '../../src/crash/reporter';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
 
@@ -29,14 +31,20 @@ export default function StoryScreen() {
   const amount = useRef(0);
   const finished = useRef(false);
   const [paused, setPaused] = useState(false);
+  const screenReader = useScreenReader();
+  // The clock starts only once there is something to see, and never runs under a screen reader:
+  // closing by itself would cut the reading short.
+  const running = Boolean(post.data) && !paused && !screenReader;
 
   useEffect(() => {
     if (token && id)
-      void api(`/posts/${id}/story-view`, { method: 'POST', token }).catch(() => undefined);
+      void api(`/posts/${id}/story-view`, { method: 'POST', token }).catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'story:view' });
+      });
   }, [id, token]);
 
   useEffect(() => {
-    if (paused || finished.current) return undefined;
+    if (!running || finished.current) return undefined;
     const timer = setInterval(() => {
       amount.current = Math.min(1, amount.current + 0.02);
       progress.setValue(amount.current);
@@ -45,7 +53,7 @@ export default function StoryScreen() {
       router.back();
     }, 100);
     return () => clearInterval(timer);
-  }, [paused, progress, router]);
+  }, [running, progress, router]);
 
   function seek(delta: number) {
     amount.current = Math.min(1, Math.max(0, amount.current + delta));
@@ -55,7 +63,7 @@ export default function StoryScreen() {
   const photo = post.data?.media[0]?.url;
   return (
     <Pressable
-      accessibilityLabel="Segure para pausar o resgate"
+      accessible={false}
       style={[styles.screen, { backgroundColor: colors.mediaBackground }]}
       onPressIn={() => setPaused(true)}
       onPressOut={() => setPaused(false)}
@@ -81,7 +89,11 @@ export default function StoryScreen() {
           style={[styles.progressFill, { width: barWidth, backgroundColor: colors.onMedia }]}
         />
       </View>
-      <View style={styles.zones}>
+      <View
+        style={styles.zones}
+        importantForAccessibility={screenReader ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={screenReader}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Voltar um pouco"
@@ -106,6 +118,9 @@ export default function StoryScreen() {
             ? messageFrom(post.error)
             : (post.data?.approxLabel ?? 'Carregando o resgate...')}
         </AppText>
+        {post.isError ? (
+          <Button title="Tentar de novo" icon="refresh-cw" onPress={() => void post.refetch()} />
+        ) : null}
         {post.data?.description ? (
           <AppText numberOfLines={2} style={{ color: colors.onMedia }}>
             {post.data.description}
