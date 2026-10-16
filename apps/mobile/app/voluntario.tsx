@@ -13,6 +13,7 @@ import {
   Notice,
   ProgressBar,
   SectionHeader,
+  Skeleton,
   Switch,
 } from '../src/components/ui';
 import { useSession } from '../src/session';
@@ -34,6 +35,7 @@ const radiusChoices = [5, 10, 20];
 const ROW_MASCOT = 64;
 // Three seals per row, leaving room for the gaps.
 const SEAL_COLUMN_WIDTH = '29%';
+const SEAL_SKELETON = 80;
 
 export default function VolunteerScreen() {
   const { colors } = useTheme();
@@ -75,7 +77,11 @@ export default function VolunteerScreen() {
     );
   }
 
+  // Until the saved settings arrive, a tap would overwrite them with the defaults.
+  const ready = Boolean(status.data);
+
   function update(patch: Partial<VolunteerSettings>) {
+    if (!ready) return;
     const next = { ...currentSettings(), ...patch, isTransportAvailable: false };
     if (patch.isFosterAvailable !== undefined) setFoster(patch.isFosterAvailable);
     save.mutate(next);
@@ -113,17 +119,31 @@ export default function VolunteerScreen() {
             {!token ? (
               <Notice message="Entre na sua conta para guardar o que você já fez." />
             ) : null}
-            {status.isError ? <Notice tone="error" message={messageFrom(status.error)} /> : null}
+            {status.isError ? (
+              <Notice
+                tone="error"
+                message={messageFrom(status.error)}
+                action={{ label: 'Tentar de novo', onPress: () => void status.refetch() }}
+              />
+            ) : null}
             <Card elevation="md">
-              <View style={styles.levelBox}>
-                <AppText variant="h2">{level?.name ?? 'Olheiro'}</AppText>
-                <ProgressBar
-                  value={level?.progress ?? 0}
-                  label="Seu nível"
-                  caption={xpCaption}
-                  tone="secondary"
-                />
-              </View>
+              {status.isLoading ? (
+                <View accessible accessibilityLabel="Carregando seu nível" style={styles.levelBox}>
+                  <Skeleton width="45%" height={28} />
+                  <Skeleton height={12} radius="pill" />
+                  <Skeleton width="60%" height={14} />
+                </View>
+              ) : (
+                <View style={styles.levelBox}>
+                  <AppText variant="h2">{level?.name ?? 'Olheiro'}</AppText>
+                  <ProgressBar
+                    value={level?.progress ?? 0}
+                    label="Seu nível"
+                    caption={xpCaption}
+                    tone="secondary"
+                  />
+                </View>
+              )}
             </Card>
             <Card>
               <View style={styles.row}>
@@ -133,6 +153,7 @@ export default function VolunteerScreen() {
                     label="Oferecer lar temporário"
                     description="Um canto em casa por alguns dias."
                     value={foster}
+                    disabled={!ready}
                     onValueChange={(value) =>
                       update({
                         isFosterAvailable: value,
@@ -155,6 +176,7 @@ export default function VolunteerScreen() {
                       key={km}
                       label={`${km} km`}
                       selected={currentSettings().serviceRadiusKm === km}
+                      disabled={!ready}
                       onPress={() => update({ serviceRadiusKm: km })}
                     />
                   ))}
@@ -171,6 +193,7 @@ export default function VolunteerScreen() {
                         key={pet.id}
                         label={pet.label}
                         selected={currentSettings().fosterPetTypes.includes(pet.id)}
+                        disabled={!ready}
                         onPress={() => togglePet(pet.id)}
                       />
                     ))}
@@ -184,6 +207,7 @@ export default function VolunteerScreen() {
                         key={days}
                         label={`${days} dias`}
                         selected={currentSettings().fosterMaxDays === days}
+                        disabled={!ready}
                         onPress={() => update({ fosterMaxDays: days })}
                       />
                     ))}
@@ -195,7 +219,15 @@ export default function VolunteerScreen() {
           </View>
           <SectionHeader title="Selos" />
           <View style={styles.grid}>
-            {(status.data?.badges ?? fallbackBadges).map((badge) => {
+            {status.isLoading
+              ? fallbackBadges.map((badge) => (
+                  <View key={badge.code} style={styles.seal}>
+                    <Skeleton width={SEAL_SKELETON} height={SEAL_SKELETON} radius="pill" />
+                    <Skeleton width="80%" height={12} />
+                  </View>
+                ))
+              : null}
+            {(status.isLoading ? [] : (status.data?.badges ?? fallbackBadges)).map((badge) => {
               const Art = badgeArtFor(badge.code);
               if (!Art) return null;
               const unlocked = badge.unlockedAt !== null;
