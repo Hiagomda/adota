@@ -293,6 +293,9 @@ export default function HomeScreen() {
             onPress={() => setLens(item.id)}
           />
         ))}
+        {/* Shortcuts to their own screens, after the filters of this list. */}
+        <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
+        <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
       </ScrollView>
       <Stories posts={storyPosts} here={here} />
     </View>
