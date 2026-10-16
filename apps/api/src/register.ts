@@ -50,6 +50,7 @@ import {
 } from './media.js';
 import { assertOwnedMedia } from './mediaPolicy.js';
 import {
+  enqueueHelperCheck,
   enqueueRescueAlert,
   notifyComment,
   notifyDiaryNote,
@@ -429,6 +430,9 @@ export async function registerRoutes(
         request.body,
       );
       await addResponse(pool, id, user, body.kind, body.note);
+      if (body.kind === 'will_help') {
+        await enqueueHelperCheck(queue, id, user.id).catch(bestEffort(request, 'queue:help-check'));
+      }
       return reply.code(201).send({ ok: true });
     },
   );

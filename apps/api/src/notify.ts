@@ -10,7 +10,12 @@ const queueName = 'rescue-alerts';
 interface RescueJob {
   postId: string;
   expanded?: boolean;
+  /** Who said "vou ajudar", for the help-check job. */
+  userId?: string;
 }
+
+/** How long after "vou ajudar" the app asks how it went. */
+export const HELP_CHECK_DELAY_MS = 3 * 60 * 60 * 1000;
 
 export function createQueue(redis: Redis): Queue<RescueJob> {
   return new Queue<RescueJob>(queueName, { connection: redis as unknown as ConnectionOptions });
@@ -22,6 +27,10 @@ export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJo
     async (job) => {
       if (job.name === 'expand') {
         await expandRescueAlert(pool, env, job.data.postId);
+        return;
+      }
+      if (job.name === 'help-check') {
+        if (job.data.userId) await remindHelper(pool, env, job.data.postId, job.data.userId);
         return;
       }
       await dispatchRescueAlert(pool, env, job.data.postId, job.data.expanded ? 1.5 : 1);
@@ -45,6 +54,66 @@ export async function enqueueRescueAlert(
     { postId, expanded: true },
     { delay: 45 * 60 * 1000, jobId: `expand-${postId}` },
   );
+}
+
+/** Schedules the "Conseguiu ir?" question for someone who just said "vou ajudar". */
+export async function enqueueHelperCheck(
+  queue: Queue<RescueJob>,
+  postId: string,
+  userId: string,
+): Promise<void> {
+  await queue.add(
+    'help-check',
+    { postId, userId },
+    {
+      delay: HELP_CHECK_DELAY_MS,
+      jobId: `help-check-${postId}-${userId}`,
+      // Gone once done, so helping the same rescue again later schedules a new one.
+      removeOnComplete: true,
+      removeOnFail: 100,
+    },
+  );
+}
+
+/**
+ * Asks a helper how it went, only if they are still on the way: a rescue nobody updated stays
+ * "a caminho" forever and hides it from people who could go.
+ */
+export async function remindHelper(
+  pool: Pool,
+  env: Env,
+  postId: string,
+  userId: string,
+): Promise<boolean> {
+  const found = await pool.query<{
+    approx_label: string;
+    fcm_tokens: string[];
+    quiet_hours_start: number | null;
+    quiet_hours_end: number | null;
+  }>(
+    `SELECT p.approx_label, u.fcm_tokens, u.quiet_hours_start, u.quiet_hours_end
+     FROM posts p
+     JOIN responses r ON r.post_id = p.id AND r.user_id = $2 AND r.kind = 'will_help'
+     JOIN users u ON u.id = r.user_id
+     WHERE p.id = $1
+       AND p.status = 'on_the_way'
+       AND p.hidden = false
+       AND u.deleted_at IS NULL
+       AND u.notifications_enabled = true`,
+    [postId, userId],
+  );
+  const target = found.rows[0];
+  if (!target) return false;
+  const title = 'Conseguiu ir?';
+  const body = `Conte em ${target.approx_label} se encontrou o animal. Se não deu, toque em Não deu certo.`;
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'help_check', $2::jsonb)`,
+    [userId, JSON.stringify({ postId, title, body })],
+  );
+  if (!isQuiet(target.quiet_hours_start, target.quiet_hours_end, belemHour())) {
+    await sendPush(env, target.fcm_tokens, title, body, postId);
+  }
+  return true;
 }
 
 export async function dispatchRescueAlert(
@@ -220,7 +289,8 @@ export async function notifyStatusChange(
      SELECT u.id, u.fcm_tokens FROM post_follows pf JOIN users u ON u.id = pf.user_id WHERE pf.post_id = $2`,
     [alert.author_id, postId],
   );
-  const title = 'Atualização de resgate';
+  const missed = status === 'not_found';
+  const title = missed ? 'Ninguém encontrou o animal' : 'Atualização de resgate';
   const statusName =
     {
       open: 'Aberto',
@@ -231,7 +301,10 @@ export async function notifyStatusChange(
       for_adoption: 'Para adoção',
       adopted: 'Adotado',
     }[status] ?? status;
-  const body = `${alert.approx_label} agora está: ${statusName}`;
+  // Kept as "agora está: …" for the other steps: the notification list reads the status from it.
+  const body = missed
+    ? `${alert.approx_label} agora está: ${statusName}. Se passar por perto, dê uma olhada.`
+    : `${alert.approx_label} agora está: ${statusName}`;
   for (const person of rowsOf<{ id: string; fcm_tokens: string[] }>(people)) {
     await pool.query(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'status', $2::jsonb)`,
