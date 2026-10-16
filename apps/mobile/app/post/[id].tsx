@@ -36,6 +36,7 @@ import {
   ListItem,
   MarajoaraPattern,
   Notice,
+  PawBurst,
   PhotoScrim,
   Skeleton,
   StatusPill,
@@ -60,6 +61,8 @@ import {
   useTheme,
 } from '../../src/theme';
 import { useLightStatusBar } from '../../src/useLightStatusBar';
+import { logBestEffort } from '../../src/crash/bestEffort';
+import { reportError } from '../../src/crash/reporter';
 
 interface Comment {
   id: string;
@@ -102,6 +105,7 @@ export default function PostScreen() {
   const [editSession, setEditSession] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [helping, setHelping] = useState(false);
+  const [helpBurst, setHelpBurst] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [comment, setComment] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; handle: string } | null>(null);
@@ -178,9 +182,10 @@ export default function PostScreen() {
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => undefined,
+        logBestEffort('post:help-haptic'),
       );
       setHelpOpen(false);
+      setHelpBurst((count) => count + 1);
       setNote(
         'Combinado. O ponto exato deste resgate fica visível para você. O WhatsApp só aparece se a pessoa autorizou.',
       );
@@ -302,9 +307,12 @@ export default function PostScreen() {
 
   function share() {
     if (!item) return;
-    void Share.share({
+    Share.share({
       message: `${animalHeadline(item.animal)} em ${item.approxLabel} no Égua, adota! ${siteUrl}/p/${item.id}`,
       url: `${siteUrl}/p/${item.id}`,
+    }).catch((error: unknown) => {
+      reportError(error, { source: 'handled', where: 'post:share' });
+      setNote('Não consegui abrir o compartilhamento. Tente de novo.');
     });
   }
 
@@ -815,6 +823,7 @@ export default function PostScreen() {
                         : onHelpPress
               }
             />
+            <PawBurst trigger={helpBurst} />
           </View>
         </View>
         {helpingNow ? (

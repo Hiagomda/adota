@@ -27,6 +27,7 @@ export { ListItem, type ListItemProps } from './ListItem';
 export { MarajoaraPattern } from './MarajoaraPattern';
 export { Notice, type NoticeProps } from './Notice';
 export { OrgCard, type OrgCardProps } from './OrgCard';
+export { PawBurst, type PawBurstProps } from './PawBurst';
 export { PhotoScrim } from './PhotoScrim';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { SearchBar } from './SearchBar';
