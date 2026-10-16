@@ -266,9 +266,10 @@ export default function VolunteerScreen() {
                     <ProgressBar
                       key={place.name}
                       value={place.rescued / Math.max(all[0]?.rescued ?? 1, 1)}
-                      label={`${index + 1}º ${place.name}`}
+                      // Ties share a place: three neighborhoods with one animal are all 1º.
+                      label={`${1 + all.filter((other) => other.rescued > place.rescued).length}º ${place.name}`}
                       caption={place.rescued === 1 ? '1 animal' : `${place.rescued} animais`}
-                      tone={index === 0 ? 'secondary' : 'primary'}
+                      tone={place.rescued === all[0]?.rescued ? 'secondary' : 'primary'}
                     />
                   ))}
                 </View>

@@ -12,6 +12,7 @@ import {
   Header,
   SkeletonRows,
 } from '../src/components/ui';
+import { openHelpRequests } from '../src/post/helpRequests';
 import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 
@@ -24,9 +25,7 @@ export default function NeedsScreen() {
     queryKey: ['needs', token],
     queryFn: () => loadFeed(token, '?type=help_request&limit=30'),
   });
-  const open = (needs.data?.posts ?? []).filter(
-    (post) => post.helpRequest && post.status !== 'adopted',
-  );
+  const open = openHelpRequests(needs.data?.posts ?? []);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>

@@ -26,6 +26,7 @@ import {
 import { useSession } from '../../src/session';
 import { motion, spacing, useTheme } from '../../src/theme';
 import { animalHeadline, placeOf } from '../../src/animalLabels';
+import { openHelpRequests } from '../../src/post/helpRequests';
 import { reportReasons, reportSentNote } from '../../src/reportReasons';
 
 interface Profile {
@@ -69,9 +70,7 @@ export default function UserScreen() {
   const organization = Boolean(
     person && (person.verified || person.role === 'ngo' || person.role === 'protector'),
   );
-  const campaigns = (posts.data?.posts ?? []).filter(
-    (post) => post.helpRequest && post.status !== 'adopted',
-  );
+  const campaigns = openHelpRequests(posts.data?.posts ?? []);
   const adoptable = (posts.data?.posts ?? []).filter((post) => post.status === 'for_adoption');
 
   async function toggleFollow() {

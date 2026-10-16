@@ -92,6 +92,7 @@ export default function AdoptionScreen() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.chipRow}
       contentContainerStyle={styles.chips}
     >
       {speciesOptions.map((option) => (
@@ -281,6 +282,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   column: { flex: 1, ...screenColumn },
   search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  // A horizontal scroll in a column grows to fill it unless told not to.
+  chipRow: { flexGrow: 0 },
   chips: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
