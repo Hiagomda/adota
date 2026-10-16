@@ -62,6 +62,36 @@ describe('community', () => {
     await pool.end();
   });
 
+  it('tells the reporter when the team looks at the report', async () => {
+    const authorId = await insertUser('author@egua.local', 'author');
+    const reporterId = await insertUser('reporter@egua.local', 'reporter');
+    await pool.query(
+      `INSERT INTO users (firebase_uid, name, handle, role, city)
+       VALUES ('dev:team@egua.local', 'Equipe', 'team', 'admin', 'Belém')`,
+    );
+    const postId = await rescue('author@egua.local', authorId, 'Marco, Belém');
+    const reported = await app.inject({
+      method: 'POST',
+      url: '/reports',
+      headers: auth('reporter@egua.local'),
+      payload: { targetType: 'post', targetId: postId, reason: 'Maus-tratos' },
+    });
+    expect(reported.statusCode).toBe(201);
+    const report = await pool.query<{ id: string }>(`SELECT id FROM reports LIMIT 1`);
+    const resolved = await app.inject({
+      method: 'POST',
+      url: `/admin/reports/${report.rows[0]?.id}`,
+      headers: auth('team@egua.local'),
+      payload: { action: 'hide' },
+    });
+    expect(resolved.statusCode).toBe(200);
+    const notice = await pool.query<{ payload: { body: string } }>(
+      `SELECT payload FROM notifications WHERE user_id = $1 AND type = 'report'`,
+      [reporterId],
+    );
+    expect(notice.rows[0]?.payload.body).toContain('tirou o conteúdo do ar');
+  });
+
   it('keeps one photo on a diary note', async () => {
     const authorId = await insertUser('author@egua.local', 'author');
     const postId = await rescue('author@egua.local', authorId, 'Marco, Belém');

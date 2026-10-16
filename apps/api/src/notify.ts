@@ -277,6 +277,26 @@ export async function notifySighting(
   }
 }
 
+/**
+ * Tells the person who reported that the team looked at it. In the app only, no push: it is
+ * not urgent, and the target stays anonymous to them either way.
+ */
+export async function notifyReportResolved(
+  pool: Pool,
+  reporterId: string,
+  action: 'hide' | 'dismiss',
+): Promise<void> {
+  const title = 'Sua denúncia foi analisada';
+  const body =
+    action === 'hide'
+      ? 'A equipe tirou o conteúdo do ar. Obrigado por avisar.'
+      : 'A equipe analisou e não viu problema desta vez. Obrigado por avisar.';
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'report', $2::jsonb)`,
+    [reporterId, JSON.stringify({ title, body })],
+  );
+}
+
 export async function notifyComment(
   pool: Pool,
   env: Env,

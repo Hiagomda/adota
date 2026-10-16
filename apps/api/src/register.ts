@@ -56,6 +56,7 @@ import {
   enqueueRescueAlert,
   notifyComment,
   notifyDiaryNote,
+  notifyReportResolved,
   notifyStatusChange,
   type createQueue,
 } from './notify.js';
@@ -732,10 +733,11 @@ export async function registerRoutes(
     requireAdmin(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['hide', 'dismiss']) }), request.body);
-    const report = await pool.query<{ target_type: string; target_id: string }>(
-      `SELECT target_type, target_id FROM reports WHERE id = $1`,
-      [id],
-    );
+    const report = await pool.query<{
+      target_type: string;
+      target_id: string;
+      reporter_id: string;
+    }>(`SELECT target_type, target_id, reporter_id FROM reports WHERE id = $1`, [id]);
     const target = report.rows[0];
     if (!target) throw new HttpError(404, 'Denúncia não encontrada.');
     if (body.action === 'hide') {
@@ -753,6 +755,9 @@ export async function registerRoutes(
       id,
       body.action === 'hide' ? 'hidden' : 'dismissed',
     ]);
+    await notifyReportResolved(pool, target.reporter_id, body.action).catch(
+      bestEffort(request, 'notify:report'),
+    );
     return { status: body.action === 'hide' ? 'hidden' : 'dismissed' };
   });
 
