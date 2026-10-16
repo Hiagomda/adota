@@ -18,3 +18,8 @@ apps/mobile/GoogleService-Info.plist
 .DS_Store
 Thumbs.db
 *.log
+
+# Agent skills: restored from skills-lock.json with `npx skills experimental_install`
+.agents/
+.claude/skills/
+.junie/
