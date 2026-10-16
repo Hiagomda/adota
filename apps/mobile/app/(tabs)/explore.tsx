@@ -163,6 +163,15 @@ export default function ExploreScreen() {
               {bannerText}
             </AppText>
           </View>
+          {feed.isError && !feed.isFetching ? (
+            <Button
+              title="Tentar de novo"
+              icon="refresh-cw"
+              variant="outline"
+              onPress={() => void feed.refetch()}
+              style={styles.bannerAction}
+            />
+          ) : null}
         </Card>
       ) : null}
       {selected ? (
@@ -240,6 +249,7 @@ const styles = StyleSheet.create({
   banner: { position: 'absolute', left: spacing.lg, right: spacing.lg },
   searchArea: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  bannerAction: { marginTop: spacing.md },
   bannerText: { flex: 1 },
   cardWrap: {
     position: 'absolute',

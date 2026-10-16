@@ -16,6 +16,7 @@ import {
   IconButton,
   Input,
   Notice,
+  Skeleton,
   Touchable,
 } from '../src/components/ui';
 import { reportError } from '../src/crash/reporter';
@@ -212,9 +213,16 @@ export default function DonateScreen() {
               onPress={() => router.push({ pathname: '/login', params: { returnTo: '/doar' } })}
             />
           ) : me.isLoading ? (
-            <AppText color="textSecondary">Carregando seu perfil…</AppText>
+            <View accessible accessibilityLabel="Carregando seu perfil" style={styles.group}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton height={44} radius="pill" />
+            </View>
           ) : me.isError || !me.data ? (
-            <Notice message="Não consegui carregar seu perfil. Volte e tente de novo." />
+            <Notice
+              tone="error"
+              message="Não consegui carregar seu perfil."
+              action={{ label: 'Tentar de novo', onPress: () => void me.refetch() }}
+            />
           ) : !isTeamRole(me.data.role) ? (
             <Notice message="Pedido com Pix só a equipe publica. As campanhas abertas continuam no início." />
           ) : (
