@@ -52,7 +52,7 @@ import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
-import { notFoundVisits } from '../../src/post/diaryEntries';
+import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
 import { PostEditor } from '../../src/post/PostEditor';
 import { isTeamRole, useSession } from '../../src/session';
@@ -146,6 +146,11 @@ export default function PostScreen() {
     enabled: Boolean(id && token),
   });
   const whatsapp = useWhatsAppContact(token, setNote);
+  const sightings = useQuery({
+    queryKey: ['sightings', id, token],
+    queryFn: () => api<{ sightings: Sighting[] }>(`/posts/${id}/sightings`, { token }),
+    enabled: Boolean(id),
+  });
   const species = post.data?.animal.species;
   const similar = useQuery({
     queryKey: ['similar', species, token],
@@ -260,6 +265,7 @@ export default function PostScreen() {
   const othersGoing = Math.max(helpers - (item.viewerWillHelp ? 1 : 0), 0);
   const missedVisits = notFoundVisits(item);
   const careList = careChips(item.animal.care);
+  const sightingList = sightings.data?.sightings ?? [];
   const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
   const fosterList = fosters.data?.homes ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
@@ -730,6 +736,51 @@ export default function PostScreen() {
                     </View>
                   ))}
                 </Card>
+              </View>
+            ) : null}
+
+            {rescueOpen || sightingList.length > 0 ? (
+              <View style={styles.section}>
+                <AppText variant="h2">Visto por aí</AppText>
+                {sightingList.length === 0 ? (
+                  <AppText color="textSecondary">
+                    Viu este animal em outro lugar? Marque onde, mesmo sem poder ir. Quem está
+                    cuidando recebe o aviso.
+                  </AppText>
+                ) : (
+                  <Card padding="none" elevation="md">
+                    {sightingList.map((seen, index) => (
+                      <View key={seen.id}>
+                        {index > 0 ? <Divider inset /> : null}
+                        <ListItem
+                          title={`${firstName(seen.author.name)} viu em ${seen.label ?? 'um ponto perto daqui'}`}
+                          subtitle={[formatWhen(seen.createdAt), seen.note]
+                            .filter(Boolean)
+                            .join(' · ')}
+                          icon="eye"
+                          showChevron
+                          onPress={() => {
+                            requestMapFocus({
+                              postId: item.id,
+                              latitude: seen.location.latitude,
+                              longitude: seen.location.longitude,
+                            });
+                            router.navigate('/explore');
+                          }}
+                        />
+                      </View>
+                    ))}
+                  </Card>
+                )}
+                {rescueOpen ? (
+                  <Button
+                    title="Vi esse animal"
+                    icon="eye"
+                    variant="outline"
+                    fullWidth
+                    onPress={() => router.push(`/sighting/${item.id}`)}
+                  />
+                ) : null}
               </View>
             ) : null}
 
@@ -1239,6 +1290,15 @@ function OutcomeOption({
       <Icon name="chevron-right" color={colors.textSecondary} />
     </Touchable>
   );
+}
+
+interface Sighting {
+  id: string;
+  label: string | null;
+  note: string | null;
+  createdAt: string;
+  author: { name: string; handle: string };
+  location: { latitude: number; longitude: number; exact: boolean };
 }
 
 interface FosterHome {
