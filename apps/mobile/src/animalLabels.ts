@@ -1,7 +1,15 @@
 import type { Post } from './types';
 
-export const speciesLabel: Record<string, string> = { dog: 'Cachorro', cat: 'Gato', other: 'Bichinho' };
-export const sizeLabel: Record<string, string> = { small: 'Pequeno', medium: 'Médio', large: 'Grande' };
+export const speciesLabel: Record<string, string> = {
+  dog: 'Cachorro',
+  cat: 'Gato',
+  other: 'Bichinho',
+};
+export const sizeLabel: Record<string, string> = {
+  small: 'Pequeno',
+  medium: 'Médio',
+  large: 'Grande',
+};
 export const sexLabel: Record<string, string> = { male: 'Macho', female: 'Fêmea' };
 
 /** The name typed at registration, or just the species when the animal has no name. */

@@ -3,6 +3,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { updateMeSchema } from '@patinha/shared';
 import type { z } from 'zod';
+import type { Env } from './config.js';
 import { users } from './db/schema.js';
 import { HttpError } from './http.js';
 import { rowsOf, type SessionUser } from './session.js';
@@ -11,11 +12,18 @@ type Database = NodePgDatabase;
 
 type ProfilePatch = z.infer<typeof updateMeSchema>;
 
-/** The account Hiago uses on the phone. The dev login is a different row. */
-const ownerEmail = 'hiago.yan@hotmail.com';
-
-export function isOwnerEmail(email: string | undefined): boolean {
-  return email?.trim().toLowerCase() === ownerEmail;
+/**
+ * The owner accounts come from OWNER_EMAILS. Firebase lets anyone sign up with any address,
+ * so the address only counts once Firebase has verified it.
+ */
+export function isOwnerToken(
+  env: Pick<Env, 'OWNER_EMAILS'>,
+  token: { email?: string; email_verified?: boolean },
+): boolean {
+  if (token.email_verified !== true || !token.email) return false;
+  const email = token.email.trim().toLowerCase();
+  const owners = (env.OWNER_EMAILS ?? '').split(',').map((item) => item.trim().toLowerCase());
+  return owners.includes(email);
 }
 
 /** The installed app treats role `admin` as the team. Do not demote a superadmin. */
@@ -61,6 +69,49 @@ export async function createDevUser(pool: Pool, email: string): Promise<SessionU
   const row = rowsOf<UserRow>(result)[0];
   if (!row) throw new HttpError(500, 'Não consegui criar a conta.');
   return mapUser(row);
+}
+
+/** First @ for a new Firebase account: the e-mail name plus four characters of the uid. */
+export function firstHandle(email: string | undefined, uid: string): string {
+  const base =
+    (email ?? '')
+      .split('@')[0]
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 16) || 'pessoa';
+  return `${base}${uid
+    .slice(0, 4)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '0')}`;
+}
+
+/**
+ * First sign-in. Another account may already own the derived @ (handles are unique), which used
+ * to fail every later request of this person. On that collision, try a random suffix.
+ */
+export async function createFirebaseUser(
+  pool: Pool,
+  input: { uid: string; name: string | undefined; email: string | undefined; role: string },
+): Promise<void> {
+  const first = firstHandle(input.email, input.uid);
+  const candidates = [first, ...Array.from({ length: 4 }, () => `${first}${randomDigits()}`)];
+  for (const handle of candidates) {
+    try {
+      await pool.query(
+        `INSERT INTO users (firebase_uid, name, handle, city, role) VALUES ($1, $2, $3, 'Belém', $4)
+         ON CONFLICT (firebase_uid) DO NOTHING`,
+        [input.uid, input.name ?? 'Pessoa', handle, input.role],
+      );
+      return;
+    } catch (error) {
+      if (!isUnique(error)) throw error;
+    }
+  }
+  throw new Error(`No free handle for the new account after ${candidates.length} tries`);
+}
+
+function randomDigits(): string {
+  return String(Math.floor(Math.random() * 9000 + 1000));
 }
 
 export async function profileByHandle(
@@ -154,21 +205,79 @@ export async function updateProfile(
   }
 }
 
-export async function anonymizeUser(pool: Pool, userId: string): Promise<void> {
-  await pool.query(
-    `UPDATE users
-     SET name = 'Conta excluída',
-         handle = $2,
-         avatar_url = NULL,
-         phone = NULL,
-         whatsapp_opt_in = false,
-         fcm_tokens = '{}',
-         firebase_uid = $3,
-         deleted_at = now()
-     WHERE id = $1`,
-    [userId, `deleted_${userId.slice(0, 8)}`, `deleted:${userId}`],
-  );
+/**
+ * "Excluir conta" (LGPD). One transaction removes what identifies or locates the person:
+ * profile, home location, Casa Amiga, volunteer data, follows, likes, notifications, their
+ * rescues and comments (hidden) and the text of their chat messages. The row itself stays,
+ * renamed, so other people's rescue history and moderation reports keep their links.
+ * Returns the Firebase uid so the caller can also remove the sign-in account.
+ */
+export async function anonymizeUser(pool: Pool, userId: string): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const before = await client.query<{ firebase_uid: string }>(
+      `SELECT firebase_uid FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      [userId],
+    );
+    const firebaseUid = before.rows[0]?.firebase_uid ?? null;
+    await client.query(
+      `UPDATE users
+       SET name = 'Conta excluída',
+           handle = $2,
+           avatar_url = NULL,
+           phone = NULL,
+           whatsapp_opt_in = false,
+           fcm_tokens = '{}',
+           city = NULL,
+           base_location = NULL,
+           notifications_enabled = false,
+           firebase_uid = $3,
+           deleted_at = COALESCE(deleted_at, now())
+       WHERE id = $1`,
+      [userId, `deleted_${userId.replace(/-/g, '')}`, `deleted:${userId}`],
+    );
+    for (const table of personalTables) {
+      await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+    }
+    await client.query(`DELETE FROM follows WHERE follower_id = $1 OR followed_id = $1`, [userId]);
+    await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
+    await client.query(`UPDATE posts SET hidden = true WHERE author_id = $1`, [userId]);
+    await client.query(
+      `UPDATE comments SET hidden = true, body = 'Comentário apagado.' WHERE user_id = $1`,
+      [userId],
+    );
+    await client.query(
+      `UPDATE adoption_messages SET body = 'Mensagem apagada.' WHERE sender_id = $1`,
+      [userId],
+    );
+    await client.query('COMMIT');
+    return firebaseUid && !firebaseUid.startsWith('deleted:') ? firebaseUid : null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
+
+/** Rows that only describe this person. Fixed names, never user input. */
+const personalTables = [
+  'fosters',
+  'volunteer_profiles',
+  'user_xp_history',
+  'user_badges',
+  'post_follows',
+  'likes',
+  'saves',
+  'story_views',
+  'notifications',
+  'adoption_terms',
+  'verification_requests',
+  'staff_totp',
+  'staff_recovery_codes',
+  'admin_sessions',
+] as const;
 
 interface UserRow {
   id: string;

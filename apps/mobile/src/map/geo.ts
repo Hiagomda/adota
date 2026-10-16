@@ -76,6 +76,11 @@ export function boundsAround(point: MapPoint, span = 0.03): MapBounds {
 }
 
 /** Whole Belém box, so paws load before the camera reports its own edges. */
+/** How the camera got to an area: a gesture of the person, or a move the app made. */
+export interface BoundsOrigin {
+  fromUser: boolean;
+}
+
 export const belemBounds: MapBounds = {
   west: -48.62753,
   south: -1.59875,

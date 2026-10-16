@@ -13,6 +13,33 @@ const publicCertificateCredential: Credential = {
   },
 };
 
+/** Codes that always mean the token itself is no good: the person has to sign in again. */
+const tokenRejections = new Set([
+  'auth/id-token-expired',
+  'auth/id-token-revoked',
+  'auth/invalid-id-token',
+  'auth/user-disabled',
+  'auth/user-not-found',
+]);
+
+/** firebase-admin reports a failed download of Google's keys as an argument error too. */
+const serverSideCause =
+  /public key|fetch|network|socket|timeout|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i;
+
+/**
+ * True when verifyIdToken failed because of the token (expired, forged, revoked, malformed).
+ * False for anything on our side or Google's side, which must not sign the person out.
+ */
+export function isTokenRejection(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  const code = error.code;
+  if (typeof code !== 'string') return false;
+  if (tokenRejections.has(code)) return true;
+  if (code !== 'auth/argument-error') return false;
+  const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  return !serverSideCause.test(message);
+}
+
 export function firebaseChecksRevocation(env: Env): boolean {
   return Boolean(env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY);
 }

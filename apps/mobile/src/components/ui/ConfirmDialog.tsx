@@ -40,7 +40,13 @@ export function ConfirmDialog({
           fullWidth
           onPress={onConfirm}
         />
-        <Button title={cancelLabel} variant="ghost" disabled={loading} fullWidth onPress={onCancel} />
+        <Button
+          title={cancelLabel}
+          variant="ghost"
+          disabled={loading}
+          fullWidth
+          onPress={onCancel}
+        />
       </View>
     </AppModal>
   );

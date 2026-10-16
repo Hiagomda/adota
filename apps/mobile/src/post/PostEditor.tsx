@@ -150,7 +150,12 @@ export function PostEditor({
             </View>
           ))}
           {pictures.length < MAX_PHOTOS ? (
-            <Button title="Adicionar foto" icon="image" variant="outline" onPress={() => void addPhoto()} />
+            <Button
+              title="Adicionar foto"
+              icon="image"
+              variant="outline"
+              onPress={() => void addPhoto()}
+            />
           ) : null}
         </View>
         {error ? <AppText color="error">{error}</AppText> : null}

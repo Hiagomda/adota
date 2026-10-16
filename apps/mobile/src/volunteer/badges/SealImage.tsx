@@ -45,7 +45,12 @@ export default function SealImage({ source, size = 80, unlocked = true }: Props)
         <G transform="translate(158 42)">
           <Circle r={18} fill="#3A3A3A" stroke="#FFFFFF" strokeWidth={2.5} />
           <Rect x={-7} y={-1} width={14} height={11} rx={2.5} fill="#FFFFFF" />
-          <Path d="M -4.5 -1 V -5 A 4.5 4.5 0 0 1 4.5 -5 V -1" fill="none" stroke="#FFFFFF" strokeWidth={2.8} />
+          <Path
+            d="M -4.5 -1 V -5 A 4.5 4.5 0 0 1 4.5 -5 V -1"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={2.8}
+          />
         </G>
       )}
     </Svg>

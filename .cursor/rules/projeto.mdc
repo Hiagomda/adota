@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Égua, adota!
 
+> `CLAUDE.md` na raiz é a fonte de verdade. Em qualquer conflito com este arquivo, vale o `CLAUDE.md` (identidade visual, build sem EAS, atualização pela VPS, fotos sem Cloudflare, sem carona solidária).
+
 Rede social de resgate de animais de rua (Android e iOS). Nome: Égua, adota!. Lançamento inicial só em Belém/PA.
 
 ## Como trabalhar
@@ -47,8 +49,7 @@ Não troque sem perguntar.
 
 Inspirado no Instagram, com identidade própria. Princípios: fotos em primeiro lugar, interface limpa, gestos naturais, resposta instantânea.
 
-- Cores: fundo branco (#FFFFFF) / escuro (#000000 a #121212), texto principal quase preto, separadores finos de 0.5 px. Cor de destaque quente e acolhedora (coral/laranja, ex.: #FF6B3D) para botões e ícones ativos. Cores de urgência: vermelho (urgente), âmbar (médio), verde (tranquilo). Tema claro/escuro automático.
-- Tipografia: fonte do sistema, títulos em semibold, corpo 14-15 px, legendas 12-13 px.
+- Cores e fontes: identidade "calor de casa paraense" do `CLAUDE.md` (turquesa #1F7A7A, coral #F26B4E, caramelo #D98A3D, creme #FFF8EE, Baloo 2 nos títulos, Nunito no corpo), sempre pelos tokens de `apps/mobile/src/theme`. Cores de urgência: vermelho (urgente), âmbar (médio), verde (tranquilo). Tema claro/escuro automático.
 - Navegação: barra de abas inferior com 5 itens e ícones sem rótulo: Início (casa), Mapa/Explorar (lupa), Criar (botão central "+", destacado), Alertas (coração/sino) e Perfil (avatar redondo). Cabeçalho do feed com logotipo de texto simples do app à esquerda e ícones de notificação e filtro à direita.
 - "Stories de Resgate" no topo do feed: círculos com avatar e anel colorido por urgência (gradiente para não vistos, cinza para vistos). Mostram resgates urgentes próximos e atualizações recentes (antes/depois, "foi resgatado!"). Toque abre visualizador em tela cheia com barras de progresso, avançar/voltar por toque nas laterais, segurar para pausar, arrastar para baixo para fechar e botão "Eu vou ajudar" no rodapé.
 - Card de post: cabeçalho com avatar, @handle, selo de verificado, distância e tempo, menu "..."; mídia 4:5 com carrossel (pontos e contador 1/N); chips de status e urgência sobre a foto; barra de ações (curtir, comentar, compartilhar, salvar à direita); contagem de curtidas, legenda com "mais", "ver todos os N comentários" e data. Botão primário "Eu vou ajudar" nos posts abertos.
@@ -64,7 +65,7 @@ Inspirado no Instagram, com identidade própria. Princípios: fotos em primeiro 
 Android e iOS. Tudo deve funcionar nas duas plataformas. Use apenas APIs e componentes compatíveis com ambas e trate diferenças (teclado, safe areas, permissões de localização, gestos, status bar).
 
 - `app.config.ts` com `bundleIdentifier` (iOS) e `package` (Android), ícones/splash para as duas, e textos de permissão em português (`NSLocationWhenInUseUsageDescription`, `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`).
-- EAS Build (`eas.json` com perfis `development`, `preview` e `production`) para gerar iOS e Android na nuvem, sem depender de Mac.
+- Sem EAS: o APK é compilado localmente (veja `android-windows-build.mdc`).
 - Firebase: `GoogleService-Info.plist` (iOS) e `google-services.json` (Android); documente como subir a chave APNs no Firebase Cloud Messaging.
 - Login: Google, "Entrar com Apple" e e-mail (a App Store exige opção equivalente quando há login de terceiros).
 - Apps com conteúdo de usuários exigem na revisão: denúncia, bloqueio de usuário, filtro de conteúdo, suporte com contato visível, remoção rápida de conteúdo abusivo, política de privacidade e exclusão de conta no app.

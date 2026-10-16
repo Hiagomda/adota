@@ -48,8 +48,18 @@ export function ProgressBar({ value, label, caption, tone = 'primary' }: Progres
     >
       {label || caption ? (
         <View style={styles.header}>
-          {label ? <AppText variant="bodySmallStrong" color={labelColor}>{label}</AppText> : <View />}
-          {caption ? <AppText variant="caption" color={labelColor}>{caption}</AppText> : null}
+          {label ? (
+            <AppText variant="bodySmallStrong" color={labelColor}>
+              {label}
+            </AppText>
+          ) : (
+            <View />
+          )}
+          {caption ? (
+            <AppText variant="caption" color={labelColor}>
+              {caption}
+            </AppText>
+          ) : null}
         </View>
       ) : null}
       <View

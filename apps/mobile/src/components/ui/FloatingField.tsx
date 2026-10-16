@@ -137,6 +137,11 @@ const styles = StyleSheet.create({
   },
   stack: { flex: 1, justifyContent: 'center', minHeight: size.touch },
   input: { padding: 0, margin: 0, minHeight: size.touch },
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
   errorText: { flex: 1 },
 });

@@ -74,13 +74,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) 
                 style={styles.touch}
               >
                 {isCreate ? (
-                  <View
-                    style={[
-                      styles.create,
-                      shadows.md,
-                      { backgroundColor: colors.secondary },
-                    ]}
-                  >
+                  <View style={[styles.create, shadows.md, { backgroundColor: colors.secondary }]}>
                     <Ionicons name={icon.active} size={size.icon.xl} color={colors.onSecondary} />
                   </View>
                 ) : (
@@ -127,7 +121,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   slot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  touch: { alignItems: 'center', justifyContent: 'center', minWidth: size.touch, minHeight: size.touch },
+  touch: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: size.touch,
+    minHeight: size.touch,
+  },
   icon: {
     width: size.control,
     height: size.control,

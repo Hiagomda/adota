@@ -10,5 +10,11 @@ export const pawSource: Record<Urgency, ImageSourcePropType> = {
 };
 
 export function pawUri(urgency: Urgency): string {
-  return Image.resolveAssetSource(pawSource[urgency])?.uri ?? '';
+  const source = pawSource[urgency];
+  // On the web an image module already is `{ uri }`, and react-native-web has no
+  // resolveAssetSource: calling it threw inside the map's moveend and no paw was drawn.
+  if (!Array.isArray(source) && typeof source === 'object' && typeof source.uri === 'string') {
+    return source.uri;
+  }
+  return Image.resolveAssetSource(source)?.uri ?? '';
 }

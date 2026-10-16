@@ -1,6 +1,7 @@
 # Test stack for the VPS that already runs Coolify.
 # Coolify's proxy owns ports 80 and 443, so this file publishes none.
-# Public URLs come from SERVICE_URL_* and the domain fields in Coolify.
+# Public URLs are fixed here and must match the domain fields in Coolify. The installed APK
+# calls api-…, photos load from imgproxy-… and uploads go to minio-… on the same sslip host.
 
 name: egua-adota
 
@@ -52,7 +53,7 @@ services:
   imgproxy:
     image: darthsim/imgproxy:v3.30.1
     environment:
-      SERVICE_URL_IMGPROXY_8080: ${SERVICE_URL_IMGPROXY_8080:-https://img.86.48.25.233.sslip.io}
+      SERVICE_URL_IMGPROXY_8080: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       IMGPROXY_USE_S3: 'true'
       IMGPROXY_S3_ENDPOINT: http://minio:9000
       IMGPROXY_S3_REGION: us-east-1
@@ -75,13 +76,14 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     environment:
-      SERVICE_URL_API_3010: ${SERVICE_URL_API_3010:-https://api.86.48.25.233.sslip.io}
+      SERVICE_URL_API_3010: http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       NODE_ENV: production
       PORT: '3010'
       DATABASE_URL: postgres://patinha:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/patinha
       REDIS_URL: redis://redis:6379
       AUTH_DEV_MODE: 'false'
       FIREBASE_PROJECT_ID: egua-adota
+      OWNER_EMAILS: hiago.yan@hotmail.com
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
@@ -90,7 +92,7 @@ services:
       IMGPROXY_URL: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
       IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
-      WEB_ORIGIN: ${SERVICE_URL_DOWNLOAD_80:-https://baixar.86.48.25.233.sslip.io}
+      WEB_ORIGIN: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       SEED_IF_EMPTY: 'true'
     command:
       - sh
@@ -123,7 +125,7 @@ services:
       context: .
       dockerfile: docker/download.Dockerfile
     environment:
-      SERVICE_URL_DOWNLOAD_80: ${SERVICE_URL_DOWNLOAD_80:-https://baixar.86.48.25.233.sslip.io}
+      SERVICE_URL_DOWNLOAD_80: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
     volumes:
       - apk:/apk
     restart: unless-stopped

@@ -1,12 +1,15 @@
 import Constants from 'expo-constants';
-import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 import { fetchWithTimeout, isNetworkError } from '../api';
 import { appVersion, buildNumber } from '../appVersion';
 import { reportError } from '../crash/reporter';
+import { withDeadline } from './deadline';
 import { isNewerNativeRelease, parsePublishedNativeApp } from './publishedVersion';
 
 const fallbackDownloadPage = 'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io';
+
+/** The VPS answers in well under a second. Past this, the app opens and skips the offer. */
+export const UPDATE_CHECK_TIMEOUT_MS = 3000;
 
 function readDownloadPageUrl(extra: unknown): string | null {
   if (!extra || typeof extra !== 'object') return null;
@@ -19,8 +22,8 @@ export const downloadPageUrl =
   readDownloadPageUrl(Constants.expoConfig?.extra) ??
   fallbackDownloadPage;
 
-export type AppUpdateOffer =
-  { kind: 'native'; apkUrl: string; version: string; notes: string[] } | { kind: 'ota' };
+/** A newer APK on the download page of the VPS. That page is the only update source. */
+export type AppUpdateOffer = { apkUrl: string; version: string; notes: string[] };
 
 export function apkDownloadUrl(page: string): string {
   return `${page.replace(/\/$/, '')}/egua-adota.apk`;
@@ -28,9 +31,11 @@ export function apkDownloadUrl(page: string): string {
 
 async function checkNativeRelease(): Promise<AppUpdateOffer | null> {
   const page = downloadPageUrl.replace(/\/$/, '');
-  const response = await fetchWithTimeout(`${page}/version.json`, {
-    headers: { accept: 'application/json', 'cache-control': 'no-cache' },
-  });
+  const response = await fetchWithTimeout(
+    `${page}/version.json`,
+    { headers: { accept: 'application/json', 'cache-control': 'no-cache' } },
+    UPDATE_CHECK_TIMEOUT_MS,
+  );
   if (!response.ok) return null;
   const published = parsePublishedNativeApp(await response.json());
   if (!published) return null;
@@ -39,60 +44,30 @@ async function checkNativeRelease(): Promise<AppUpdateOffer | null> {
     published,
   );
   if (!newer) return null;
-  return {
-    kind: 'native',
-    apkUrl: apkDownloadUrl(page),
-    version: published.version,
-    notes: published.notes,
-  };
+  return { apkUrl: apkDownloadUrl(page), version: published.version, notes: published.notes };
 }
 
-function otaUpdatesAvailable(): boolean {
-  return requireOptionalNativeModule('ExpoUpdates') != null;
-}
-
-async function checkOtaUpdate(): Promise<AppUpdateOffer | null> {
-  if (!otaUpdatesAvailable()) return null;
-  const updates = await import('expo-updates');
-  if (!updates.isEnabled) return null;
-  const result = await updates.checkForUpdateAsync();
-  if (result.isAvailable || result.isRollBackToEmbedded) return { kind: 'ota' };
-  return null;
-}
-
+/** Never rejects and never takes longer than the timeout: a dead VPS only means no offer. */
 export async function checkForAppUpdate(): Promise<AppUpdateOffer | null> {
-  if (Platform.OS === 'web') return null;
-
-  if (Platform.OS === 'android') {
-    try {
-      const native = await checkNativeRelease();
-      if (native) return native;
-    } catch (error) {
-      // Offline or timeout: the OTA check below may still succeed.
-      if (!isNetworkError(error)) {
-        reportError(error, { source: 'handled', where: 'update:native' });
-      }
-    }
-  }
-
+  // The APK from the VPS is the Android channel. iOS will update through the App Store.
+  if (Platform.OS !== 'android') return null;
   try {
-    return await checkOtaUpdate();
+    return await withDeadline(checkNativeRelease(), UPDATE_CHECK_TIMEOUT_MS, null);
   } catch (error) {
     if (!isNetworkError(error)) {
-      reportError(error, { source: 'handled', where: 'update:ota' });
+      reportError(error, { source: 'handled', where: 'update:native' });
     }
     return null;
   }
 }
 
-export async function applyOtaUpdate(): Promise<void> {
-  if (!otaUpdatesAvailable()) {
-    throw new Error('Update was not downloaded');
-  }
-  const updates = await import('expo-updates');
-  const fetched = await updates.fetchUpdateAsync();
-  if (!fetched.isNew && !fetched.isRollBackToEmbedded) {
-    throw new Error('Update was not downloaded');
-  }
-  await updates.reloadAsync();
+let startupCheck: Promise<AppUpdateOffer | null> | null = null;
+
+/**
+ * The first thing the app does when the JS starts. Later callers get the same answer instead of
+ * asking the VPS again.
+ */
+export function startStartupUpdateCheck(): Promise<AppUpdateOffer | null> {
+  startupCheck ??= checkForAppUpdate();
+  return startupCheck;
 }

@@ -183,7 +183,9 @@ export default function DonateScreen() {
         setMessage('Sem internet. O pedido de doação precisa de conexão para publicar.');
         return;
       }
-      setMessage(error instanceof ApiError ? error.message : 'Não consegui publicar. Tente de novo.');
+      setMessage(
+        error instanceof ApiError ? error.message : 'Não consegui publicar. Tente de novo.',
+      );
     } finally {
       setPending(false);
     }
@@ -238,7 +240,9 @@ export default function DonateScreen() {
                       icon="x"
                       variant="filled"
                       accessibilityLabel="Remover esta foto"
-                      onPress={() => setPhotos((current) => current.filter((item) => item !== photo))}
+                      onPress={() =>
+                        setPhotos((current) => current.filter((item) => item !== photo))
+                      }
                       style={styles.removePhoto}
                     />
                   </View>
@@ -249,7 +253,10 @@ export default function DonateScreen() {
                     accessibilityLabel="Escolher foto da galeria"
                     pressedScale={0.96}
                     onPress={pickFromLibrary}
-                    style={[styles.add, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}
+                    style={[
+                      styles.add,
+                      { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+                    ]}
                   >
                     <Icon name="image" size="lg" color={colors.onPrimarySoft} />
                   </Touchable>
@@ -313,7 +320,9 @@ export default function DonateScreen() {
                   accuracyM={moved ? null : (located?.accuracy ?? null)}
                   urgency="low"
                   onOutside={() =>
-                    setMessage('Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.')
+                    setMessage(
+                      'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
+                    )
                   }
                   onChange={(next, fromUser) => {
                     if (!fromUser || !insideServiceArea(next)) return;

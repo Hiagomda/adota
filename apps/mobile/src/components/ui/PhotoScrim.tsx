@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../../theme';
 
@@ -18,22 +18,23 @@ export function PhotoScrim({ stop = 0.4, edge = 'bottom' }: PhotoScrimProps) {
   // One id per look: on the web, ids are global and two different gradients must not share one.
   const id = `photo-scrim-${edge}-${Math.round(stop * 100)}`;
   const darkAtBottom = edge === 'bottom';
+  // The accessibility props live on a View: on the web an Svg hands them to the DOM as-is.
   return (
-    <Svg
+    <View
       style={StyleSheet.absoluteFill}
-      width="100%"
-      height="100%"
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Defs>
-        <LinearGradient id={id} x1="0" y1={darkAtBottom ? 0 : 1} x2="0" y2={darkAtBottom ? 1 : 0}>
-          <Stop offset={stop} stopColor={colors.photoScrim} stopOpacity={0} />
-          <Stop offset={1} stopColor={colors.photoScrim} stopOpacity={0.92} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+      <Svg width="100%" height="100%">
+        <Defs>
+          <LinearGradient id={id} x1="0" y1={darkAtBottom ? 0 : 1} x2="0" y2={darkAtBottom ? 1 : 0}>
+            <Stop offset={stop} stopColor={colors.photoScrim} stopOpacity={0} />
+            <Stop offset={1} stopColor={colors.photoScrim} stopOpacity={0.92} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
+    </View>
   );
 }

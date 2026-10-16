@@ -6,7 +6,8 @@ import type { MapPoint } from '../map/geo';
 import { openAppSettings, permissionOutcome } from '../permissions';
 import { readDeviceFix } from './deviceLocation';
 
-export type GpsStatus = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout' | 'weak';
+export type GpsStatus =
+  'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout' | 'weak';
 
 export interface GpsFix extends MapPoint {
   accuracy: number;

@@ -38,6 +38,8 @@ const envSchema = z.object({
   ADMIN_TOTP_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   /** Comma-separated IPs. Empty means the staff API does not filter by address. */
   ADMIN_IP_ALLOWLIST: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /** Comma-separated e-mails promoted to admin once Firebase has verified them. */
+  OWNER_EMAILS: z.preprocess(blankAsUnset, z.string().min(3).optional()),
   /** How many reverse proxies sit in front of the API. 1 is Caddy or Coolify. */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
 });

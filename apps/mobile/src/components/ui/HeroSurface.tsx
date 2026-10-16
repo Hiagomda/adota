@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { size, useTheme } from '../../theme';
 import { MARAJOARA_PATTERN_ID, MarajoaraPatternDef } from './MarajoaraPattern';

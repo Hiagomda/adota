@@ -34,7 +34,9 @@ export function BottomSheet({ visible, onClose, onClosed, title, children }: Bot
   const drag = useSharedValue(0);
   const onClosedRef = useRef(onClosed);
   const sawOpen = useRef(false);
-  onClosedRef.current = onClosed;
+  useEffect(() => {
+    onClosedRef.current = onClosed;
+  }, [onClosed]);
   useEffect(() => {
     if (mounted) {
       sawOpen.current = true;
@@ -72,7 +74,9 @@ export function BottomSheet({ visible, onClose, onClosed, title, children }: Bot
       onRequestClose={onClose}
     >
       <GestureHandlerRootView style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }, backdrop]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }, backdrop]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Fechar"
@@ -126,7 +130,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
   },
-  handleArea: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingTop: spacing.sm },
+  handleArea: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.sm,
+  },
   handle: { width: 40, height: 4, borderRadius: radius.pill },
   title: { alignSelf: 'flex-start', paddingTop: spacing.md, paddingBottom: spacing.sm },
 });

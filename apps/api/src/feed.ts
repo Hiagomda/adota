@@ -1,5 +1,6 @@
 import {
   canTransitionStatus,
+  insideServiceArea,
   looksLikeAnimalSale,
   statusAfterLeavingHelp,
   type AnimalStatus,
@@ -205,6 +206,10 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
 
 export async function createPost(pool: Pool, env: Env, user: SessionUser, input: CreatePostInput) {
   if (input.parentPostId) return addDiaryNote(pool, user, input);
+  // Updates reuse the rescue's own point, so only a new rescue is checked against the area.
+  if (!insideServiceArea(input)) {
+    throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
+  }
   assertHelpRequest(user, input);
   assertOwnedMedia(
     user.id,

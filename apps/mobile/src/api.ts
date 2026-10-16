@@ -57,7 +57,11 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 function isAbortError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
 }
 
 /**
@@ -115,7 +119,13 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
       init.timeoutMs,
     );
   } catch (error) {
-    recordRequest({ method, path: requestPath(url), status: 0, ms: Date.now() - started, bytes: 0 });
+    recordRequest({
+      method,
+      path: requestPath(url),
+      status: 0,
+      ms: Date.now() - started,
+      bytes: 0,
+    });
     throw error;
   }
   const bytes = Number(response.headers.get('content-length') ?? 0);
@@ -205,14 +215,19 @@ export async function loadFeed(
   search = '',
 ): Promise<{ posts: Post[]; nextCursor: string | null }> {
   const page = await api(`/posts${search}`, { token, schema: feedPageSchema });
-  return { posts: parseList(postSchema, page.posts, `/posts${search}`), nextCursor: page.nextCursor };
+  return {
+    posts: parseList(postSchema, page.posts, `/posts${search}`),
+    nextCursor: page.nextCursor,
+  };
 }
 
 export function loadPost(id: string, token: string | null) {
   return api<Post>(`/posts/${id}`, { token, schema: postSchema });
 }
 
-export async function loadNotifications(token: string): Promise<{ notifications: AppNotification[] }> {
+export async function loadNotifications(
+  token: string,
+): Promise<{ notifications: AppNotification[] }> {
   const page = await api('/notifications', { token, schema: notificationsPageSchema });
   return { notifications: parseList(notificationSchema, page.notifications, '/notifications') };
 }

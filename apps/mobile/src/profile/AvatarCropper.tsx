@@ -146,7 +146,10 @@ export function AvatarCropper({
           perfil.
         </AppText>
         <View
-          style={[styles.frame, { borderColor: colors.primary, backgroundColor: colors.surfaceMuted }]}
+          style={[
+            styles.frame,
+            { borderColor: colors.primary, backgroundColor: colors.surfaceMuted },
+          ]}
         >
           <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
             <Animated.View style={[styles.photo, imageStyle]}>

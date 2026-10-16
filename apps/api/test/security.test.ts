@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { isOwnerToken } from '../src/accounts.js';
 import { buildApp } from '../src/app.js';
 import { requireRole, requireUser } from '../src/authz.js';
 import type { Env } from '../src/config.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
-import { firebaseChecksRevocation } from '../src/firebaseAdmin.js';
+import { firebaseChecksRevocation, isTokenRejection } from '../src/firebaseAdmin.js';
 import { extensionKind, ownedMediaKey, sniffImage } from '../src/mediaPolicy.js';
 import { assertHelpRequest, publicPixKey, publicPlace } from '../src/privacy.js';
 import type { SessionUser } from '../src/session.js';
@@ -74,6 +75,36 @@ describe('authorization', () => {
   it('refuses a role field on the profile update', () => {
     const parsed = updateMeSchema.safeParse({ name: 'Ana', role: 'admin' });
     expect(parsed.success).toBe(false);
+  });
+
+  it('signs out only when Firebase rejects the token itself', () => {
+    const fail = (code: string, message = '') => Object.assign(new Error(message), { code });
+    expect(isTokenRejection(fail('auth/id-token-expired'))).toBe(true);
+    expect(isTokenRejection(fail('auth/id-token-revoked'))).toBe(true);
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'Firebase ID token has invalid signature.')),
+    ).toBe(true);
+    // Google's keys could not be downloaded: a server problem, the session stays.
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'Error fetching public keys for Google certs')),
+    ).toBe(false);
+    expect(
+      isTokenRejection(fail('auth/argument-error', 'getaddrinfo EAI_AGAIN googleapis.com')),
+    ).toBe(false);
+    expect(isTokenRejection(fail('auth/internal-error'))).toBe(false);
+    expect(isTokenRejection(fail('ECONNREFUSED'))).toBe(false);
+    expect(isTokenRejection(new Error('database down'))).toBe(false);
+  });
+
+  it('makes the owner admin only after Firebase verified the address', () => {
+    const owners = { OWNER_EMAILS: 'dono@example.com, outra@example.com' };
+    expect(isOwnerToken(owners, { email: 'Dono@Example.com', email_verified: true })).toBe(true);
+    expect(isOwnerToken(owners, { email: 'outra@example.com', email_verified: true })).toBe(true);
+    // Anyone can create an e-mail account with the owner's address before verifying it.
+    expect(isOwnerToken(owners, { email: 'dono@example.com', email_verified: false })).toBe(false);
+    expect(isOwnerToken(owners, { email: 'dono@example.com' })).toBe(false);
+    expect(isOwnerToken(owners, { email: 'alguem@example.com', email_verified: true })).toBe(false);
+    expect(isOwnerToken({}, { email: 'dono@example.com', email_verified: true })).toBe(false);
   });
 });
 

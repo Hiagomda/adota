@@ -17,7 +17,11 @@ export function InfoChip({ label, icon, tone = 'neutral' }: InfoChipProps) {
   const { colors } = useTheme();
   const { background, foreground } = toneColors(colors, tone);
   return (
-    <View accessible accessibilityLabel={label} style={[styles.chip, { backgroundColor: background }]}>
+    <View
+      accessible
+      accessibilityLabel={label}
+      style={[styles.chip, { backgroundColor: background }]}
+    >
       {icon ? <Icon name={icon} size="sm" color={foreground} /> : null}
       <AppText variant="bodySmallStrong" style={{ color: foreground }}>
         {label}

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../src/api';
@@ -49,11 +49,13 @@ export default function SettingsScreen() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [crop, setCrop] = useState<{ uri: string; width: number; height: number } | null>(null);
 
-  useEffect(() => {
-    if (!me.data) return;
+  // Refill the form when a fresh account arrives, during render instead of in an effect.
+  const [filledFrom, setFilledFrom] = useState<typeof me.data>(undefined);
+  if (me.data && me.data !== filledFrom) {
+    setFilledFrom(me.data);
     setName(me.data.name);
     setHandle(me.data.handle);
-  }, [me.data]);
+  }
 
   async function run(task: () => Promise<unknown>, success: string) {
     if (!token) {
@@ -360,7 +362,7 @@ export default function SettingsScreen() {
       <ConfirmDialog
         visible={confirmDelete}
         title="Excluir sua conta?"
-        message="Seu perfil é anonimizado e seu telefone, foto e avisos são apagados. Isso não pode ser desfeito."
+        message="Apagamos seu perfil, telefone, localização, fotos, Casa Amiga, conquistas e avisos. Seus resgates e comentários saem do app. Isso não pode ser desfeito."
         confirmLabel="Excluir minha conta"
         destructive
         loading={deleting}

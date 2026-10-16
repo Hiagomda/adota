@@ -55,8 +55,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <p>{post.description}</p>
           <p>
             {post.animal.name?.trim() || speciesLabel[post.animal.species] || 'Animal'} · publicado
-            por{' '}
-            <Link href={`/u/${post.author.handle}`}>@{post.author.handle}</Link>
+            por <Link href={`/u/${post.author.handle}`}>@{post.author.handle}</Link>
             {post.author.verified ? ' · verificado' : ''}
           </p>
           <p>

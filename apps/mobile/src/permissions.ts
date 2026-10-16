@@ -9,7 +9,9 @@ import { Linking, Platform } from 'react-native';
  */
 export type PermissionOutcome = 'granted' | 'denied' | 'blocked';
 
-export function permissionOutcome(response: Pick<PermissionResponse, 'granted' | 'canAskAgain'>): PermissionOutcome {
+export function permissionOutcome(
+  response: Pick<PermissionResponse, 'granted' | 'canAskAgain'>,
+): PermissionOutcome {
   if (response.granted) return 'granted';
   return response.canAskAgain ? 'denied' : 'blocked';
 }

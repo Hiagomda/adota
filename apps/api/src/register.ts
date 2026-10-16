@@ -11,7 +11,7 @@ import {
   volunteerSettingsSchema,
 } from '@patinha/shared';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
@@ -19,13 +19,14 @@ import { registerAdoptionChat } from './adoptionChat.js';
 import {
   anonymizeUser,
   createDevUser,
+  createFirebaseUser,
   findUserByFirebaseUid,
   grantOwnerRole,
-  isOwnerEmail,
+  isOwnerToken,
   profileByHandle,
   updateProfile,
 } from './accounts.js';
-import { requireAdmin, requireUser } from './authz.js';
+import { isOperator, requireAdmin, requireUser } from './authz.js';
 import type { Env } from './config.js';
 import {
   addResponse,
@@ -37,10 +38,15 @@ import {
   listPosts,
   updatePost,
 } from './feed.js';
-import { ensureFirebaseApp, firebaseChecksRevocation } from './firebaseAdmin.js';
+import { ensureFirebaseApp, firebaseChecksRevocation, isTokenRejection } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
 import { HttpError } from './http.js';
-import { publicMediaUrl, presignUploads, verifyUploadedImages } from './media.js';
+import {
+  deleteUserUploads,
+  publicMediaUrl,
+  presignUploads,
+  verifyUploadedImages,
+} from './media.js';
 import { assertOwnedMedia } from './mediaPolicy.js';
 import {
   enqueueRescueAlert,
@@ -49,6 +55,7 @@ import {
   notifyStatusChange,
   type createQueue,
 } from './notify.js';
+import { fosterDistanceKm } from './privacy.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
 import { registerStaffRoutes } from './staff/routes.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
@@ -80,6 +87,28 @@ const verificationSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+/**
+ * Write limits count per account, after the session is resolved: many phones in Belém share one
+ * carrier IP (CGNAT), so an IP count would block neighbours. Without a session it falls back to
+ * the IP. The global per-IP limit in app.ts still runs first as a flood guard.
+ */
+function perAccount(max: number) {
+  return {
+    config: {
+      rateLimit: {
+        max,
+        timeWindow: '1 minute',
+        hook: 'preHandler' as const,
+        keyGenerator: (request: FastifyRequest) =>
+          request.user ? `user:${request.user.id}` : `ip:${request.ip}`,
+      },
+    },
+  };
+}
+const writeLimit = perAccount(30);
+/** Actions that change XP, verification or the account itself. */
+const strictLimit = perAccount(5);
+
 export async function registerRoutes(
   app: FastifyInstance,
   deps: { env: Env; pool: Pool; queue: RescueQueue; storage: S3Client },
@@ -89,7 +118,7 @@ export async function registerRoutes(
 
   app.decorateRequest('user', null);
   app.addHook('onRequest', async (request) => {
-    request.user = await resolveUser(env, pool, request.headers.authorization);
+    request.user = await resolveUser(env, pool, request.headers.authorization, request.log);
   });
 
   app.get('/auth/config', async () => ({
@@ -116,17 +145,17 @@ export async function registerRoutes(
     return volunteerStatus(pool, user.id);
   });
 
-  app.put('/volunteers/settings', async (request) => {
+  app.put('/volunteers/settings', writeLimit, async (request) => {
     const user = requireUser(request.user);
     return saveVolunteerSettings(pool, user.id, parse(volunteerSettingsSchema, request.body));
   });
 
-  app.post('/volunteers/actions/claim-xp', async (request) => {
+  app.post('/volunteers/actions/claim-xp', strictLimit, async (request) => {
     const user = requireUser(request.user);
     return claimVolunteerXp(pool, user.id, parse(claimVolunteerXpSchema, request.body));
   });
 
-  app.patch('/me', async (request) => {
+  app.patch('/me', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const patch = parse(updateMeSchema, request.body);
     if (patch.avatarUrl?.startsWith('uploads/')) {
@@ -139,7 +168,7 @@ export async function registerRoutes(
     return publicUser(fresh);
   });
 
-  app.post('/me/fcm-token', async (request) => {
+  app.post('/me/fcm-token', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const { token } = parse(z.object({ token: z.string().min(8).max(512) }), request.body);
     await pool.query(
@@ -151,13 +180,26 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.delete('/me', async (request, reply) => {
+  app.delete('/me', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
-    await anonymizeUser(pool, user.id);
+    const firebaseUid = await anonymizeUser(pool, user.id);
+    // The account is already gone from the app. Photos and the sign-in record follow; a failure
+    // there is logged for a manual cleanup instead of failing the request.
+    await deleteUserUploads(env, storage, user.id).catch(
+      bestEffort(request, 'delete-account:photos'),
+    );
+    if (firebaseUid && firebaseChecksRevocation(env)) {
+      await ensureFirebaseApp(env);
+      const admin = await import('firebase-admin');
+      await admin
+        .auth()
+        .deleteUser(firebaseUid)
+        .catch(bestEffort(request, 'delete-account:firebase'));
+    }
     return reply.code(204).send();
   });
 
-  app.post('/me/verification', async (request, reply) => {
+  app.post('/me/verification', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const body = parse(verificationSchema, request.body);
     await pool.query(
@@ -179,7 +221,7 @@ export async function registerRoutes(
     };
   });
 
-  app.post('/users/:id/follow', async (request) => {
+  app.post('/users/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode seguir a própria conta.');
@@ -190,7 +232,7 @@ export async function registerRoutes(
     return { following: true };
   });
 
-  app.delete('/users/:id/follow', async (request) => {
+  app.delete('/users/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM follows WHERE follower_id = $1 AND followed_id = $2`, [
@@ -200,7 +242,7 @@ export async function registerRoutes(
     return { following: false };
   });
 
-  app.post('/users/:id/block', async (request) => {
+  app.post('/users/:id/block', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     if (id === user.id) throw new HttpError(400, 'Você não pode bloquear a própria conta.');
@@ -215,7 +257,7 @@ export async function registerRoutes(
     return { blocked: true };
   });
 
-  app.delete('/users/:id/block', async (request) => {
+  app.delete('/users/:id/block', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, [user.id, id]);
@@ -246,7 +288,9 @@ export async function registerRoutes(
       try {
         const address = await reverseAddress(query.latitude, query.longitude);
         return { address };
-      } catch {
+      } catch (error) {
+        // The address is a convenience; the pin alone is enough to publish.
+        request.log.warn({ err: error }, 'geocode: reverse lookup failed');
         return { address: null };
       }
     },
@@ -305,7 +349,9 @@ export async function registerRoutes(
         created.reviewStatus === 'published' &&
         !body.parentPostId
       ) {
-        await enqueueRescueAlert(queue, created.id, body.urgency).catch(() => undefined);
+        await enqueueRescueAlert(queue, created.id, body.urgency).catch(
+          bestEffort(request, 'queue:rescue-alert'),
+        );
       }
       if (body.parentPostId && created.reviewStatus === 'published') {
         await notifyDiaryNote(
@@ -314,13 +360,13 @@ export async function registerRoutes(
           body.parentPostId,
           user.id,
           stripControls(body.description),
-        ).catch(() => undefined);
+        ).catch(bestEffort(request, 'notify:diary-note'));
       }
       return reply.code(201).send(created);
     },
   );
 
-  app.patch('/posts/:id', async (request) => {
+  app.patch('/posts/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(updatePostSchema, request.body);
@@ -330,7 +376,7 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.delete('/posts/:id', async (request) => {
+  app.delete('/posts/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await deletePost(pool, id, user);
@@ -346,22 +392,26 @@ export async function registerRoutes(
       const body = parse(z.object({ outcome: leaveHelpOutcomeSchema }), request.body);
       const result = await leaveHelp(pool, id, user, body.outcome);
       if (result.changed) {
-        await notifyStatusChange(pool, env, id, result.status).catch(() => undefined);
+        await notifyStatusChange(pool, env, id, result.status).catch(
+          bestEffort(request, 'notify:status'),
+        );
       } else if (result.noted) {
         await notifyDiaryNote(pool, env, id, user.id, 'Não encontrei o animal.').catch(
-          () => undefined,
+          bestEffort(request, 'notify:diary-note'),
         );
       }
       return result;
     },
   );
 
-  app.patch('/posts/:id/status', async (request) => {
+  app.patch('/posts/:id/status', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ status: animalStatusSchema }), request.body);
     await changeStatus(pool, id, user, body.status);
-    await notifyStatusChange(pool, env, id, body.status).catch(() => undefined);
+    await notifyStatusChange(pool, env, id, body.status).catch(
+      bestEffort(request, 'notify:status'),
+    );
     return { status: body.status };
   });
 
@@ -442,6 +492,14 @@ export async function registerRoutes(
       const user = requireUser(request.user);
       const id = resourceId(request.params);
       const body = parse(commentSchema, request.body);
+      // Same visibility as GET /posts/:id/comments: no comments on a hidden or unpublished post.
+      const post = await pool.query<{ author_id: string }>(
+        `SELECT author_id FROM posts
+         WHERE id = $1 AND hidden = false AND review_status = 'published'`,
+        [id],
+      );
+      const postAuthorId = post.rows[0]?.author_id;
+      if (!postAuthorId) throw new HttpError(404, 'Esse resgate não está mais disponível.');
       let parentAuthorId: string | null = null;
       if (body.parentCommentId) {
         const parent = await pool.query<{ user_id: string }>(
@@ -453,20 +511,39 @@ export async function registerRoutes(
         if (!parentRow) throw new HttpError(404, 'Esse comentário não existe mais.');
         parentAuthorId = parentRow.user_id;
       }
+      // A block in either direction keeps both people out of each other's threads.
+      const others = [postAuthorId, parentAuthorId].filter(
+        (other): other is string => other !== null && other !== user.id,
+      );
+      if (others.length > 0) {
+        const blocked = await pool.query(
+          `SELECT 1 FROM blocks
+           WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[]))
+              OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))
+           LIMIT 1`,
+          [user.id, others],
+        );
+        if ((blocked.rowCount ?? 0) > 0) {
+          throw new HttpError(403, 'Você não pode comentar nesta conversa.');
+        }
+      }
       const inserted = await pool.query<{ id: string }>(
         `INSERT INTO comments (post_id, user_id, body, parent_comment_id)
          VALUES ($1, $2, $3, $4) RETURNING id`,
         [id, user.id, body.body, body.parentCommentId ?? null],
       );
-      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId);
+      // The comment is saved; a failed notification must not answer 500 and invite a duplicate.
+      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId).catch(
+        bestEffort(request, 'notify:comment'),
+      );
       return reply.code(201).send({ id: inserted.rows[0]?.id });
     },
   );
 
-  app.post('/posts/:id/like', async (request) => toggle(pool, 'likes', request));
-  app.post('/posts/:id/save', async (request) => toggle(pool, 'saves', request));
+  app.post('/posts/:id/like', writeLimit, async (request) => toggle(pool, 'likes', request));
+  app.post('/posts/:id/save', writeLimit, async (request) => toggle(pool, 'saves', request));
 
-  app.post('/posts/:id/follow', async (request) => {
+  app.post('/posts/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(
@@ -476,14 +553,14 @@ export async function registerRoutes(
     return { following: true };
   });
 
-  app.delete('/posts/:id/follow', async (request) => {
+  app.delete('/posts/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(`DELETE FROM post_follows WHERE user_id = $1 AND post_id = $2`, [user.id, id]);
     return { following: false };
   });
 
-  app.post('/posts/:id/story-view', async (request) => {
+  app.post('/posts/:id/story-view', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     await pool.query(
@@ -493,19 +570,34 @@ export async function registerRoutes(
     return { viewed: true };
   });
 
+  // Casa Amiga addresses are homes. Only the people allowed to see the exact pin of this rescue
+  // get the list, and only in whole kilometres, so distances from many posts cannot pin a house.
+  // Everyone else gets an empty list: same shape, so older APKs just hide the section.
   app.get('/posts/:id/fosters', async (request) => {
     const id = resourceId(request.params);
+    const viewer = request.user;
+    if (!viewer) return { fosters: [] };
     const result = await pool.query(
       `SELECT u.id, u.name, u.handle, u.verified, f.capacity,
               ST_Distance(f.location, p.location) AS meters
-       FROM fosters f
+       FROM posts p
+       JOIN fosters f ON ST_DWithin(f.location, p.location, f.radius_km * 1000)
        JOIN users u ON u.id = f.user_id
-       JOIN posts p ON p.id = $1
-       WHERE f.available = true
-         AND ST_DWithin(f.location, p.location, f.radius_km * 1000)
+       WHERE p.id = $1
+         AND f.available = true
+         AND u.deleted_at IS NULL
+         AND u.suspended = false
+         AND (
+           p.author_id = $2
+           OR $3::boolean
+           OR EXISTS (
+             SELECT 1 FROM responses r
+             WHERE r.post_id = p.id AND r.user_id = $2 AND r.kind = 'will_help'
+           )
+         )
        ORDER BY meters ASC
        LIMIT 10`,
-      [id],
+      [id, viewer.id, isOperator(viewer.role)],
     );
     return {
       fosters: rowsOf<{
@@ -521,12 +613,12 @@ export async function registerRoutes(
         handle: foster.handle,
         verified: foster.verified,
         capacity: foster.capacity,
-        distanceKm: Math.round((foster.meters / 1000) * 10) / 10,
+        distanceKm: fosterDistanceKm(foster.meters),
       })),
     };
   });
 
-  app.post('/fosters', async (request) => {
+  app.post('/fosters', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const body = parse(fosterSchema, request.body);
     await pool.query(
@@ -552,7 +644,7 @@ export async function registerRoutes(
     return { available: true };
   });
 
-  app.post('/posts/:id/adoption-term', async (request, reply) => {
+  app.post('/posts/:id/adoption-term', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(adoptionSchema, request.body);
@@ -705,7 +797,9 @@ export async function registerRoutes(
     const post = updated.rows[0];
     if (!post) throw new HttpError(404, 'Alerta não encontrado.');
     if (status === 'published' && post.type === 'rescue_alert') {
-      await enqueueRescueAlert(queue, id, post.urgency).catch(() => undefined);
+      await enqueueRescueAlert(queue, id, post.urgency).catch(
+        bestEffort(request, 'queue:rescue-alert'),
+      );
     }
     return { reviewStatus: status };
   });
@@ -763,6 +857,16 @@ async function toggle(
   return { active: true };
 }
 
+/**
+ * Notifications and queue jobs never undo the action the person already completed, but a
+ * failure still has to reach the logs.
+ */
+function bestEffort(request: FastifyRequest, where: string) {
+  return (error: unknown) => {
+    request.log.error({ err: error, where }, 'best-effort step failed');
+  };
+}
+
 function resourceId(params: unknown): string {
   return parse(z.object({ id: z.string().uuid() }), params).id;
 }
@@ -773,10 +877,16 @@ function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.o
   return result.data;
 }
 
+/**
+ * A token Firebase rejects means "signed out" and the route answers 401. Anything else (database,
+ * Firebase config, network to Google) is a server failure and must surface as 500: answering 401
+ * there would make the app drop a valid session.
+ */
 async function resolveUser(
   env: Env,
   pool: Pool,
   authorization: string | undefined,
+  log: FastifyBaseLogger,
 ): Promise<SessionUser | null> {
   if (!authorization?.startsWith('Bearer ')) return null;
   const token = authorization.slice('Bearer '.length);
@@ -784,35 +894,27 @@ async function resolveUser(
     return findUserByFirebaseUid(pool, token);
   }
   if (!env.FIREBASE_PROJECT_ID) return null;
+  await ensureFirebaseApp(env);
+  const admin = await import('firebase-admin');
+  let decoded: Awaited<ReturnType<ReturnType<typeof admin.auth>['verifyIdToken']>>;
   try {
-    await ensureFirebaseApp(env);
-    const admin = await import('firebase-admin');
-    const decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
-    const owner = isOwnerEmail(decoded.email);
-    if (owner) await grantOwnerRole(pool, decoded.uid);
-    const existing = await findUserByFirebaseUid(pool, decoded.uid);
-    if (existing) return existing;
-    const email = decoded.email ?? `${decoded.uid}@firebase.local`;
-    const handle =
-      email
-        .split('@')[0]
-        ?.replace(/[^a-z0-9]/g, '')
-        .slice(0, 16) || 'pessoa';
-    await pool.query(
-      `INSERT INTO users (firebase_uid, name, handle, city, role) VALUES ($1, $2, $3, 'Belém', $4)
-       ON CONFLICT (firebase_uid) DO NOTHING`,
-      [
-        decoded.uid,
-        decoded.name ?? 'Pessoa',
-        `${handle}${decoded.uid.slice(0, 4)}`,
-        owner ? 'admin' : 'user',
-      ],
-    );
-    if (owner) await grantOwnerRole(pool, decoded.uid);
-    return findUserByFirebaseUid(pool, decoded.uid);
-  } catch {
+    decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
+  } catch (error) {
+    if (!isTokenRejection(error)) throw error;
+    log.info({ code: (error as { code: string }).code }, 'auth: Firebase rejected the token');
     return null;
   }
+  const owner = isOwnerToken(env, decoded);
+  if (owner) await grantOwnerRole(pool, decoded.uid);
+  const existing = await findUserByFirebaseUid(pool, decoded.uid);
+  if (existing) return existing;
+  await createFirebaseUser(pool, {
+    uid: decoded.uid,
+    name: decoded.name,
+    email: decoded.email,
+    role: owner ? 'admin' : 'user',
+  });
+  return findUserByFirebaseUid(pool, decoded.uid);
 }
 
 declare module 'fastify' {

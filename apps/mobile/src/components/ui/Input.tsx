@@ -4,12 +4,17 @@ import { radius, size, spacing, typography, useTheme } from '../../theme';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 
+/** About five lines of body text before the chat box scrolls. */
+const CHAT_MAX_HEIGHT = 120;
+
 export interface InputProps extends Omit<TextInputProps, 'style' | 'placeholderTextColor'> {
   label: string;
   helper?: string;
   /** Inline validation message. Replaces the helper text while present. */
   error?: string;
   leftIcon?: IconName;
+  /** chat: no visible label (screen readers still get it) and a box that starts at one line and grows. */
+  variant?: 'field' | 'chat';
   ref?: Ref<TextInput>;
 }
 
@@ -20,6 +25,7 @@ export function Input({
   leftIcon,
   editable = true,
   multiline,
+  variant = 'field',
   ref,
   onFocus,
   onBlur,
@@ -27,20 +33,20 @@ export function Input({
 }: InputProps) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
-  const borderColor = error
-    ? colors.error
-    : focused
-      ? colors.primary
-      : colors.border;
+  const chat = variant === 'chat';
+  const borderColor = error ? colors.error : focused ? colors.primary : colors.border;
   return (
     <View style={styles.wrapper}>
-      <AppText variant="caption" color="textSecondary">
-        {label}
-      </AppText>
+      {chat ? null : (
+        <AppText variant="caption" color="textSecondary">
+          {label}
+        </AppText>
+      )}
       <View
         style={[
           styles.field,
-          multiline ? styles.multiline : null,
+          multiline && !chat ? styles.multiline : null,
+          chat ? styles.chatField : null,
           {
             borderColor,
             backgroundColor: editable ? colors.surface : colors.surfaceMuted,
@@ -69,7 +75,8 @@ export function Input({
             styles.input,
             typography.body,
             { color: editable ? colors.text : colors.textDisabled },
-            multiline ? styles.inputMultiline : null,
+            multiline && !chat ? styles.inputMultiline : null,
+            chat ? styles.chatInput : null,
           ]}
         />
       </View>
@@ -103,6 +110,8 @@ const styles = StyleSheet.create({
   multiline: { alignItems: 'flex-start', minHeight: 112, paddingTop: spacing.md },
   input: { flex: 1, paddingVertical: spacing.sm },
   inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
+  chatField: { borderRadius: radius.lg, paddingHorizontal: spacing.md },
+  chatInput: { maxHeight: CHAT_MAX_HEIGHT },
   message: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   messageText: { flex: 1 },
 });

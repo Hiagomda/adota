@@ -24,7 +24,11 @@ export function Skeleton({ width = '100%', height, radius = 'md' }: SkeletonProp
 
   useEffect(() => {
     if (reduce) return;
-    pulse.value = withRepeat(withTiming(0.55, { duration: 900, easing: Easing.inOut(Easing.ease) }), -1, true);
+    pulse.value = withRepeat(
+      withTiming(0.55, { duration: 900, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
   }, [pulse, reduce]);
 
   const animated = useAnimatedStyle(() => ({ opacity: pulse.value }));
@@ -93,5 +97,10 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   headText: { flex: 1, gap: spacing.sm },
   rows: { padding: spacing.lg, gap: spacing.md },
-  rail: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, overflow: 'hidden' },
+  rail: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    overflow: 'hidden',
+  },
 });

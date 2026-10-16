@@ -43,6 +43,7 @@ import {
   mapStyleUrl,
   normalizeBounds,
   usableMapBounds,
+  type BoundsOrigin,
   type MapBounds,
 } from './geo';
 import { mapColors } from './layerColors';
@@ -97,7 +98,7 @@ export function MapCanvas({
   /** Tap on the map, away from a paw, closes the selected card. */
   onDismiss?: () => void;
   /** Called when the camera settles on an area, so the paws for that view can load. */
-  onCommitBounds?: (bounds: MapBounds) => void;
+  onCommitBounds?: (bounds: MapBounds, origin: BoundsOrigin) => void;
   /** Opens the camera on this pin, ahead of the GPS center. */
   focus?: LngLat | null;
 }) {
@@ -113,8 +114,10 @@ export function MapCanvas({
   const framedPin = useRef<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [styleReady, setStyleReady] = useState(false);
-  const [pinsReady, setPinsReady] = useState(false);
   const [sprite, setSprite] = useState(0);
+  // Pins mount a beat after each sprite so MapLibre has the paw images before it draws them.
+  const [pinsSprite, setPinsSprite] = useState<number | null>(null);
+  const pinsReady = styleReady && pinsSprite === sprite;
   const focusRef = useRef(focus);
   const trackingRef = useRef(tracking);
   const landed = useRef(false);
@@ -124,6 +127,8 @@ export function MapCanvas({
   const opened = useRef(false);
   const committed = useRef<MapBounds | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A gesture anywhere in the debounce window makes the settled area the person's choice. */
+  const userMoved = useRef(false);
 
   useEffect(() => {
     commitRef.current = onCommitBounds;
@@ -140,8 +145,7 @@ export function MapCanvas({
 
   useEffect(() => {
     if (!styleReady) return;
-    setPinsReady(false);
-    const timer = setTimeout(() => setPinsReady(true), 250);
+    const timer = setTimeout(() => setPinsSprite(sprite), 250);
     return () => clearTimeout(timer);
   }, [styleReady, sprite]);
 
@@ -340,6 +344,7 @@ export function MapCanvas({
         opened.current &&
         Date.now() > programmaticUntil.current;
       opened.current = true;
+      if (fromUser) userMoved.current = true;
       apply({ type: 'region', bounds, fromUser });
       const aim = focusRef.current;
       if (aim) {
@@ -354,7 +359,9 @@ export function MapCanvas({
       if (commitTimer.current) clearTimeout(commitTimer.current);
       commitTimer.current = setTimeout(() => {
         committed.current = bounds;
-        commitRef.current?.(bounds);
+        const origin = { fromUser: userMoved.current };
+        userMoved.current = false;
+        commitRef.current?.(bounds, origin);
       }, 350);
     },
     [apply],

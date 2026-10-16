@@ -12,7 +12,13 @@ export interface CheckboxProps {
   disabled?: boolean;
 }
 
-export function Checkbox({ label, checked, onChange, description, disabled = false }: CheckboxProps) {
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+  description,
+  disabled = false,
+}: CheckboxProps) {
   const { colors } = useTheme();
   return (
     <Touchable

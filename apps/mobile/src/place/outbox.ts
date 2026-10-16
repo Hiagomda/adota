@@ -9,7 +9,9 @@ const storageKey = 'egua-outbox';
 /** Server-side failures (5xx) are retried this many times before the draft is given up. */
 const maxServerAttempts = 5;
 
-const storedDraftSchema = alertDraftSchema.extend({ attempts: z.number().int().nonnegative().default(0) });
+const storedDraftSchema = alertDraftSchema.extend({
+  attempts: z.number().int().nonnegative().default(0),
+});
 type StoredDraft = z.infer<typeof storedDraftSchema>;
 
 /**
@@ -90,7 +92,8 @@ async function flush(): Promise<number> {
         pending.push(draft);
         continue;
       }
-      const serverFailure = error instanceof ApiError && error.kind === 'http' && error.status >= 500;
+      const serverFailure =
+        error instanceof ApiError && error.kind === 'http' && error.status >= 500;
       if (serverFailure && draft.attempts + 1 < maxServerAttempts) {
         pending.push({ ...draft, attempts: draft.attempts + 1 });
         continue;

@@ -71,10 +71,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {toast && palette ? (
-        <View
-          pointerEvents="none"
-          style={[styles.host, { top: insets.top + spacing.sm }]}
-        >
+        <View pointerEvents="none" style={[styles.host, { top: insets.top + spacing.sm }]}>
           <Animated.View
             key={toast.id}
             entering={FadeInUp.duration(duration(motion.base))}

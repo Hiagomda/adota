@@ -1,14 +1,7 @@
 import type { ColorRoles } from '../../theme';
 
 export type Tone =
-  | 'neutral'
-  | 'primary'
-  | 'secondary'
-  | 'caramel'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'info';
+  'neutral' | 'primary' | 'secondary' | 'caramel' | 'success' | 'warning' | 'error' | 'info';
 
 export interface ToneColors {
   background: string;

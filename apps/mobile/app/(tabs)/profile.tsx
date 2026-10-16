@@ -101,7 +101,7 @@ export default function ProfileScreen() {
               verified={me.data?.verified}
             />
             <View style={styles.headText}>
-              <AppText variant="h1" numberOfLines={1}>
+              <AppText variant="h1" numberOfLines={2}>
                 {me.data?.name ?? 'Sua conta'}
               </AppText>
               {me.data ? (
@@ -141,18 +141,10 @@ export default function ProfileScreen() {
               onPress={() => router.push('/voluntario')}
             />
           </View>
-          {token ? (
-            <View style={styles.logout}>
-              <Button
-                title="Sair da conta"
-                icon="log-out"
-                variant="outline"
-                fullWidth
-                onPress={() => {
-                  void logout().then(() => router.replace('/'));
-                }}
-              />
-            </View>
+          {highlights.length > 0 ? (
+            <AppText variant="bodySmallStrong" style={styles.railTitle}>
+              Seus resgates urgentes
+            </AppText>
           ) : null}
           {highlights.length > 0 ? (
             <ScrollView
@@ -249,6 +241,19 @@ export default function ProfileScreen() {
               onAction={tab === 'posts' ? () => router.push('/create') : undefined}
             />
           ) : null}
+          {token ? (
+            <View style={styles.logout}>
+              <Button
+                title="Sair da conta"
+                icon="log-out"
+                variant="outline"
+                fullWidth
+                onPress={() => {
+                  void logout().then(() => router.replace('/'));
+                }}
+              />
+            </View>
+          ) : null}
           <VersionMark />
         </View>
       </ScrollView>
@@ -274,7 +279,8 @@ const styles = StyleSheet.create({
   cell: { width: '33.33%', aspectRatio: 1, padding: CELL_GAP },
   cellFill: { flex: 1 },
   cellImage: { width: '100%', height: '100%' },
-  logout: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  logout: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  railTitle: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
 });
 
 // One broken screen must not take the whole app down.

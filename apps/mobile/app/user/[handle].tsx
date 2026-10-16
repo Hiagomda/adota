@@ -125,7 +125,12 @@ export default function UserScreen() {
         ) : (
           <>
             <View style={styles.head}>
-              <Avatar name={person.name} uri={person.avatarUrl} size="xl" verified={person.verified} />
+              <Avatar
+                name={person.name}
+                uri={person.avatarUrl}
+                size="xl"
+                verified={person.verified}
+              />
               <View style={styles.headText}>
                 <AppText variant="h1" numberOfLines={2}>
                   {person.name}
@@ -135,7 +140,12 @@ export default function UserScreen() {
             </View>
             <View style={styles.stats}>
               <StatCard value={person.counts.posts} label="publicações" icon="image" />
-              <StatCard value={person.counts.followers} label="seguidores" icon="users" tone="secondary" />
+              <StatCard
+                value={person.counts.followers}
+                label="seguidores"
+                icon="users"
+                tone="secondary"
+              />
               <StatCard value={person.counts.helped} label="resgates" icon="heart" tone="success" />
             </View>
             <View style={styles.actions}>
@@ -193,7 +203,11 @@ export default function UserScreen() {
           </>
         )}
       </ScrollView>
-      <BottomSheet visible={reportOpen} onClose={() => setReportOpen(false)} title="Por que você denuncia?">
+      <BottomSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        title="Por que você denuncia?"
+      >
         {reportReasons.map((reason) => (
           <ListItem
             key={reason}

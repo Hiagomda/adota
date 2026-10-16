@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../../theme';
 import { AppText } from './AppText';
 import { Touchable } from './Touchable';
@@ -31,7 +36,10 @@ export function Segmented<T extends string>({
   const { colors, shadows } = useTheme();
   const duration = useMotionDuration();
   const [width, setWidth] = useState(0);
-  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const index = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
   const inset = variant === 'pill' ? PADDING : 0;
   const segment = options.length > 0 ? (width - inset * 2) / options.length : 0;
   const offset = useSharedValue(0);

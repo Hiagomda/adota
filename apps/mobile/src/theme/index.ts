@@ -1,12 +1,6 @@
 import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
-import {
-  darkColors,
-  lightColors,
-  makeShadows,
-  type ColorRoles,
-  type Shadow,
-} from './tokens';
+import { darkColors, lightColors, makeShadows, type ColorRoles, type Shadow } from './tokens';
 
 export * from './tokens';
 export { appFonts } from './fonts';

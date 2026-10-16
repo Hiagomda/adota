@@ -70,7 +70,8 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
   });
   await app.register(rateLimit, {
     global: true,
-    max: 300,
+    // Flood guard per IP, before auth. High because carriers put many phones behind one IP.
+    max: 600,
     timeWindow: '1 minute',
     errorResponseBuilder: () => ({
       statusCode: 429,

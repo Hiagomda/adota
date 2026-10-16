@@ -39,7 +39,12 @@ export default function ResetPasswordScreen() {
         noticeTone="success"
         onBack={() => router.back()}
       >
-        <Button title="Voltar para entrar" size="lg" fullWidth onPress={() => router.replace('/login')} />
+        <Button
+          title="Voltar para entrar"
+          size="lg"
+          fullWidth
+          onPress={() => router.replace('/login')}
+        />
       </AuthForm>
     );
   }

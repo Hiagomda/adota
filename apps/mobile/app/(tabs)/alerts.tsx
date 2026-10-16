@@ -118,9 +118,7 @@ export default function AlertsScreen() {
                 subtitle={notificationBody(item.payload.body)}
                 icon="bell"
                 accessibilityLabel={`${item.readAt ? '' : 'Não lida. '}${item.payload.title ?? 'Atualização'}. ${notificationBody(item.payload.body)}`}
-                trailing={
-                  item.readAt ? null : <Badge kind="dot" accessibilityLabel="Não lida" />
-                }
+                trailing={item.readAt ? null : <Badge kind="dot" accessibilityLabel="Não lida" />}
                 onPress={() => void open(item)}
               />
             )}

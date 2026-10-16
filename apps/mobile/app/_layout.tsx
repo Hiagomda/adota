@@ -24,11 +24,16 @@ import { flushOutbox } from '../src/place/outbox';
 import { queryClient } from '../src/queryClient';
 import { useSession } from '../src/session';
 import { appFonts } from '../src/theme';
+import { startStartupUpdateCheck } from '../src/updates/checkForAppUpdate';
 import { UpdatePrompt } from '../src/updates/UpdatePrompt';
 
 // Order matters: the reporter first, so the global handlers below can send what they catch.
 startCrashReporter();
 installGlobalErrorHandlers(setFatalError);
+
+// First real work of the app: ask the VPS for a newer APK. It runs alongside fonts and session,
+// gives up after 3 s and never throws, so a dead VPS cannot hold the splash.
+void startStartupUpdateCheck();
 
 // The splash stays up until fonts and the saved session are ready, so nothing jumps or flashes.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
