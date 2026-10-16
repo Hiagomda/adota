@@ -22,7 +22,7 @@ export function Header({ title, subtitle, onBack, right, large = false }: Header
         <IconButton icon="arrow-left" accessibilityLabel="Voltar" onPress={onBack} />
       ) : null}
       <View style={styles.text}>
-        <AppText variant={large ? 'h1' : 'h3'} numberOfLines={1}>
+        <AppText variant={large ? 'h1' : 'h3'} numberOfLines={2}>
           {title}
         </AppText>
         {subtitle ? (

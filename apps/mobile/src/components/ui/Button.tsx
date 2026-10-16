@@ -130,7 +130,11 @@ export function Button({
             {!loading && !leading && icon && iconPosition === 'left' ? (
               <Icon name={icon} color={foreground} />
             ) : null}
-            <AppText variant="button" style={{ color: foreground }} numberOfLines={1}>
+            <AppText
+              variant="button"
+              style={[styles.label, { color: foreground }]}
+              numberOfLines={2}
+            >
               {title}
             </AppText>
             {!loading && icon && iconPosition === 'right' ? (
@@ -150,10 +154,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xs,
   },
   medium: { minHeight: size.control },
   large: { minHeight: size.control + spacing.sm, paddingHorizontal: spacing.xxl },
   full: { alignSelf: 'stretch' },
+  // Two lines before an ellipsis: with a large system font a long title wraps instead of hiding.
+  label: { flexShrink: 1, textAlign: 'center' },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
