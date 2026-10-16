@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, messageFrom } from '../src/api';
+import { api, loadMe, messageFrom } from '../src/api';
 import { reportError } from '../src/crash/reporter';
 import {
   AppText,
@@ -34,7 +34,6 @@ const petChoices = [
 ] as const;
 
 const dayChoices = [3, 7, 15, 30];
-const radiusChoices = [5, 10, 20];
 
 const ROW_MASCOT = 64;
 // Three seals per row, leaving room for the gaps.
@@ -80,6 +79,14 @@ export default function VolunteerScreen() {
       active = false;
     };
   }, [levelFloor, levelName]);
+
+  const me = useQuery({
+    queryKey: ['me', token],
+    queryFn: () => loadMe(token ?? ''),
+    enabled: Boolean(token),
+  });
+  // Casa Amiga is reached on WhatsApp only, so an offer without a shown number reaches nobody.
+  const reachable = Boolean(me.data?.phone && me.data.whatsappOptIn);
 
   const save = useMutation({
     mutationFn: (body: VolunteerSettings) =>
@@ -179,7 +186,7 @@ export default function VolunteerScreen() {
                 <View style={styles.rowText}>
                   <Switch
                     label="Oferecer lar temporário"
-                    description="Um canto em casa por alguns dias."
+                    description="Um canto em casa por alguns dias. Endereço e encontro você combina pelo WhatsApp."
                     value={foster}
                     disabled={!ready}
                     onValueChange={(value) =>
@@ -195,21 +202,12 @@ export default function VolunteerScreen() {
                 </View>
               </View>
             </Card>
-            {foster ? (
-              <View style={styles.block}>
-                <AppText variant="h3">Até onde você chega</AppText>
-                <View style={styles.chips}>
-                  {radiusChoices.map((km) => (
-                    <Chip
-                      key={km}
-                      label={`${km} km`}
-                      selected={currentSettings().serviceRadiusKm === km}
-                      disabled={!ready}
-                      onPress={() => update({ serviceRadiusKm: km })}
-                    />
-                  ))}
-                </View>
-              </View>
+            {foster && me.data && !reachable ? (
+              <Notice
+                tone="warning"
+                message="Quem resgata fala com a Casa Amiga pelo WhatsApp. Salve seu número e ligue Mostrar meu WhatsApp em Ajustes."
+                action={{ label: 'Abrir Ajustes', onPress: () => router.push('/settings') }}
+              />
             ) : null}
             {foster ? (
               <>
