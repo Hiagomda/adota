@@ -18,6 +18,7 @@ import {
   ListItem,
   Notice,
   Switch,
+  useToast,
 } from '../src/components/ui';
 import { VersionMark } from '../src/diagnostics/VersionMark';
 import { AvatarCropper } from '../src/profile/AvatarCropper';
@@ -42,7 +43,7 @@ export default function SettingsScreen() {
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [organization, setOrganization] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -59,14 +60,14 @@ export default function SettingsScreen() {
 
   async function run(task: () => Promise<unknown>, success: string) {
     if (!token) {
-      setMessage('Entre na sua conta para continuar.');
+      toast.show('Entre na sua conta para continuar.', 'error');
       return;
     }
     try {
       await task();
-      setMessage(success);
+      toast.show(success, 'success');
     } catch (error) {
-      setMessage(messageFrom(error));
+      toast.show(messageFrom(error), 'error');
     }
   }
 
@@ -74,7 +75,10 @@ export default function SettingsScreen() {
     const nextName = name.trim();
     const nextHandle = handle.trim().toLowerCase();
     if (!nextName || !/^[a-z0-9._]{3,24}$/.test(nextHandle)) {
-      setMessage('O nome não pode ficar vazio e o @ usa de 3 a 24 letras, números, ponto ou _.');
+      toast.show(
+        'O nome não pode ficar vazio e o @ usa de 3 a 24 letras, números, ponto ou _.',
+        'error',
+      );
       return;
     }
     setSavingProfile(true);
@@ -91,13 +95,13 @@ export default function SettingsScreen() {
 
   async function changePhoto() {
     if (!token) {
-      setMessage('Entre na sua conta para continuar.');
+      toast.show('Entre na sua conta para continuar.', 'error');
       return;
     }
     if (Platform.OS !== 'web') {
       const outcome = permissionOutcome(await ImagePicker.requestMediaLibraryPermissionsAsync());
       if (outcome !== 'granted') {
-        setMessage('Preciso da galeria para trocar a foto do perfil.');
+        toast.show('Preciso da galeria para trocar a foto do perfil.', 'error');
         return;
       }
     }
@@ -111,7 +115,7 @@ export default function SettingsScreen() {
       Image.getSize(uri, (width, height) => resolve({ width, height }), reject);
     }).catch(() => null);
     if (!size || size.width < 1 || size.height < 1) {
-      setMessage('Não consegui ler essa foto. Escolha outra.');
+      toast.show('Não consegui ler essa foto. Escolha outra.', 'error');
       return;
     }
     setCrop({ uri, width: size.width, height: size.height });
@@ -166,7 +170,13 @@ export default function SettingsScreen() {
         <View style={styles.column}>
           <Header title="Ajustes" large onBack={() => router.back()} />
           <View style={styles.body}>
-            {message ? <Notice message={message} /> : null}
+            {me.isError ? (
+              <Notice
+                tone="error"
+                message={messageFrom(me.error)}
+                action={{ label: 'Tentar de novo', onPress: () => void me.refetch() }}
+              />
+            ) : null}
 
             <View style={styles.section}>
               <AppText variant="h3">Seu perfil</AppText>
@@ -195,7 +205,7 @@ export default function SettingsScreen() {
                     title={savingProfile ? 'Salvando…' : 'Salvar perfil'}
                     icon="check"
                     fullWidth
-                    disabled={savingProfile}
+                    disabled={savingProfile || !me.data}
                     onPress={() => void saveProfile()}
                   />
                 </View>
@@ -253,6 +263,7 @@ export default function SettingsScreen() {
                         key={km}
                         label={`${km} km`}
                         selected={me.data?.alertRadiusKm === km}
+                        disabled={!me.data}
                         onPress={() =>
                           void patchMe({ alertRadiusKm: km }, `Raio de ${km} km salvo.`)
                         }
