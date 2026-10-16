@@ -51,6 +51,7 @@ import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
+import { careChips } from '../../src/post/care';
 import { notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
 import { PostEditor } from '../../src/post/PostEditor';
@@ -258,6 +259,7 @@ export default function PostScreen() {
   const helpers = item.helpersCount ?? 0;
   const othersGoing = Math.max(helpers - (item.viewerWillHelp ? 1 : 0), 0);
   const missedVisits = notFoundVisits(item);
+  const careList = careChips(item.animal.care);
   const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
   const fosterList = fosters.data?.homes ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
@@ -558,6 +560,19 @@ export default function PostScreen() {
                 <InfoChip label={item.animal.ageEstimate} icon="clock" tone="info" />
               ) : null}
             </View>
+
+            {careList.length > 0 ? (
+              <View style={styles.chips} accessibilityRole="list">
+                {careList.map((chip) => (
+                  <InfoChip
+                    key={chip.key}
+                    label={chip.label}
+                    icon={chip.yes ? 'check' : 'minus'}
+                    tone={chip.yes ? 'success' : 'neutral'}
+                  />
+                ))}
+              </View>
+            ) : null}
 
             <View style={styles.section}>
               <AppText variant="h2">
@@ -966,6 +981,8 @@ export default function PostScreen() {
         description={item.description}
         name={item.animal.name ?? ''}
         urgency={item.urgency}
+        ageEstimate={item.animal.ageEstimate}
+        care={item.animal.care}
         photos={item.media.flatMap((photo) =>
           photo.storageKey ? [{ key: photo.storageKey, preview: photo.thumbUrl }] : [],
         )}

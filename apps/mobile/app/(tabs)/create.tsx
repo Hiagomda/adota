@@ -39,6 +39,7 @@ import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
+import { ageBands, careKeys, careQuestion, type AgeBand, type CareKey } from '../../src/post/care';
 
 const suggestions = [
   'Está na rua e precisa de resgate agora.',
@@ -136,6 +137,8 @@ export default function CreateScreen() {
   const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>('dog');
   const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [sex, setSex] = useState<'male' | 'female' | 'unknown'>('unknown');
+  const [age, setAge] = useState<AgeBand | null>(null);
+  const [care, setCare] = useState<Partial<Record<CareKey, true>>>({});
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>(
     askedKind === 'adoption' ? 'low' : 'high',
   );
@@ -241,6 +244,8 @@ export default function CreateScreen() {
       size,
       sex,
       name: animalName.trim(),
+      ...(age ? { ageEstimate: age } : {}),
+      care,
       urgency,
       point,
       accuracyM: gps.fix?.accuracy ?? null,
@@ -596,6 +601,42 @@ export default function CreateScreen() {
                         label={option.label}
                         selected={sex === option.value}
                         onPress={() => setSex(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">Idade</AppText>
+                  <View style={styles.chips}>
+                    {ageBands.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={age === option.value}
+                        onPress={() => setAge(age === option.value ? null : option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">O que você já sabe</AppText>
+                  <AppText variant="bodySmall" color="textSecondary">
+                    Marque só o que tem certeza. É o que quem adota pergunta primeiro.
+                  </AppText>
+                  <View style={styles.chips}>
+                    {careKeys.map((key) => (
+                      <Chip
+                        key={key}
+                        label={careQuestion[key]}
+                        selected={care[key] === true}
+                        onPress={() =>
+                          setCare((current) => {
+                            const next = { ...current };
+                            if (next[key]) delete next[key];
+                            else next[key] = true;
+                            return next;
+                          })
+                        }
                       />
                     ))}
                   </View>

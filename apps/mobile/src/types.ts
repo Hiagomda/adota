@@ -1,3 +1,5 @@
+import type { AnimalCare } from './post/care';
+
 export interface Account {
   id: string;
   name: string;
@@ -41,6 +43,8 @@ export interface Post {
     sex: string;
     ageEstimate: string | null;
     healthNotes: string | null;
+    /** Older API builds did not send it. */
+    care?: AnimalCare;
     temperament: string | null;
   };
   location: { latitude: number; longitude: number; exact: boolean };

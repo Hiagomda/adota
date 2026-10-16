@@ -15,6 +15,15 @@ export const alertDraftSchema = z.object({
   size: z.enum(['small', 'medium', 'large']).default('medium'),
   sex: z.enum(['male', 'female', 'unknown']).default('unknown'),
   name: z.string().trim().max(80).optional().default(''),
+  ageEstimate: z.enum(['filhote', 'adulto', 'idoso']).optional(),
+  care: z
+    .object({
+      neutered: z.boolean().optional(),
+      vaccinated: z.boolean().optional(),
+      goodWithKids: z.boolean().optional(),
+      goodWithAnimals: z.boolean().optional(),
+    })
+    .optional(),
   urgency: z.enum(['low', 'medium', 'high']),
   helpRequest: z
     .object({
@@ -152,6 +161,8 @@ export async function publishAlert(
       size: draft.size,
       sex: draft.sex,
       ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
+      ...(draft.ageEstimate ? { ageEstimate: draft.ageEstimate } : {}),
+      ...(draft.care && Object.keys(draft.care).length > 0 ? { care: draft.care } : {}),
       ...(draft.helpRequest
         ? {
             helpRequest: {

@@ -6,6 +6,7 @@ import { uploadProfilePhoto } from '../place/publish';
 import { permissionOutcome } from '../permissions';
 import { radius, size, spacing } from '../theme';
 import { AppText, BottomSheet, Button, Chip, IconButton, Input } from '../components/ui';
+import { ageBandOf, ageBands, careKeys, careQuestion, type AgeBand, type AnimalCare } from './care';
 
 const MAX_PHOTOS = 5;
 
@@ -20,12 +21,16 @@ interface PostEditorProps {
   description: string;
   name: string;
   urgency: 'low' | 'medium' | 'high';
+  ageEstimate: string | null;
+  care: AnimalCare | undefined;
   photos: EditPhoto[];
   onClose: () => void;
   onSave: (body: {
     description: string;
     name: string;
     urgency: 'low' | 'medium' | 'high';
+    ageEstimate?: AgeBand;
+    care: AnimalCare;
     media: { url: string }[];
   }) => Promise<void>;
 }
@@ -42,6 +47,8 @@ export function PostEditor({
   description,
   name,
   urgency,
+  ageEstimate,
+  care,
   photos,
   onClose,
   onSave,
@@ -49,6 +56,8 @@ export function PostEditor({
   const [draft, setDraft] = useState(description);
   const [title, setTitle] = useState(name);
   const [level, setLevel] = useState(urgency);
+  const [age, setAge] = useState<AgeBand | null>(ageBandOf(ageEstimate));
+  const [facts, setFacts] = useState<AnimalCare>(care ?? {});
   const [pictures, setPictures] = useState(photos);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -97,6 +106,8 @@ export function PostEditor({
         description: text,
         name: title.trim(),
         urgency: level,
+        ...(age ? { ageEstimate: age } : {}),
+        care: facts,
         media: pictures.map((photo) => ({ url: photo.key })),
       });
     } catch (caught) {
@@ -134,6 +145,37 @@ export function PostEditor({
             />
           ))}
         </View>
+        <AppText variant="bodyStrong">Idade</AppText>
+        <View style={styles.chips}>
+          {ageBands.map((option) => (
+            <Chip
+              key={option.value}
+              label={option.label}
+              selected={age === option.value}
+              onPress={() => setAge(option.value)}
+            />
+          ))}
+        </View>
+        <AppText variant="bodyStrong">O que você já sabe</AppText>
+        <View style={styles.chips}>
+          {careKeys.map((key) => (
+            <Chip
+              key={key}
+              label={careQuestion[key]}
+              selected={facts[key] === true}
+              // Tapping again says "no", the third tap goes back to "nobody said".
+              onPress={() =>
+                setFacts((current) => ({
+                  ...current,
+                  [key]: current[key] === true ? false : current[key] === false ? null : true,
+                }))
+              }
+            />
+          ))}
+        </View>
+        <AppText variant="caption" color="textSecondary">
+          Toque uma vez para sim, outra para não, e mais uma para deixar em branco.
+        </AppText>
         <View style={styles.photos}>
           {pictures.map((photo) => (
             <View key={photo.key} style={styles.thumbWrap}>

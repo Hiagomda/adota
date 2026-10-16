@@ -51,6 +51,14 @@ export const postSchema: Schema<Post> = z.object({
     sex: z.string(),
     ageEstimate: nullableString,
     healthNotes: nullableString,
+    care: z
+      .object({
+        neutered: z.boolean().nullable().optional(),
+        vaccinated: z.boolean().nullable().optional(),
+        goodWithKids: z.boolean().nullable().optional(),
+        goodWithAnimals: z.boolean().nullable().optional(),
+      })
+      .optional(),
     temperament: nullableString,
   }),
   location: z.object({
