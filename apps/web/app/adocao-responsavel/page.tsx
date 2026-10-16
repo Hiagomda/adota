@@ -19,7 +19,7 @@ const steps = [
   },
   {
     title: 'Combine o encontro em Belém',
-    body: 'Fale com quem publicou o resgate e marque um lugar para conhecer o animal. O telefone só aparece depois que você diz que vai ajudar.',
+    body: 'No app, toque em Quero adotar para falar com quem publicou pelo WhatsApp e marque um lugar para conhecer o animal.',
   },
   {
     title: 'Leve para casa com compromisso',

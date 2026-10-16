@@ -21,12 +21,19 @@ export default function LegalScreen() {
               chave Pix, a transferência acontece fora da plataforma. Quem publica é responsável
               pela veracidade do resgate.
             </AppText>
+            <AppText color="textSecondary">
+              O app não tem conversa própria. Adoção, Casa Amiga e resgate são combinados pelo
+              WhatsApp, fora da plataforma, entre as pessoas. O Égua, adota! não guarda, não lê e
+              não responde pelo que é combinado lá. Denuncie abuso pelo Suporte.
+            </AppText>
             <AppText variant="h1">Privacidade</AppText>
             <AppText color="textSecondary">
               Guardamos conta, fotos, textos e a localização do resgate. Quem vê o resgate no app
-              recebe a localização aproximada em cerca de 500 metros. O ponto exato e o telefone, se
-              a pessoa autorizou o WhatsApp, só aparecem para quem vai ajudar, para o autor e para a
-              moderação. Você pode excluir a conta em Ajustes. A exclusão anonimiza o perfil e apaga
+              recebe a localização aproximada em cerca de 500 metros. O ponto exato só aparece para
+              quem vai ajudar, para o autor e para a moderação. Seu WhatsApp só é mostrado se você
+              ligar Mostrar meu WhatsApp em Ajustes, e só para quem pede: quem quer adotar um animal
+              seu, quem vai ajudar no seu resgate e, se você oferece Casa Amiga, quem cuida de um
+              resgate. Você pode excluir a conta em Ajustes. A exclusão anonimiza o perfil e apaga
               telefone, foto e tokens de notificação.
             </AppText>
             <VersionMark />
