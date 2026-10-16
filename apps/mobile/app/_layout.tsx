@@ -26,6 +26,7 @@ import { useSession } from '../src/session';
 import { appFonts } from '../src/theme';
 import { startStartupUpdateCheck } from '../src/updates/checkForAppUpdate';
 import { UpdatePrompt } from '../src/updates/UpdatePrompt';
+import { logBestEffort } from '../src/crash/bestEffort';
 
 // Order matters: the reporter first, so the global handlers below can send what they catch.
 startCrashReporter();
@@ -36,7 +37,7 @@ installGlobalErrorHandlers(setFatalError);
 void startStartupUpdateCheck();
 
 // The splash stays up until fonts and the saved session are ready, so nothing jumps or flashes.
-void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+void SplashScreen.preventAutoHideAsync().catch(logBestEffort('splash'));
 
 // If a storage or font call hangs, the app still opens: better a system font than a frozen splash.
 const STARTUP_TIMEOUT_MS = 6000;
@@ -99,7 +100,7 @@ function RootLayout() {
   }, [fontsSettled, sessionReady, started]);
 
   useEffect(() => {
-    if (started) void SplashScreen.hideAsync().catch(() => undefined);
+    if (started) void SplashScreen.hideAsync().catch(logBestEffort('splash'));
   }, [started]);
 
   useEffect(() => {

@@ -18,6 +18,7 @@ import {
 import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
+import { logBestEffort } from '../src/crash/bestEffort';
 
 const emptyPosts: Post[] = [];
 
@@ -36,7 +37,9 @@ export default function LostScreen() {
   const like = useCallback(
     async (post: Post) => {
       if (!token) return;
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+        logBestEffort('lost:haptic'),
+      );
       client.setQueryData(['posts', 'lost', token], (current: { posts: Post[] } | undefined) =>
         current
           ? {

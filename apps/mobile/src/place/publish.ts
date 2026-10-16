@@ -3,6 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { z } from 'zod';
 import { ApiError, api, isNetworkError } from '../api';
 import type { MapPoint } from '../map/geo';
+import { logBestEffort } from '../crash/bestEffort';
 
 export const alertDraftSchema = z.object({
   id: z.string().min(1),
@@ -71,7 +72,7 @@ function preparedPhoto(uri: string): Promise<PreparedPhoto> {
 
 /** Shrink the picture while the person is still writing, so Publicar does not wait on it. */
 export function preparePhoto(uri: string): void {
-  void preparedPhoto(uri).catch(() => undefined);
+  void preparedPhoto(uri).catch(logBestEffort('publish:prepare-photo'));
 }
 
 async function putPhoto(uri: string, url: string): Promise<void> {

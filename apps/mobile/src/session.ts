@@ -13,6 +13,7 @@ import { signOutGoogle } from './auth/googleNative';
 import { reportError, setReporterUser } from './crash/reporter';
 import { queryClient } from './queryClient';
 import type { Account } from './types';
+import { logBestEffort } from './crash/bestEffort';
 
 /** The team, in the app: admin and superadmin. Reviewers are not included. */
 export function isTeamRole(role: string | undefined): boolean {
@@ -86,7 +87,8 @@ async function readOrDiscard<T>(key: string, read: () => Promise<T>, fallback: T
     return await read();
   } catch (error) {
     reportError(error, { source: 'handled', where: `session:${key}` });
-    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(key).catch(() => undefined);
+    if (Platform.OS !== 'web')
+      await SecureStore.deleteItemAsync(key).catch(logBestEffort('session:secure-delete'));
     return fallback;
   }
 }

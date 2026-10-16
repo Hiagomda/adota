@@ -16,6 +16,7 @@ import { contentMaxWidth, motion, radius, spacing, useMotionDuration, useTheme }
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { toneColors } from './tones';
+import { logBestEffort } from '../../crash/bestEffort';
 
 type ToastTone = 'success' | 'error' | 'info';
 
@@ -58,7 +59,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     counter.current += 1;
     setToast({ id: counter.current, message, tone });
     if (tone === 'error') {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+        logBestEffort('toast:haptic'),
+      );
     }
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(null), VISIBLE_MS);

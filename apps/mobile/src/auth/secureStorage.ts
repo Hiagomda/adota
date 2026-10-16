@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { logBestEffort } from '../crash/bestEffort';
 
 /** Under the 2048-byte Keychain limit, with room for multi-byte characters. */
 const CHUNK = 1500;
@@ -45,7 +46,7 @@ export const secureAuthStorage = {
       await writeChunk(`${base}.${index}`, parts[index] ?? '');
     }
     for (let index = parts.length; index < parts.length + 4; index += 1) {
-      await dropChunk(`${base}.${index}`).catch(() => undefined);
+      await dropChunk(`${base}.${index}`).catch(logBestEffort('secure-storage:drop'));
     }
   },
 
@@ -67,10 +68,10 @@ export const secureAuthStorage = {
     const base = safeKey(key);
     const countRaw = await readChunk(`${base}.n`);
     const count = Number(countRaw);
-    await dropChunk(`${base}.n`).catch(() => undefined);
+    await dropChunk(`${base}.n`).catch(logBestEffort('secure-storage:drop'));
     const limit = Number.isInteger(count) && count > 0 ? count : 0;
     for (let index = 0; index < limit; index += 1) {
-      await dropChunk(`${base}.${index}`).catch(() => undefined);
+      await dropChunk(`${base}.${index}`).catch(logBestEffort('secure-storage:drop'));
     }
   },
 };

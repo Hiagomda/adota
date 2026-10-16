@@ -38,6 +38,7 @@ import { isOfflineError, preparePhoto, publishAlert } from '../../src/place/publ
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
+import { logBestEffort } from '../../src/crash/bestEffort';
 
 const suggestions = [
   'Está na rua e precisa de resgate agora.',
@@ -261,7 +262,9 @@ export default function CreateScreen() {
         body: { actionType: 'report', sourceId: created.id },
       })
         .then(() => client.invalidateQueries({ queryKey: ['volunteer', token] }))
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          reportError(error, { source: 'handled', where: 'create:claim-xp' });
+        });
       const fresh = await loadPost(created.id, token).catch(() => null);
       if (fresh) {
         client.setQueryData(
@@ -467,7 +470,7 @@ export default function CreateScreen() {
                         multiline
                         selected={description === text}
                         onPress={() => {
-                          void Haptics.selectionAsync().catch(() => undefined);
+                          void Haptics.selectionAsync().catch(logBestEffort('create:haptic'));
                           setDescription(text);
                         }}
                       />

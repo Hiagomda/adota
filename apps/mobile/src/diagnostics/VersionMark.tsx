@@ -7,6 +7,7 @@ import { AppText, BottomSheet, Button, Touchable } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { radius, size, spacing, useTheme } from '../theme';
 import { diagnosticRows, diagnosticText } from './snapshot';
+import { logBestEffort } from '../crash/bestEffort';
 
 const TAPS_TO_OPEN = 5;
 const TAP_WINDOW_MS = 1_800;
@@ -38,7 +39,9 @@ export function VersionMark() {
     taps.current += 1;
     if (taps.current < TAPS_TO_OPEN) return;
     taps.current = 0;
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      logBestEffort('version:haptic'),
+    );
     setOpen(true);
   }
 

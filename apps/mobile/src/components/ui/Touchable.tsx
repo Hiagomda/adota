@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { motion, useMotionDuration, useTheme } from '../../theme';
+import { logBestEffort } from '../../crash/bestEffort';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -70,7 +71,7 @@ export function Touchable({
           haptic === 'medium'
             ? Haptics.ImpactFeedbackStyle.Medium
             : Haptics.ImpactFeedbackStyle.Light,
-        ).catch(() => undefined);
+        ).catch(logBestEffort('touchable:haptic'));
       }
       onPress?.(event);
     },

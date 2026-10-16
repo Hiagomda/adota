@@ -6,6 +6,7 @@ import { FloatingTabBar } from '../../src/components/ui';
 import { openCreateCamera } from '../../src/createCamera';
 import { requestFeedRefresh } from '../../src/feedRefresh';
 import { useTheme } from '../../src/theme';
+import { logBestEffort } from '../../src/crash/bestEffort';
 
 export default function TabsLayout() {
   const { colors } = useTheme();
@@ -16,7 +17,7 @@ export default function TabsLayout() {
         tabBar={(props) => <FloatingTabBar {...props} />}
         screenListeners={{
           tabPress: () => {
-            void Haptics.selectionAsync().catch(() => undefined);
+            void Haptics.selectionAsync().catch(logBestEffort('tabs:haptic'));
           },
         }}
         screenOptions={{

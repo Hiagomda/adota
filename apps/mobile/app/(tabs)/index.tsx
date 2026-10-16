@@ -27,6 +27,7 @@ import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocatio
 import { useSession } from '../../src/session';
 import { screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
+import { logBestEffort } from '../../src/crash/bestEffort';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
@@ -156,7 +157,9 @@ export default function HomeScreen() {
   const like = useCallback(
     async (post: Post) => {
       if (!token) return;
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+        logBestEffort('home:haptic'),
+      );
       client.setQueryData(['posts', token], (current: { posts: Post[] } | undefined) =>
         current
           ? {
