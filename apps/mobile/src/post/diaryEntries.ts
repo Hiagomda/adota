@@ -13,6 +13,12 @@ export interface DiaryLine {
   body: string | null;
   when: string;
   handle: string;
+  photo: DiaryPhoto | null;
+}
+
+export interface DiaryPhoto {
+  url: string;
+  thumbUrl: string;
 }
 
 interface DiarySource {
@@ -25,6 +31,7 @@ interface DiarySource {
     description: string;
     status?: string;
     kind?: 'not_found' | 'status' | 'note';
+    photo?: DiaryPhoto | null;
     createdAt: string;
     author: { name: string; handle: string };
   }[];
@@ -54,6 +61,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
       body: post.description,
       when: post.createdAt,
       handle: post.author.handle,
+      photo: null,
     },
   ];
   for (const update of post.updates ?? []) {
@@ -67,6 +75,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
         body: null,
         when: update.createdAt,
         handle: update.author.handle,
+        photo: null,
       });
     } else if (kind === 'status' && update.status && stepLines[update.status]) {
       lines.push({
@@ -76,6 +85,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
         body: null,
         when: update.createdAt,
         handle: update.author.handle,
+        photo: null,
       });
     } else {
       lines.push({
@@ -85,6 +95,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
         body: update.description,
         when: update.createdAt,
         handle: update.author.handle,
+        photo: update.photo ?? null,
       });
     }
   }

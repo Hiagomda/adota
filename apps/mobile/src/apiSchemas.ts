@@ -95,6 +95,7 @@ export const postSchema: Schema<Post> = z.object({
         description: z.string(),
         status: z.string().optional(),
         kind: z.enum(['not_found', 'status', 'note']).optional(),
+        photo: z.object({ url: z.string(), thumbUrl: z.string() }).nullable().optional(),
         createdAt: isoDate,
         author: z.object({ name: z.string(), handle: z.string() }),
       }),

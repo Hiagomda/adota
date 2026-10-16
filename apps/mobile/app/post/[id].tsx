@@ -49,6 +49,7 @@ import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
 import { formatWhatsApp } from '../../src/contact/whatsapp';
 import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
+import { uploadProfilePhoto } from '../../src/place/publish';
 import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
@@ -787,12 +788,14 @@ export default function PostScreen() {
             <AnimalDiary
               post={item}
               canWrite={Boolean(token) && (userId === item.author.id || item.viewerWillHelp)}
-              onPublish={async (description) => {
+              adopted={item.status === 'adopted'}
+              onPublish={async (description, photoUri) => {
                 if (!token) {
                   setNote('Entre na sua conta para escrever no diário.');
                   return false;
                 }
                 try {
+                  const photoKey = photoUri ? await uploadProfilePhoto(token, photoUri) : null;
                   const created = await api<{ reviewStatus: string }>('/posts', {
                     method: 'POST',
                     token,
@@ -806,7 +809,7 @@ export default function PostScreen() {
                       longitude: item.location.longitude,
                       approxLabel: item.approxLabel,
                       parentPostId: item.id,
-                      media: [],
+                      media: photoKey ? [{ url: photoKey }] : [],
                     },
                   });
                   await client.invalidateQueries({ queryKey: ['post', id, token] });

@@ -71,6 +71,7 @@ export interface Post {
     status?: string;
     /** Older API builds did not send it: treat as a note. */
     kind?: 'not_found' | 'status' | 'note';
+    photo?: { url: string; thumbUrl: string } | null;
     createdAt: string;
     author: { name: string; handle: string };
   }[];
