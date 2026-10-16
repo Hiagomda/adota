@@ -158,7 +158,7 @@ export function PostEditor({
             />
           ) : null}
         </View>
-        {error ? <AppText color="error">{error}</AppText> : null}
+        {error ? <AppText color="errorText">{error}</AppText> : null}
         <Button
           title="Salvar"
           icon="check"

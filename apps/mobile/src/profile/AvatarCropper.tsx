@@ -157,7 +157,7 @@ export function AvatarCropper({
             </Animated.View>
           </GestureDetector>
         </View>
-        {error ? <AppText color="error">{error}</AppText> : null}
+        {error ? <AppText color="errorText">{error}</AppText> : null}
         <Button
           title="Usar esta foto"
           icon="check"
