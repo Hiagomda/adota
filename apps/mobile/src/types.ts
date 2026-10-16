@@ -52,6 +52,8 @@ export interface Post {
   liked: boolean;
   saved: boolean;
   viewerWillHelp: boolean;
+  /** People on the way right now. Only the single-post endpoint sends it. */
+  helpersCount?: number;
   helpRequest: {
     kind: string;
     goalAmount: string | null;
@@ -63,6 +65,8 @@ export interface Post {
     id: string;
     description: string;
     status?: string;
+    /** Older API builds did not send it: treat as a note. */
+    kind?: 'not_found' | 'status' | 'note';
     createdAt: string;
     author: { name: string; handle: string };
   }[];

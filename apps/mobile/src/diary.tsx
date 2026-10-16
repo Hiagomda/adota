@@ -1,12 +1,24 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Button, Input } from './components/ui';
+import { AppText, Button, Icon, Input, type IconName } from './components/ui';
 import { formatWhen } from './format';
-import { radius, spacing, statusLabel, useTheme } from './theme';
+import { diaryLines, type DiaryTone } from './post/diaryEntries';
+import { radius, spacing, useTheme, type ColorRoles } from './theme';
 import type { Post } from './types';
 
-const DOT = 12;
+const BADGE = 32;
 const RAIL = 2;
+
+/** Each kind of line has its own mark, so a missed visit never reads like progress. */
+const toneStyle: Record<
+  DiaryTone,
+  { icon: IconName; background: keyof ColorRoles; foreground: keyof ColorRoles }
+> = {
+  found: { icon: 'map-pin', background: 'secondarySoft', foreground: 'onSecondarySoft' },
+  status: { icon: 'arrow-right', background: 'primarySoft', foreground: 'onPrimarySoft' },
+  not_found: { icon: 'search', background: 'warningSoft', foreground: 'onWarningSoft' },
+  note: { icon: 'edit-3', background: 'surfaceMuted', foreground: 'textSecondary' },
+};
 
 export function AnimalDiary({
   post,
@@ -20,23 +32,7 @@ export function AnimalDiary({
   const { colors } = useTheme();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const notes = post.updates ?? [];
-  const entries = [
-    {
-      id: post.id,
-      title: 'Achado',
-      body: post.description,
-      when: post.createdAt,
-      handle: post.author.handle,
-    },
-    ...notes.map((note) => ({
-      id: note.id,
-      title: (note.status && statusLabel[note.status]) || 'Nota',
-      body: note.description,
-      when: note.createdAt,
-      handle: note.author.handle,
-    })),
-  ];
+  const entries = diaryLines(post);
 
   async function publish() {
     const description = text.trim();
@@ -54,25 +50,33 @@ export function AnimalDiary({
         As atualizações ficam neste resgate. Quem acompanha recebe o aviso.
       </AppText>
       <View>
-        {entries.map((entry, index) => (
-          <View key={entry.id} style={styles.row}>
-            <View style={styles.rail}>
-              <View style={[styles.dot, { backgroundColor: colors.secondary }]} />
-              {index < entries.length - 1 ? (
-                <View style={[styles.line, { backgroundColor: colors.border }]} />
-              ) : null}
+        {entries.map((entry, index) => {
+          const tone = toneStyle[entry.tone];
+          return (
+            <View
+              key={entry.id}
+              accessible
+              accessibilityLabel={`${entry.title}, ${formatWhen(entry.when)}. ${entry.body ?? ''}`}
+              style={styles.row}
+            >
+              <View style={styles.rail}>
+                <View style={[styles.badge, { backgroundColor: colors[tone.background] }]}>
+                  <Icon name={tone.icon} size="sm" color={colors[tone.foreground]} />
+                </View>
+                {index < entries.length - 1 ? (
+                  <View style={[styles.line, { backgroundColor: colors.border }]} />
+                ) : null}
+              </View>
+              <View style={styles.entry}>
+                <AppText variant="bodyStrong">{entry.title}</AppText>
+                <AppText variant="caption" color="textSecondary">
+                  @{entry.handle} · {formatWhen(entry.when)}
+                </AppText>
+                {entry.body ? <AppText>{entry.body}</AppText> : null}
+              </View>
             </View>
-            <View style={styles.entry}>
-              <AppText variant="bodyStrong">
-                {entry.title} · {formatWhen(entry.when)}
-              </AppText>
-              <AppText variant="caption" color="textSecondary">
-                @{entry.handle}
-              </AppText>
-              <AppText>{entry.body}</AppText>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
       {canWrite ? (
         <View style={styles.composer}>
@@ -107,9 +111,15 @@ export function AnimalDiary({
 const styles = StyleSheet.create({
   block: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md },
-  rail: { width: DOT, alignItems: 'center' },
-  dot: { width: DOT, height: DOT, borderRadius: radius.pill, marginTop: spacing.xs },
-  line: { width: RAIL, flex: 1, marginTop: spacing.xs },
+  rail: { width: BADGE, alignItems: 'center' },
+  badge: {
+    width: BADGE,
+    height: BADGE,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  line: { width: RAIL, flex: 1, marginVertical: spacing.xs },
   entry: { flex: 1, gap: spacing.xs, paddingBottom: spacing.lg },
   composer: { gap: spacing.md },
 });

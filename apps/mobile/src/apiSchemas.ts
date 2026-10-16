@@ -69,6 +69,7 @@ export const postSchema: Schema<Post> = z.object({
   liked: z.boolean(),
   saved: z.boolean(),
   viewerWillHelp: z.boolean(),
+  helpersCount: z.number().int().nonnegative().optional(),
   helpRequest: z
     .object({
       kind: z.string(),
@@ -85,6 +86,7 @@ export const postSchema: Schema<Post> = z.object({
         id: z.string().min(1),
         description: z.string(),
         status: z.string().optional(),
+        kind: z.enum(['not_found', 'status', 'note']).optional(),
         createdAt: isoDate,
         author: z.object({ name: z.string(), handle: z.string() }),
       }),
