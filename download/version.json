@@ -1,9 +1,11 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 21,
+  "androidVersionCode": 22,
   "notes": [
-    "A foto de outra pessoa aparece no perfil dela.",
-    "Quem quer adotar conversa com quem cuida dentro do app.",
-    "Nessa conversa o telefone fica oculto."
+    "Adoção, lar temporário e resgate agora se combinam pelo WhatsApp.",
+    "Nova tela Para adoção, com filtros de idade, porte, bairro e cuidados.",
+    "Vi esse animal: marque onde viu, sem precisar ir até lá.",
+    "Ajudar no resgate ficou mais claro: Encontrei o animal ou Não deu certo.",
+    "Precisa-se, ranking dos bairros e rascunho que não se perde ao fechar o app."
   ]
 }
