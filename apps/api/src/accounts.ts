@@ -127,6 +127,13 @@ export async function profileByHandle(
     `SELECT
        (SELECT count(*)::int FROM posts WHERE author_id = $1 AND parent_post_id IS NULL AND hidden = false AND review_status = 'published') AS posts,
        (SELECT count(DISTINCT p.animal_id)::int FROM responses r JOIN posts p ON p.id = r.post_id WHERE r.user_id = $1 AND r.kind = 'will_help') AS helped,
+       (SELECT count(DISTINCT p.animal_id)::int FROM posts p
+          WHERE p.parent_post_id IS NULL AND p.hidden = false
+            AND p.status IN ('rescued', 'fostered', 'for_adoption', 'adopted')
+            AND p.type IN ('rescue_alert', 'lost')
+            AND (p.author_id = $1 OR EXISTS (
+              SELECT 1 FROM responses r WHERE r.post_id = p.id AND r.user_id = $1 AND r.kind = 'will_help'
+            ))) AS rescued,
        (SELECT count(*)::int FROM follows WHERE followed_id = $1) AS followers,
        (SELECT count(*)::int FROM follows WHERE follower_id = $1 AND follower_id <> followed_id) AS following,
        (SELECT EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followed_id = $1)) AS following_me`,
@@ -135,6 +142,7 @@ export async function profileByHandle(
   const countRow = rowsOf<{
     posts: number;
     helped: number;
+    rescued: number;
     followers: number;
     following: number;
     following_me: boolean;
@@ -150,6 +158,8 @@ export async function profileByHandle(
     counts: {
       posts: countRow?.posts ?? 0,
       helped: countRow?.helped ?? 0,
+      // Animals this person found or went for that left the street. Older APKs ignore it.
+      rescued: countRow?.rescued ?? 0,
       followers: countRow?.followers ?? 0,
       following: countRow?.following ?? 0,
     },

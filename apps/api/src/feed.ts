@@ -193,7 +193,8 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
     [id],
   );
   const updates = await pool.query(
-    `SELECT p.id, p.description, p.status, p.created_at, u.name, u.handle
+    `SELECT p.id, p.description, p.status, p.created_at, u.name, u.handle,
+            (SELECT m.url FROM post_media m WHERE m.post_id = p.id ORDER BY m.position LIMIT 1) AS photo
      FROM posts p JOIN users u ON u.id = p.author_id
      WHERE p.parent_post_id = $1 AND p.hidden = false AND p.review_status = 'published'
      ORDER BY p.created_at ASC`,
@@ -210,11 +211,18 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
       created_at: Date;
       name: string;
       handle: string;
+      photo: string | null;
     }>(updates).map((update) => ({
       id: update.id,
       description: update.description,
       status: update.status,
       kind: diaryKind(update.description, update.status),
+      photo: update.photo
+        ? {
+            url: publicMediaUrl(env, update.photo, 'full'),
+            thumbUrl: publicMediaUrl(env, update.photo, 'thumb'),
+          }
+        : null,
       createdAt: update.created_at.toISOString(),
       author: { name: update.name, handle: update.handle },
     })),
@@ -724,6 +732,8 @@ async function addDiaryNote(
   }
   const description = stripControls(input.description.trim());
   const reviewStatus = looksLikeAnimalSale(description) ? 'pending' : 'published';
+  const photos = input.media.slice(0, DIARY_PHOTOS).map((item) => item.url);
+  assertOwnedMedia(user.id, photos);
   const inserted = await pool.query<{ id: string }>(
     `INSERT INTO posts (
        author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status
@@ -735,10 +745,18 @@ async function addDiaryNote(
   );
   const id = inserted.rows[0]?.id;
   if (!id) throw new HttpError(500, 'Não consegui salvar o diário.');
+  for (const [position, url] of photos.entries()) {
+    await pool.query(
+      `INSERT INTO post_media (post_id, url, type, position) VALUES ($1, $2, 'image', $3)`,
+      [id, url, position],
+    );
+  }
   return { id, reviewStatus };
 }
 
 const NOT_FOUND_NOTE = 'Não encontrei o animal.';
+/** A diary note is a short update: one photo is enough to show the animal now. */
+const DIARY_PHOTOS = 1;
 
 export type DiaryKind = 'not_found' | 'status' | 'note';
 

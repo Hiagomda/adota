@@ -17,6 +17,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerContactRoutes } from './contact.js';
+import { registerNeighborhoodRoutes } from './neighborhoods.js';
 import { registerSightingRoutes } from './sightings.js';
 import {
   anonymizeUser,
@@ -340,7 +341,8 @@ export async function registerRoutes(
     async (request, reply) => {
       const user = requireUser(request.user);
       const body = parse(createPostSchema, request.body);
-      if (!body.parentPostId) {
+      // Diary notes may carry a photo too ("notícias da casa nova"), checked the same way.
+      if (!body.parentPostId || body.media.length > 0) {
         await verifyUploadedImages(
           env,
           storage,
@@ -845,6 +847,7 @@ export async function registerRoutes(
   registerAdoptionChat(app, { env, pool });
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, { env, pool, writeLimit });
+  registerNeighborhoodRoutes(app, { pool });
   await registerStaffRoutes(app, { env, pool });
 }
 
