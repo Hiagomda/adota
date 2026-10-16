@@ -42,5 +42,7 @@ export function publicUser(user: SessionUser) {
     quietHoursStart: user.quietHoursStart,
     quietHoursEnd: user.quietHoursEnd,
     whatsappOptIn: user.whatsappOptIn,
+    // The person's own number, so Ajustes can show it. Only ever sent to its owner.
+    phone: user.phone,
   };
 }
