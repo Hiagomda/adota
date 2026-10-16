@@ -64,7 +64,7 @@ export function Touchable({
     (event: GestureResponderEvent) => {
       if (haptic === 'success') {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-          () => undefined,
+          logBestEffort('touchable:haptic'),
         );
       } else if (haptic) {
         void Haptics.impactAsync(

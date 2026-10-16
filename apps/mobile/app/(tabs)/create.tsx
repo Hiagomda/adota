@@ -279,13 +279,13 @@ export default function CreateScreen() {
       void client.invalidateQueries({ queryKey: ['map'] });
       if (created.reviewStatus === 'pending') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
-          () => undefined,
+          logBestEffort('create:haptic'),
         );
         setMessage('Seu texto foi para revisão antes de aparecer para as outras pessoas.');
         return;
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => undefined,
+        logBestEffort('create:haptic'),
       );
       router.push(`/post/${created.id}`);
     } catch (error) {
@@ -298,7 +298,7 @@ export default function CreateScreen() {
         setDescription('');
         setReference('');
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
-          () => undefined,
+          logBestEffort('create:haptic'),
         );
         setMessage(
           kind === 'adoption'

@@ -30,6 +30,7 @@ import { permissionOutcome } from '../src/permissions';
 import { isTeamRole, useSession } from '../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
+import { logBestEffort } from '../src/crash/bestEffort';
 
 const helpKinds = [
   { value: 'food', label: 'Ração' },
@@ -176,7 +177,7 @@ export default function DonateScreen() {
       void client.invalidateQueries({ queryKey: ['home-campaigns'] });
       void client.invalidateQueries({ queryKey: ['posts'] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => undefined,
+        logBestEffort('doar:haptic'),
       );
       router.replace(`/post/${created.id}`);
     } catch (error) {
