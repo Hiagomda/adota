@@ -6,22 +6,26 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, messageFrom } from '../../src/api';
 import {
+  AnimalCard,
   AppText,
   Avatar,
   Badge,
   BottomSheet,
   Button,
+  CampaignCard,
   EmptyState,
   ErrorState,
   Header,
   ListItem,
   Notice,
+  SectionHeader,
   SkeletonRows,
   StatCard,
   Touchable,
 } from '../../src/components/ui';
 import { useSession } from '../../src/session';
 import { motion, spacing, useTheme } from '../../src/theme';
+import { animalHeadline, placeOf } from '../../src/animalLabels';
 
 interface Profile {
   id: string;
@@ -30,7 +34,14 @@ interface Profile {
   avatarUrl?: string | null;
   verified: boolean;
   role: string;
-  counts: { posts: number; helped: number; followers: number; following: number };
+  counts: {
+    posts: number;
+    helped: number;
+    /** Animals that left the street. Older API builds did not send it. */
+    rescued?: number;
+    followers: number;
+    following: number;
+  };
   following: boolean;
 }
 
@@ -60,6 +71,14 @@ export default function UserScreen() {
     enabled: Boolean(profile.data),
   });
   const person = profile.data;
+  // ONGs and protectors get their help requests and animals for adoption up front.
+  const organization = Boolean(
+    person && (person.verified || person.role === 'ngo' || person.role === 'protector'),
+  );
+  const campaigns = (posts.data?.posts ?? []).filter(
+    (post) => post.helpRequest && post.status !== 'adopted',
+  );
+  const adoptable = (posts.data?.posts ?? []).filter((post) => post.status === 'for_adoption');
 
   async function toggleFollow() {
     if (!person) return;
@@ -146,7 +165,12 @@ export default function UserScreen() {
                 icon="users"
                 tone="secondary"
               />
-              <StatCard value={person.counts.helped} label="resgates" icon="heart" tone="success" />
+              <StatCard
+                value={person.counts.rescued ?? person.counts.helped}
+                label={person.counts.rescued === undefined ? 'resgates' : 'saíram da rua'}
+                icon="heart"
+                tone="success"
+              />
             </View>
             <View style={styles.actions}>
               <Button
@@ -167,6 +191,57 @@ export default function UserScreen() {
               <View style={styles.note}>
                 <Notice message={note} />
               </View>
+            ) : null}
+            {organization && campaigns.length > 0 ? (
+              <View style={styles.block}>
+                <SectionHeader
+                  title="Pedidos de ajuda"
+                  subtitle="O Pix aparece no pedido. O app não recebe dinheiro."
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.rail}
+                >
+                  {campaigns.map((post, index) => (
+                    <CampaignCard
+                      key={post.id}
+                      index={index}
+                      kind={post.helpRequest?.kind ?? ''}
+                      place={placeOf(post.approxLabel)}
+                      goalAmount={post.helpRequest?.goalAmount ?? null}
+                      deadline={post.helpRequest?.deadline ?? null}
+                      createdAt={post.createdAt}
+                      onPress={() => router.push(`/post/${post.id}`)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+            {organization && adoptable.length > 0 ? (
+              <View style={styles.block}>
+                <SectionHeader title="Para adoção" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.rail}
+                >
+                  {adoptable.map((post, index) => (
+                    <AnimalCard
+                      key={post.id}
+                      variant="compact"
+                      index={index}
+                      photoUri={post.media[0]?.thumbUrl || post.media[0]?.url}
+                      title={animalHeadline(post.animal)}
+                      subtitle={placeOf(post.approxLabel)}
+                      onPress={() => router.push(`/post/${post.id}`)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+            {organization && (campaigns.length > 0 || adoptable.length > 0) ? (
+              <SectionHeader title="Todas as publicações" />
             ) : null}
             <View style={styles.grid}>
               {(posts.data?.posts ?? []).map((post) => (
@@ -255,6 +330,8 @@ const styles = StyleSheet.create({
   },
   note: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  block: { gap: spacing.sm, paddingBottom: spacing.md },
+  rail: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm },
   cell: { width: '33.33%', aspectRatio: 1 },
   cellFill: { flex: 1 },
   image: { width: '100%', height: '100%' },
