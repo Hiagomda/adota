@@ -45,6 +45,8 @@ import { AnimalDiary } from '../../src/diary';
 import { distanceLabel, formatKm, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
+import { journeyOf } from '../../src/post/journey';
+import { RescueJourney } from '../../src/post/RescueJourney';
 import { PostEditor } from '../../src/post/PostEditor';
 import { isTeamRole, useSession } from '../../src/session';
 import {
@@ -378,10 +380,12 @@ export default function PostScreen() {
             <View style={styles.titleBlock}>
               <AppText variant="display">{animalHeadline(item.animal)}</AppText>
               <View style={styles.pills}>
-                <StatusPill status={item.status} />
+                {journeyOf(item.type, item.status) ? null : <StatusPill status={item.status} />}
                 <StatusPill urgency={item.urgency} />
               </View>
             </View>
+
+            <RescueJourney type={item.type} status={item.status} />
 
             {/* One coral action per screen: the place is a quiet row, the footer keeps the CTA. */}
             <Touchable
@@ -430,7 +434,9 @@ export default function PostScreen() {
             </View>
 
             <View style={styles.section}>
-              <AppText variant="h2">A história de {animalHeadline(item.animal)}</AppText>
+              <AppText variant="h2">
+                {item.type === 'adoption' ? 'Sobre o animal' : 'O que aconteceu'}
+              </AppText>
               <AppText>{item.description}</AppText>
               {animalLines.length > 0 ? (
                 <Card
@@ -580,41 +586,6 @@ export default function PostScreen() {
               </View>
             ) : null}
 
-            <View style={styles.section}>
-              <AppText variant="h2">Conversa</AppText>
-              <AppText color="textSecondary">
-                A nota do diário conta o que mudou no resgate. Aqui o pessoal conversa e debate.
-              </AppText>
-              {(comments.data?.comments.length ?? 0) === 0 ? (
-                <AppText color="textSecondary">Ninguém comentou ainda. Escreva o primeiro.</AppText>
-              ) : (
-                (comments.data?.comments ?? []).map((itemComment) => (
-                  <Touchable
-                    key={itemComment.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Responder comentário de @${itemComment.author.handle}`}
-                    onPress={() => {
-                      setReplyTo({ id: itemComment.id, handle: itemComment.author.handle });
-                      setCommentsOpen(true);
-                    }}
-                  >
-                    <AppText>
-                      <AppText variant="bodyStrong">@{itemComment.author.handle}</AppText>
-                      {itemComment.parentHandle ? ` para @${itemComment.parentHandle}` : ''}{' '}
-                      {itemComment.body}
-                    </AppText>
-                  </Touchable>
-                ))
-              )}
-              <Button
-                title="Comentar"
-                icon="message-circle"
-                variant="outline"
-                fullWidth
-                onPress={() => setCommentsOpen(true)}
-              />
-            </View>
-
             <AnimalDiary
               post={item}
               canWrite={Boolean(token) && (userId === item.author.id || item.viewerWillHelp)}
@@ -653,6 +624,41 @@ export default function PostScreen() {
                 }
               }}
             />
+
+            <View style={styles.section}>
+              <AppText variant="h2">Conversa</AppText>
+              <AppText color="textSecondary">
+                Perguntas e recados de quem acompanha. As novidades do animal ficam no diário.
+              </AppText>
+              {(comments.data?.comments.length ?? 0) === 0 ? (
+                <AppText color="textSecondary">Ninguém comentou ainda. Escreva o primeiro.</AppText>
+              ) : (
+                (comments.data?.comments ?? []).map((itemComment) => (
+                  <Touchable
+                    key={itemComment.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Responder comentário de @${itemComment.author.handle}`}
+                    onPress={() => {
+                      setReplyTo({ id: itemComment.id, handle: itemComment.author.handle });
+                      setCommentsOpen(true);
+                    }}
+                  >
+                    <AppText>
+                      <AppText variant="bodyStrong">@{itemComment.author.handle}</AppText>
+                      {itemComment.parentHandle ? ` para @${itemComment.parentHandle}` : ''}{' '}
+                      {itemComment.body}
+                    </AppText>
+                  </Touchable>
+                ))
+              )}
+              <Button
+                title="Comentar"
+                icon="message-circle"
+                variant="outline"
+                fullWidth
+                onPress={() => setCommentsOpen(true)}
+              />
+            </View>
 
             {similarPosts.length > 0 ? (
               <View style={styles.section}>
