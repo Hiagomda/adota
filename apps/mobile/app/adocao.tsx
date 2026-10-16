@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../src/api';
-import { placeOf } from '../src/animalLabels';
 import {
   AnimalCard,
   AppText,
@@ -25,7 +24,7 @@ import {
   type AdoptionFilters,
 } from '../src/post/adoptionQuery';
 import { ageBandOf, ageBands, careKeys, careQuestion, type CareKey } from '../src/post/care';
-import { animalHeadline } from '../src/animalLabels';
+import { animalHeadline, placeOf } from '../src/animalLabels';
 import { useSession } from '../src/session';
 import { screenColumn, size, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
