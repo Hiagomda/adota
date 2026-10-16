@@ -43,7 +43,9 @@ import {
   Touchable,
 } from '../../src/components/ui';
 import { AnimalDiary } from '../../src/diary';
-import { distanceLabel, formatKm, formatWhen } from '../../src/format';
+import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
+import { formatWhatsApp } from '../../src/contact/whatsapp';
+import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
@@ -130,14 +132,13 @@ export default function PostScreen() {
     enabled: Boolean(id),
   });
   const fosters = useQuery({
-    // The server lists Casas Amigas only to the author, the team and who said "vou ajudar".
-    queryKey: ['fosters', id, token],
-    queryFn: () =>
-      api<{ fosters: { id: string; name: string; distanceKm: number }[] }>(`/posts/${id}/fosters`, {
-        token,
-      }),
-    enabled: Boolean(id),
+    // The server lists Casas Amigas only to the author, the team and who said "vou ajudar",
+    // without address or distance: the meeting is arranged on WhatsApp.
+    queryKey: ['foster-homes', id, token],
+    queryFn: () => api<{ homes: FosterHome[] }>(`/posts/${id}/foster-homes`, { token }),
+    enabled: Boolean(id && token),
   });
+  const whatsapp = useWhatsAppContact(token, setNote);
   const species = post.data?.animal.species;
   const similar = useQuery({
     queryKey: ['similar', species, token],
@@ -248,7 +249,7 @@ export default function PostScreen() {
   const helpingNow = item.viewerWillHelp && !adoptionContact;
   const footerHeight =
     spacing.lg + SHARE_BUTTON + footerPad + (helpingNow ? size.control + spacing.sm * 2 : 0);
-  const fosterList = fosters.data?.fosters ?? [];
+  const fosterList = fosters.data?.homes ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
   const speciesName = speciesLabel[item.animal.species] ?? 'bichinho';
   const animalLines = [
@@ -296,13 +297,26 @@ export default function PostScreen() {
     setHelpOpen(true);
   }
 
-  function openAdoptionChat() {
+  const postLink = `${siteUrl}/p/${item.id}`;
+  // "a Mel" reads wrong without knowing the sex, so the name goes alone or "um gato".
+  const animalRef = item.animal.name?.trim() || `um ${speciesName.toLowerCase()}`;
+  const authorFirstName = item.author.name.split(' ')[0] ?? item.author.name;
+
+  function talkToAuthor() {
     if (!item) return;
-    if (!token) {
-      setNote('Entre na sua conta para conversar sobre a adoção.');
-      return;
-    }
-    router.push(`/chat/${item.id}`);
+    const text = adoptionContact
+      ? `Oi, ${authorFirstName}! Vi o post de adoção de ${animalRef} no Égua, adota! e quero adotar. ${postLink}`
+      : `Oi, ${authorFirstName}! Vou ajudar no resgate de ${animalRef} em ${placeOf(item.approxLabel)}, pelo Égua, adota!. ${postLink}`;
+    void whatsapp.open(`/posts/${item.id}/contact`, text);
+  }
+
+  function talkToFosterHome(home: FosterHome) {
+    if (!item) return;
+    const first = home.name.split(' ')[0] ?? home.name;
+    void whatsapp.open(
+      `/posts/${item.id}/foster-homes/${home.id}/contact`,
+      `Oi, ${first}! Vi que você oferece Casa Amiga no Égua, adota!. Tem ${animalRef} precisando de lar temporário em ${placeOf(item.approxLabel)}. ${postLink}`,
+    );
   }
 
   function share() {
@@ -503,7 +517,13 @@ export default function PostScreen() {
                   elevation="none"
                   style={{ backgroundColor: colors.surfaceMuted }}
                 >
-                  <ListItem title="WhatsApp" subtitle={item.author.phone} icon="message-circle" />
+                  <ListItem
+                    title="Falar no WhatsApp"
+                    subtitle={formatWhatsApp(item.author.phone)}
+                    icon="message-circle"
+                    showChevron
+                    onPress={talkToAuthor}
+                  />
                 </Card>
               ) : null}
             </View>
@@ -574,19 +594,22 @@ export default function PostScreen() {
 
             {fosterList.length > 0 ? (
               <View style={styles.section}>
-                <AppText variant="h2">Lares temporários perto</AppText>
+                <AppText variant="h2">Casas Amigas</AppText>
+                <AppText color="textSecondary">
+                  Combine pelo WhatsApp. Encontro e endereço vocês acertam por lá.
+                </AppText>
                 <Card padding="none" elevation="md">
-                  {fosterList.map((foster, index) => (
-                    <View key={foster.id}>
+                  {fosterList.map((home, index) => (
+                    <View key={home.id}>
                       {index > 0 ? <Divider inset /> : null}
                       <ListItem
-                        title={foster.name}
-                        icon="home"
-                        trailing={
-                          <AppText variant="bodySmall" color="textSecondary">
-                            {formatKm(foster.distanceKm)}
-                          </AppText>
+                        title={home.name}
+                        subtitle={
+                          home.maxDays ? `Acolhe por até ${home.maxDays} dias` : 'Lar temporário'
                         }
+                        icon="home"
+                        showChevron
+                        onPress={() => talkToFosterHome(home)}
                       />
                     </View>
                   ))}
@@ -797,30 +820,38 @@ export default function PostScreen() {
             <Button
               title={
                 adoptionContact && isAuthor
-                  ? 'Ver conversas'
+                  ? forAdoption
+                    ? 'Compartilhar para achar um lar'
+                    : 'Compartilhar'
                   : forAdoption
                     ? 'Quero adotar'
                     : adopted
-                      ? 'Conversar'
+                      ? 'Falar no WhatsApp'
                       : helpingNow
                         ? 'Não consegui'
                         : 'Eu vou ajudar'
               }
-              icon={adoptionContact ? 'message-circle' : helpingNow ? 'x' : 'heart'}
+              icon={
+                adoptionContact && isAuthor
+                  ? 'share-2'
+                  : adoptionContact
+                    ? 'message-circle'
+                    : helpingNow
+                      ? 'x'
+                      : 'heart'
+              }
               variant={helpingNow ? 'outline' : 'secondary'}
               size="lg"
               fullWidth
-              loading={helpingNow && leaving}
+              loading={(helpingNow && leaving) || whatsapp.busy === `/posts/${item.id}/contact`}
               onPress={
                 adoptionContact && isAuthor
-                  ? () => router.push(`/chat/${item.id}`)
-                  : forAdoption
-                    ? openAdoptionChat
-                    : adopted
-                      ? openAdoptionChat
-                      : helpingNow
-                        ? () => void leaveRescue('could_not')
-                        : onHelpPress
+                  ? share
+                  : adoptionContact
+                    ? talkToAuthor
+                    : helpingNow
+                      ? () => void leaveRescue('could_not')
+                      : onHelpPress
               }
             />
             <PawBurst trigger={helpBurst} />
@@ -989,6 +1020,12 @@ export default function PostScreen() {
       </BottomSheet>
     </View>
   );
+}
+
+interface FosterHome {
+  id: string;
+  name: string;
+  maxDays: number | null;
 }
 
 const styles = StyleSheet.create({

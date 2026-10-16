@@ -57,10 +57,7 @@ export default function AlertsScreen() {
       await api('/notifications/read', { method: 'POST', token });
       await client.invalidateQueries({ queryKey: ['notifications', token] });
     }
-    if (item.payload.postId && item.payload.adopterId) {
-      router.push(`/chat/${item.payload.postId}?with=${item.payload.adopterId}`);
-      return;
-    }
+    // Old adoption-chat notices also land on the animal: conversations moved to WhatsApp.
     if (item.payload.postId) router.push(`/post/${item.payload.postId}`);
   }
 
