@@ -39,6 +39,8 @@ const ROW_MASCOT = 64;
 // Three seals per row, leaving room for the gaps.
 const SEAL_COLUMN_WIDTH = '29%';
 const SEAL_SKELETON = 80;
+/** The ranking moves slowly: once every few minutes is enough. */
+const RANKING_STALE_MS = 5 * 60 * 1000;
 
 export default function VolunteerScreen() {
   const { colors } = useTheme();
@@ -80,6 +82,14 @@ export default function VolunteerScreen() {
     };
   }, [levelFloor, levelName]);
 
+  const ranking = useQuery({
+    queryKey: ['neighborhoods'],
+    queryFn: () =>
+      api<{ days: number; neighborhoods: { name: string; rescued: number }[] }>(
+        '/stats/neighborhoods',
+      ),
+    staleTime: RANKING_STALE_MS,
+  });
   const me = useQuery({
     queryKey: ['me', token],
     queryFn: () => loadMe(token ?? ''),
@@ -243,6 +253,28 @@ export default function VolunteerScreen() {
             ) : null}
             {save.isError ? <Notice tone="error" message={messageFrom(save.error)} /> : null}
           </View>
+          {(ranking.data?.neighborhoods.length ?? 0) > 0 ? (
+            <View style={styles.ranking}>
+              <SectionHeader
+                title="Bairros que mais tiraram animais da rua"
+                subtitle={`Nos últimos ${ranking.data?.days ?? 30} dias`}
+                flush
+              />
+              <Card>
+                <View style={styles.rankList}>
+                  {ranking.data?.neighborhoods.map((place, index, all) => (
+                    <ProgressBar
+                      key={place.name}
+                      value={place.rescued / Math.max(all[0]?.rescued ?? 1, 1)}
+                      label={`${index + 1}º ${place.name}`}
+                      caption={place.rescued === 1 ? '1 animal' : `${place.rescued} animais`}
+                      tone={index === 0 ? 'secondary' : 'primary'}
+                    />
+                  ))}
+                </View>
+              </Card>
+            </View>
+          ) : null}
           <SectionHeader title="Selos" />
           <View style={styles.grid}>
             {status.isLoading
@@ -300,6 +332,8 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   block: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  ranking: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.lg },
+  rankList: { gap: spacing.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, paddingHorizontal: spacing.lg },
   seal: { width: SEAL_COLUMN_WIDTH, alignItems: 'center', gap: spacing.xs },
   sealName: { textAlign: 'center' },
