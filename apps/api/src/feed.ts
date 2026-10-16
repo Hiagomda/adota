@@ -178,6 +178,10 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
   if (!row) throw new HttpError(404, 'Esse alerta não existe.');
   const [post] = await hydrate(pool, env, [row], viewer);
   if (!post) throw new HttpError(404, 'Esse alerta não existe.');
+  const helpers = await pool.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
+    [id],
+  );
   const updates = await pool.query(
     `SELECT p.id, p.description, p.status, p.created_at, u.name, u.handle
      FROM posts p JOIN users u ON u.id = p.author_id
@@ -187,6 +191,8 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
   );
   return {
     ...post,
+    // People who said "vou ajudar" and have not stepped back. Older APKs ignore it.
+    helpersCount: helpers.rows[0]?.count ?? 0,
     updates: rowsOf<{
       id: string;
       description: string;
@@ -198,6 +204,7 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
       id: update.id,
       description: update.description,
       status: update.status,
+      kind: diaryKind(update.description, update.status),
       createdAt: update.created_at.toISOString(),
       author: { name: update.name, handle: update.handle },
     })),
@@ -477,7 +484,7 @@ export async function leaveHelp(
          )
          SELECT $2, animal_id, 'update', 'low', $3, location, approx_label, status, id
          FROM posts WHERE id = $1`,
-        [postId, user.id, 'Não encontrei o animal.'],
+        [postId, user.id, NOT_FOUND_NOTE],
       );
       noted = true;
     }
@@ -676,11 +683,25 @@ async function addDiaryNote(
   return { id, reviewStatus };
 }
 
+const NOT_FOUND_NOTE = 'Não encontrei o animal.';
+
+export type DiaryKind = 'not_found' | 'status' | 'note';
+
+/**
+ * What a diary entry is, for the app to draw it: someone went and did not find the animal,
+ * the rescue changed step, or a note someone wrote. The first two are texts this file writes.
+ */
+export function diaryKind(description: string, status: string): DiaryKind {
+  if (description === NOT_FOUND_NOTE) return 'not_found';
+  if (description === statusLabel(status as AnimalStatus)) return 'status';
+  return 'note';
+}
+
 function statusLabel(status: AnimalStatus): string {
   const labels: Record<AnimalStatus, string> = {
     open: 'Resgate aberto.',
     on_the_way: 'Alguém está a caminho.',
-    not_found: 'Não encontrei o animal.',
+    not_found: NOT_FOUND_NOTE,
     rescued: 'Animal resgatado.',
     fostered: 'Foi para um lar temporário.',
     for_adoption: 'Disponível para adoção.',
