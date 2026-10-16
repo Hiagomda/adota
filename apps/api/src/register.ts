@@ -16,6 +16,7 @@ import type { Pool } from 'pg';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
+import { registerContactRoutes } from './contact.js';
 import {
   anonymizeUser,
   createDevUser,
@@ -108,6 +109,8 @@ function perAccount(max: number) {
 const writeLimit = perAccount(30);
 /** Actions that change XP, verification or the account itself. */
 const strictLimit = perAccount(5);
+/** Asking for someone's WhatsApp: enough to talk to a few people, too few to harvest numbers. */
+const contactLimit = perAccount(10);
 
 export async function registerRoutes(
   app: FastifyInstance,
@@ -835,6 +838,7 @@ export async function registerRoutes(
   });
 
   registerAdoptionChat(app, { env, pool });
+  registerContactRoutes(app, { pool, contactLimit });
   await registerStaffRoutes(app, { env, pool });
 }
 

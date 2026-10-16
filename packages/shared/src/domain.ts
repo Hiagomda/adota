@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeWhatsApp } from './phone.js';
 
 export const roleSchema = z.enum(['user', 'protector', 'ngo', 'moderator', 'admin']);
 export const speciesSchema = z.enum(['dog', 'cat', 'other']);
@@ -145,7 +146,26 @@ export const updateMeSchema = z
       .trim()
       .regex(/^[a-z0-9._]{3,24}$/)
       .optional(),
-    phone: z.string().trim().max(20).nullable().optional(),
+    // Empty clears the number; anything else must be a Brazilian phone, stored as 55 + digits.
+    phone: z
+      .string()
+      .trim()
+      .max(20)
+      .nullable()
+      .optional()
+      .transform((value, context) => {
+        if (value === undefined || value === null) return value;
+        if (value === '') return null;
+        const number = normalizeWhatsApp(value);
+        if (number === null) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Confira o número do WhatsApp com DDD.',
+          });
+          return z.NEVER;
+        }
+        return number;
+      }),
     whatsappOptIn: z.boolean().optional(),
     city: z.string().trim().max(80).nullable().optional(),
     alertRadiusKm: z.number().int().min(1).max(100).optional(),

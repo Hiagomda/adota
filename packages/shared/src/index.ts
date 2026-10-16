@@ -50,3 +50,4 @@ export {
   type VolunteerSettingsInput,
 } from './volunteer.js';
 export { insideServiceArea } from './serviceArea.js';
+export { normalizeWhatsApp } from './phone.js';
