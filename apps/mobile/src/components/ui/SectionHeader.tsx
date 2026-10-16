@@ -9,13 +9,21 @@ export interface SectionHeaderProps {
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Drops the side and top padding, for a header inside a column that already has its own. */
+  flush?: boolean;
 }
 
 /** Title of a block: big title in the brand font, with a pill to see everything on the right. */
-export function SectionHeader({ title, subtitle, actionLabel, onAction }: SectionHeaderProps) {
+export function SectionHeader({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  flush = false,
+}: SectionHeaderProps) {
   const { colors } = useTheme();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, flush && styles.flush]}>
       <View style={styles.text}>
         <AppText variant="h2">{title}</AppText>
         {subtitle ? (
@@ -52,6 +60,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     paddingBottom: spacing.md,
   },
+  flush: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 },
   text: { flex: 1 },
   action: {
     minHeight: size.touch,

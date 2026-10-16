@@ -16,6 +16,7 @@ import {
   IconButton,
   Input,
   Notice,
+  SectionHeader,
   Segmented,
   Touchable,
 } from '../../src/components/ui';
@@ -315,6 +316,12 @@ export default function CreateScreen() {
     ? `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`
     : 'Ponto ainda não definido';
   const thumbSize = { width: thumb, height: Math.round(thumb * THUMB_RATIO) };
+  const missing = [
+    ...(description.trim().length === 0
+      ? [kind === 'adoption' ? 'contar sobre ele' : 'contar o que aconteceu']
+      : []),
+    ...(point ? [] : ['marcar o lugar no mapa']),
+  ];
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
@@ -424,160 +431,184 @@ export default function CreateScreen() {
                   if (value === 'adoption') setUrgency('low');
                 }}
               />
-              <Input
-                label="Nome"
-                value={animalName}
-                onChangeText={setAnimalName}
-                placeholder="Ex.: Pretinho da esquina"
-                maxLength={80}
-                helper="É o título do resgate. Se ficar vazio, o card mostra só Cachorro, Gato ou Outro."
-              />
-              <View style={styles.group}>
-                <AppText variant="bodyStrong">Espécie</AppText>
-                <View style={styles.chips}>
-                  {speciesOptions.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={species === option.value}
-                      onPress={() => setSpecies(option.value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={styles.group}>
-                <AppText variant="bodyStrong">Porte</AppText>
-                <View style={styles.chips}>
-                  {sizeOptions.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={size === option.value}
-                      onPress={() => setSize(option.value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={styles.group}>
-                <AppText variant="bodyStrong">Sexo</AppText>
-                <View style={styles.chips}>
-                  {sexOptions.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={sex === option.value}
-                      onPress={() => setSex(option.value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={styles.group}>
-                <AppText variant="bodyStrong">Urgência</AppText>
-                <View style={styles.chips}>
-                  {urgencyOptions.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={urgency === option.value}
-                      onPress={() => setUrgency(option.value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={styles.group}>
-                <AppText variant="bodySmall" color="textSecondary">
-                  Sugestões para a descrição
-                </AppText>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.suggestionRow}
-                >
-                  {(kind === 'adoption' ? adoptionSuggestions : suggestions).map((text) => (
-                    <Chip
-                      key={text}
-                      label={text}
-                      multiline
-                      selected={description === text}
-                      onPress={() => {
-                        void Haptics.selectionAsync().catch(() => undefined);
-                        setDescription(text);
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-              <Input
-                label="Descrição"
-                multiline
-                value={description}
-                onChangeText={setDescription}
-                placeholder="O que você viu e como o animal está"
-              />
-              <AppText variant="bodySmall" color="textSecondary">
-                {gps.fix && !located
-                  ? 'Sua localização está fora de Belém. Mova o mapa até a área verde.'
-                  : gps.message}
-              </AppText>
-              {gps.action ? (
-                <Button
-                  title={gps.action.label}
-                  icon="settings"
-                  variant="ghost"
-                  onPress={() => void gps.action?.run()}
+              <View style={styles.section}>
+                <SectionHeader
+                  title={kind === 'adoption' ? 'Conte sobre ele' : 'O que está acontecendo'}
+                  flush
                 />
-              ) : null}
-              <View style={styles.map}>
-                <PlacePicker
-                  focus={moved ? null : located}
-                  accuracyM={moved ? null : (located?.accuracy ?? null)}
-                  urgency={urgency}
-                  onOutside={() => {
-                    setMessage(
-                      'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
-                    );
-                  }}
-                  onChange={(next, fromUser) => {
-                    if (!fromUser || !insideServiceArea(next)) return;
-                    setMoved(true);
-                    setManual(next);
-                    setMessage(null);
-                  }}
-                />
-                {gps.status === 'loading' ? (
-                  <View style={[styles.loading, { backgroundColor: colors.overlay }]}>
-                    <ActivityIndicator color={colors.onMedia} />
-                    <AppText variant="bodyStrong" style={{ color: colors.onMedia }}>
-                      Buscando o GPS...
-                    </AppText>
+                {kind !== 'adoption' ? (
+                  <View style={styles.group}>
+                    <AppText variant="bodyStrong">Urgência</AppText>
+                    <View style={styles.chips}>
+                      {urgencyOptions.map((option) => (
+                        <Chip
+                          key={option.value}
+                          label={option.label}
+                          selected={urgency === option.value}
+                          onPress={() => setUrgency(option.value)}
+                        />
+                      ))}
+                    </View>
                   </View>
                 ) : null}
+                <View style={styles.group}>
+                  <AppText variant="bodySmall" color="textSecondary">
+                    Toque numa sugestão ou escreva do seu jeito
+                  </AppText>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.suggestionRow}
+                  >
+                    {(kind === 'adoption' ? adoptionSuggestions : suggestions).map((text) => (
+                      <Chip
+                        key={text}
+                        label={text}
+                        multiline
+                        selected={description === text}
+                        onPress={() => {
+                          void Haptics.selectionAsync().catch(() => undefined);
+                          setDescription(text);
+                        }}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+                <Input
+                  label="Descrição"
+                  multiline
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder={
+                    kind === 'adoption'
+                      ? 'Jeito, saúde e com quem ele se dá bem'
+                      : 'O que você viu e como o animal está'
+                  }
+                />
               </View>
-              <Button
-                title="Usar minha localização atual"
-                icon="crosshair"
-                variant="outline"
-                fullWidth
-                onPress={() => {
-                  setMoved(false);
-                  void gps.retry();
-                }}
-              />
-              <View style={styles.address}>
-                <Icon name="map-pin" color={colors.primary} />
-                <AppText variant="bodyStrong" style={styles.addressText}>
-                  {looking ? 'Buscando o endereço...' : (address ?? coordinates)}
+              <View style={styles.section}>
+                <SectionHeader
+                  title="Onde o animal está"
+                  subtitle="No app aparece só o bairro. O ponto exato fica com quem for ajudar."
+                  flush
+                />
+                <AppText variant="bodySmall" color="textSecondary">
+                  {moved
+                    ? 'Ponto escolhido no mapa.'
+                    : gps.fix && !located
+                      ? 'Sua localização está fora de Belém. Mova o mapa até a área verde.'
+                      : gps.message}
                 </AppText>
+                {gps.action ? (
+                  <Button
+                    title={gps.action.label}
+                    icon="settings"
+                    variant="ghost"
+                    onPress={() => void gps.action?.run()}
+                  />
+                ) : null}
+                <View style={styles.map}>
+                  <PlacePicker
+                    focus={moved ? null : located}
+                    accuracyM={moved ? null : (located?.accuracy ?? null)}
+                    urgency={urgency}
+                    onOutside={() => {
+                      setMessage(
+                        'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
+                      );
+                    }}
+                    onChange={(next, fromUser) => {
+                      if (!fromUser || !insideServiceArea(next)) return;
+                      setMoved(true);
+                      setManual(next);
+                      setMessage(null);
+                    }}
+                  />
+                  {gps.status === 'loading' ? (
+                    <View style={[styles.loading, { backgroundColor: colors.overlay }]}>
+                      <ActivityIndicator color={colors.onMedia} />
+                      <AppText variant="bodyStrong" style={{ color: colors.onMedia }}>
+                        Buscando o GPS...
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
+                <Button
+                  title="Usar minha localização atual"
+                  icon="crosshair"
+                  variant="outline"
+                  fullWidth
+                  onPress={() => {
+                    setMoved(false);
+                    void gps.retry();
+                  }}
+                />
+                <View style={styles.address}>
+                  <Icon name="map-pin" color={colors.primary} />
+                  <AppText variant="bodyStrong" style={styles.addressText}>
+                    {looking ? 'Buscando o endereço...' : (address ?? coordinates)}
+                  </AppText>
+                </View>
+                <Input
+                  label="Ponto de referência"
+                  value={reference}
+                  onChangeText={setReference}
+                  placeholder="Se quiser. Ex.: em frente à padaria"
+                />
               </View>
-              <Input
-                label="Ponto de referência"
-                value={reference}
-                onChangeText={setReference}
-                placeholder="Se quiser. Ex.: em frente à padaria"
-              />
-              {gps.fix ? (
-                <AppText variant="caption" color="textSecondary">
-                  Precisão do GPS: {Math.round(gps.fix.accuracy)} m
+              <View style={styles.section}>
+                <SectionHeader title="Sobre o animal" flush />
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">Espécie</AppText>
+                  <View style={styles.chips}>
+                    {speciesOptions.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={species === option.value}
+                        onPress={() => setSpecies(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">Porte</AppText>
+                  <View style={styles.chips}>
+                    {sizeOptions.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={size === option.value}
+                        onPress={() => setSize(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">Sexo</AppText>
+                  <View style={styles.chips}>
+                    {sexOptions.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={sex === option.value}
+                        onPress={() => setSex(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <Input
+                  label="Nome (se souber)"
+                  value={animalName}
+                  onChangeText={setAnimalName}
+                  placeholder="Ex.: Pretinho da esquina"
+                  maxLength={80}
+                  helper="Vira o título do card. Sem nome, o card mostra a espécie."
+                />
+              </View>
+              {missing.length > 0 ? (
+                <AppText variant="bodySmall" color="textSecondary">
+                  Falta {missing.join(' e ')}.
                 </AppText>
               ) : null}
               {message ? (
@@ -628,6 +659,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  section: { gap: spacing.md, paddingTop: spacing.lg },
   group: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   suggestionRow: { gap: spacing.sm, paddingRight: spacing.sm },
