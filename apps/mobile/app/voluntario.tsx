@@ -19,7 +19,7 @@ import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 import { Mascot } from '../src/mascot';
 import { useVolunteerAvailability } from '../src/volunteer/availability';
-import { badgeArt } from '../src/volunteer/badgeArt';
+import { badgeArtFor } from '../src/volunteer/badgeArt';
 import type { VolunteerBadge, VolunteerSettings, VolunteerStatus } from '../src/volunteer/types';
 
 const petChoices = [
@@ -51,7 +51,7 @@ export default function VolunteerScreen() {
 
   useEffect(() => {
     if (!status.data) return;
-    sync(false, status.data.settings.isFosterAvailable);
+    sync(status.data.settings.isFosterAvailable);
   }, [status.data, sync]);
 
   const save = useMutation({
@@ -59,7 +59,7 @@ export default function VolunteerScreen() {
       api<VolunteerStatus>('/volunteers/settings', { method: 'PUT', token, body }),
     onSuccess: (next) => {
       client.setQueryData(['volunteer', token], next);
-      sync(false, next.settings.isFosterAvailable);
+      sync(next.settings.isFosterAvailable);
     },
   });
 
@@ -195,30 +195,29 @@ export default function VolunteerScreen() {
           </View>
           <SectionHeader title="Selos" />
           <View style={styles.grid}>
-            {(status.data?.badges ?? fallbackBadges)
-              .filter((badge) => badge.code !== 'good_pilot')
-              .map((badge) => {
-                const Art = badgeArt[badge.code];
-                const unlocked = badge.unlockedAt !== null;
-                return (
-                  <View
-                    key={badge.code}
-                    accessible
-                    accessibilityLabel={`${badge.name}, ${unlocked ? 'conquistado' : 'ainda não conquistado'}`}
-                    style={styles.seal}
-                  >
-                    <Art unlocked={unlocked} />
-                    <AppText variant="caption" style={styles.sealName}>
-                      {badge.name}
-                    </AppText>
-                    <Badge
-                      kind="label"
-                      label={unlocked ? 'Seu' : 'Ainda não'}
-                      tone={unlocked ? 'success' : 'neutral'}
-                    />
-                  </View>
-                );
-              })}
+            {(status.data?.badges ?? fallbackBadges).map((badge) => {
+              const Art = badgeArtFor(badge.code);
+              if (!Art) return null;
+              const unlocked = badge.unlockedAt !== null;
+              return (
+                <View
+                  key={badge.code}
+                  accessible
+                  accessibilityLabel={`${badge.name}, ${unlocked ? 'conquistado' : 'ainda não conquistado'}`}
+                  style={styles.seal}
+                >
+                  <Art unlocked={unlocked} />
+                  <AppText variant="caption" style={styles.sealName}>
+                    {badge.name}
+                  </AppText>
+                  <Badge
+                    kind="label"
+                    label={unlocked ? 'Seu' : 'Ainda não'}
+                    tone={unlocked ? 'success' : 'neutral'}
+                  />
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
