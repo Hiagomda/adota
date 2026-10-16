@@ -26,6 +26,7 @@ import {
 import { useSession } from '../../src/session';
 import { motion, spacing, useTheme } from '../../src/theme';
 import { animalHeadline, placeOf } from '../../src/animalLabels';
+import { reportReasons, reportSentNote } from '../../src/reportReasons';
 
 interface Profile {
   id: string;
@@ -44,13 +45,6 @@ interface Profile {
   };
   following: boolean;
 }
-
-const reportReasons = [
-  'Conteúdo abusivo',
-  'Parece venda de animal',
-  'Informação falsa',
-  'É spam',
-] as const;
 
 export default function UserScreen() {
   const { handle } = useLocalSearchParams<{ handle: string }>();
@@ -302,7 +296,7 @@ export default function UserScreen() {
               })
                 .then(() => {
                   setReportOpen(false);
-                  setNote('Denúncia enviada. A equipe analisa antes de ocultar.');
+                  setNote(reportSentNote);
                 })
                 .catch((error: unknown) => {
                   setReportOpen(false);

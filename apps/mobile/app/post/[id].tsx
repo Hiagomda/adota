@@ -69,6 +69,7 @@ import {
 import { useLightStatusBar } from '../../src/useLightStatusBar';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { reportError } from '../../src/crash/reporter';
+import { reportReasons, reportSentNote } from '../../src/reportReasons';
 
 interface Comment {
   id: string;
@@ -76,13 +77,6 @@ interface Comment {
   parentHandle: string | null;
   author: { handle: string };
 }
-
-const reportReasons = [
-  'Conteúdo abusivo',
-  'Parece venda de animal',
-  'Informação falsa',
-  'É spam',
-] as const;
 
 const NOTE_MS = 6000;
 const DOT = 8;
@@ -1153,7 +1147,7 @@ export default function PostScreen() {
               }).then((ok) => {
                 if (!ok) return;
                 setReportOpen(false);
-                setNote('Denúncia enviada. A equipe analisa antes de ocultar.');
+                setNote(reportSentNote);
               });
             }}
           />
