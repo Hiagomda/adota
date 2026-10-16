@@ -332,6 +332,7 @@ export default function HomeScreen() {
         {/* Shortcuts to their own screens, after the filters of this list. */}
         <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
+        <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
       </ScrollView>
       <Stories posts={storyPosts} here={here} nearby={nearbyFirst} />
     </View>
