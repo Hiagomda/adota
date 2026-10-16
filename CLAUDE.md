@@ -66,6 +66,8 @@ download/                     página de download servida pelo container `downlo
 - Sem Cloudflare, CDN, proxy ou R2. As fotos ficam no MinIO da VPS e são servidas pelo imgproxy. Variáveis `R2_*` que sobraram são ignoradas.
 - Identidade "calor de casa paraense": turquesa `#1F7A7A`, coral `#F26B4E`, caramelo `#D98A3D`, fundo creme `#FFF8EE`, Baloo 2 nos títulos e Nunito no corpo. Mascote: vira-lata caramelo com coleira turquesa e plaquinha de patinha coral. Detalhes de Belém (marajoara sutil, fitinha do Círio, mangueira). Use sempre os tokens de `src/theme`, nunca hex solto. Branco sobre coral não passa contraste, então superfície coral usa texto escuro.
 - Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho. Existem "Minha localização" e "Buscar nesta área": movimentos do app (abertura, GPS, "Ver no mapa") carregam sozinhos; gesto da pessoa só mostra o botão (`onCommitBounds` recebe `fromUser`).
+- Contato só pelo WhatsApp, fora do app: o dono não quer responder por conversa dentro da plataforma. O app não tem chat (a rota `/chat/[postId]` só explica a mudança). O número sai um por vez em `POST /posts/:id/contact` e `POST /posts/:id/foster-homes/:userId/contact` (`contact.ts`, 10/min por conta), só de quem ligou "Mostrar meu WhatsApp". As rotas de `adoptionChat.ts` ficam só para APKs antigos.
+- Casa Amiga não pede endereço: a oferta é o interruptor de "Sua rede" (`volunteer_profiles`), listada em `GET /posts/:id/foster-homes` sem distância. Encontro e endereço são combinados no WhatsApp. A tabela `fosters` e `GET /posts/:id/fosters` ficam para APKs antigos.
 - Admin do dono: o e-mail em `OWNER_EMAILS` vira admin só com `email_verified` do Firebase.
 
 ## Regras
