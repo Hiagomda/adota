@@ -3,10 +3,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, messageFrom } from '../../src/api';
+import { Image } from 'expo-image';
+import { animalHeadline } from '../../src/animalLabels';
+import { api, loadPost, messageFrom } from '../../src/api';
 import {
   AppText,
   Avatar,
+  Chip,
+  ConfirmDialog,
+  Icon,
   EmptyState,
   ErrorState,
   Header,
@@ -16,8 +21,19 @@ import {
   SkeletonRows,
   Touchable,
 } from '../../src/components/ui';
+import { Mascot } from '../../src/mascot';
 import { useSession } from '../../src/session';
-import { radius, spacing, useTheme } from '../../src/theme';
+import { radius, spacing, statusLabel, useTheme } from '../../src/theme';
+
+const THUMB = 44;
+const EMPTY_MASCOT = 96;
+
+/** First lines for someone who wants to adopt and does not know how to start. */
+const adopterStarters = [
+  'Oi! Ele ainda está para adoção?',
+  'Como ele é com crianças e outros bichos?',
+  'Posso conhecer ele pessoalmente?',
+];
 
 interface ChatPerson {
   id: string;
@@ -80,6 +96,13 @@ export default function AdoptionChatScreen() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+
+  const post = useQuery({
+    queryKey: ['post', postId, token],
+    enabled: Boolean(postId),
+    queryFn: () => loadPost(postId ?? '', token),
+  });
 
   const list = useQuery({
     queryKey: ['adoption-chat', postId, token],
@@ -198,12 +221,38 @@ export default function AdoptionChatScreen() {
               <IconButton
                 icon="slash"
                 accessibilityLabel="Bloquear pessoa"
-                onPress={() => void blockPerson()}
+                onPress={() => setConfirmBlock(true)}
               />
             </View>
           ) : null
         }
       />
+      {post.data && !showList ? (
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel={`Ver o animal: ${animalHeadline(post.data.animal)}`}
+          onPress={() => router.push(`/post/${post.data.id}`)}
+          style={[styles.animal, { borderBottomColor: colors.border }]}
+        >
+          {post.data.media[0] ? (
+            <Image
+              source={{ uri: post.data.media[0].thumbUrl }}
+              style={styles.thumb}
+              contentFit="cover"
+              accessible={false}
+            />
+          ) : null}
+          <View style={styles.animalText}>
+            <AppText variant="bodySmallStrong" numberOfLines={1}>
+              {animalHeadline(post.data.animal)}
+            </AppText>
+            <AppText variant="caption" color="textSecondary">
+              {statusLabel[post.data.status] ?? post.data.status}
+            </AppText>
+          </View>
+          <Icon name="chevron-right" size="sm" color={colors.textSecondary} />
+        </Touchable>
+      ) : null}
       {note ? (
         <View style={styles.note}>
           <Notice message={note} />
@@ -283,10 +332,29 @@ export default function AdoptionChatScreen() {
               onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
             >
               {(messages.data?.messages.length ?? 0) === 0 ? (
-                <AppText color="textSecondary">
-                  Escreva a primeira mensagem. A conversa fica só entre vocês dois, o telefone
-                  continua oculto e o app não recebe dinheiro.
-                </AppText>
+                <View style={styles.empty}>
+                  <Mascot pose="wave" size={EMPTY_MASCOT} />
+                  <AppText variant="bodyStrong" style={styles.emptyText}>
+                    {role === 'adopter' ? 'Diga oi para quem cuida' : 'Responda quem quer adotar'}
+                  </AppText>
+                  <AppText variant="bodySmall" color="textSecondary" style={styles.emptyText}>
+                    A conversa fica só entre vocês dois. O telefone continua oculto e o app não
+                    recebe dinheiro.
+                  </AppText>
+                  {role === 'adopter' ? (
+                    <View style={styles.starters}>
+                      {adopterStarters.map((text) => (
+                        <Chip
+                          key={text}
+                          label={text}
+                          multiline
+                          selected={draft === text}
+                          onPress={() => setDraft(text)}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
               ) : (
                 (messages.data?.messages ?? []).map((item) => (
                   <View
@@ -318,11 +386,14 @@ export default function AdoptionChatScreen() {
             <View style={styles.field}>
               <Input
                 label="Mensagem"
+                variant="chat"
                 value={draft}
                 onChangeText={setDraft}
                 multiline
                 maxLength={500}
-                placeholder="Escreva para quem cuida"
+                placeholder={
+                  role === 'author' ? 'Escreva para quem quer adotar' : 'Escreva para quem cuida'
+                }
               />
             </View>
             <IconButton
@@ -335,6 +406,18 @@ export default function AdoptionChatScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+      <ConfirmDialog
+        visible={confirmBlock}
+        title={other ? `Bloquear ${other.name}?` : 'Bloquear pessoa?'}
+        message="Vocês deixam de se ver no app e esta conversa fecha."
+        confirmLabel="Bloquear"
+        destructive
+        onCancel={() => setConfirmBlock(false)}
+        onConfirm={() => {
+          setConfirmBlock(false);
+          void blockPerson();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -371,6 +454,20 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   field: { flex: 1 },
+  animal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  thumb: { width: THUMB, height: THUMB, borderRadius: radius.sm },
+  animalText: { flex: 1 },
+  empty: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.xl },
+  emptyText: { textAlign: 'center' },
+  starters: { alignSelf: 'stretch', gap: spacing.sm, paddingTop: spacing.md },
 });
 
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
