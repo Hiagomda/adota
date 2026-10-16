@@ -11,6 +11,8 @@ export interface Account {
   quietHoursStart: number | null;
   quietHoursEnd: number | null;
   whatsappOptIn: boolean;
+  /** Stored as 55 + digits. Older API builds did not send it. */
+  phone?: string | null;
 }
 
 export interface Post {

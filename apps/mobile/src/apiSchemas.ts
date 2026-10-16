@@ -105,6 +105,7 @@ export const accountSchema: Schema<Account> = z.object({
   quietHoursStart: z.number().nullable(),
   quietHoursEnd: z.number().nullable(),
   whatsappOptIn: z.boolean(),
+  phone: nullableString.optional(),
 });
 
 export const notificationSchema: Schema<AppNotification> = z.object({

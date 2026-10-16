@@ -20,6 +20,7 @@ import {
   Switch,
   useToast,
 } from '../src/components/ui';
+import { formatWhatsApp, normalizeWhatsApp } from '../src/contact/whatsapp';
 import { VersionMark } from '../src/diagnostics/VersionMark';
 import { AvatarCropper } from '../src/profile/AvatarCropper';
 import { permissionOutcome } from '../src/permissions';
@@ -43,6 +44,8 @@ export default function SettingsScreen() {
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [organization, setOrganization] = useState('');
+  const [phone, setPhone] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
   const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -56,6 +59,7 @@ export default function SettingsScreen() {
     setFilledFrom(me.data);
     setName(me.data.name);
     setHandle(me.data.handle);
+    setPhone(me.data.phone ? formatWhatsApp(me.data.phone) : '');
   }
 
   async function run(task: () => Promise<unknown>, success: string) {
@@ -138,6 +142,22 @@ export default function SettingsScreen() {
       await api('/me', { method: 'PATCH', token, body });
       await client.invalidateQueries({ queryKey: ['me', token] });
     }, success);
+  }
+
+  async function savePhone() {
+    const typed = phone.trim();
+    const number = typed ? normalizeWhatsApp(typed) : null;
+    if (typed && !number) {
+      toast.show('Confira o número com DDD, por exemplo (91) 98888-7777.', 'error');
+      return;
+    }
+    setSavingPhone(true);
+    await patchMe(
+      // Without a number there is nothing to show, so the switch goes off with it.
+      number ? { phone: number } : { phone: null, whatsappOptIn: false },
+      number ? 'WhatsApp salvo.' : 'WhatsApp removido.',
+    );
+    setSavingPhone(false);
   }
 
   async function deleteAccount() {
@@ -242,15 +262,39 @@ export default function SettingsScreen() {
                       )
                     }
                   />
+                  <Input
+                    label="Seu WhatsApp"
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="(91) 98888-7777"
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                    textContentType="telephoneNumber"
+                    helper="Com DDD. As conversas acontecem no WhatsApp, fora do app."
+                  />
+                  <Button
+                    title={savingPhone ? 'Salvando…' : 'Salvar WhatsApp'}
+                    icon="check"
+                    variant="outline"
+                    fullWidth
+                    disabled={savingPhone || !me.data}
+                    onPress={() => void savePhone()}
+                  />
                   <Switch
-                    label="Mostrar WhatsApp depois do eu vou ajudar"
-                    description="Seu número só aparece para quem se ofereceu naquele resgate."
-                    value={me.data?.whatsappOptIn ?? false}
-                    disabled={!me.data}
+                    label="Mostrar meu WhatsApp"
+                    description={
+                      me.data?.phone
+                        ? 'Quem quer adotar um animal seu, quem vai ajudar no seu resgate e quem precisa de Casa Amiga pode te chamar.'
+                        : 'Salve seu número acima para ligar.'
+                    }
+                    value={Boolean(me.data?.whatsappOptIn && me.data.phone)}
+                    disabled={!me.data?.phone}
                     onValueChange={(value) =>
                       void patchMe(
                         { whatsappOptIn: value },
-                        value ? 'WhatsApp liberado depois do eu vou ajudar.' : 'WhatsApp oculto.',
+                        value
+                          ? 'Seu WhatsApp aparece para quem pode te chamar.'
+                          : 'WhatsApp oculto.',
                       )
                     }
                   />
@@ -303,31 +347,6 @@ export default function SettingsScreen() {
                     }
                   />
                 </View>
-              </Card>
-              <Card padding="none" elevation="none">
-                <ListItem
-                  title="Oferecer lar temporário"
-                  subtitle="Registra um lar no centro de Belém, raio de 8 km"
-                  icon="home"
-                  onPress={() =>
-                    void run(
-                      () =>
-                        api('/fosters', {
-                          method: 'POST',
-                          token,
-                          body: {
-                            capacity: 2,
-                            speciesAccepted: ['dog', 'cat'],
-                            sizesAccepted: ['small', 'medium'],
-                            latitude: -1.4558,
-                            longitude: -48.5039,
-                            radiusKm: 8,
-                          },
-                        }),
-                      'Lar temporário registrado no centro de Belém, raio de 8 km.',
-                    )
-                  }
-                />
               </Card>
             </View>
 
