@@ -40,7 +40,14 @@ import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { ageBands, careKeys, careQuestion, type AgeBand, type CareKey } from '../../src/post/care';
+import {
+  clearCreateDraft,
+  saveCreateDraft,
+  takeCreateDraft,
+} from '../../src/place/createDraftStore';
 
+/** Waits for a pause in typing before saving the draft on the phone. */
+const DRAFT_SAVE_MS = 800;
 const suggestions = [
   'Está na rua e precisa de resgate agora.',
   'Parece machucado e não consegue andar.',
@@ -107,8 +114,14 @@ export default function CreateScreen() {
   const client = useQueryClient();
   const gps = useAnimalGps();
   const [bootShot] = useState(peekInitialCreateShot);
+  // What the person left half-filled the last time the app closed.
+  const [restored] = useState(takeCreateDraft);
+  const [draftNotice, setDraftNotice] = useState(restored !== null);
   const [photos, setPhotos] = useState<string[]>(() =>
-    bootShot && 'uri' in bootShot ? [bootShot.uri] : [],
+    [...(restored?.photos ?? []), ...(bootShot && 'uri' in bootShot ? [bootShot.uri] : [])].slice(
+      0,
+      MAX_PHOTOS,
+    ),
   );
   const photosRef = useRef<string[]>(photos);
   useEffect(() => {
@@ -123,27 +136,41 @@ export default function CreateScreen() {
     if (bootShot && 'error' in bootShot) return;
     openCreateCamera();
   }, [bootShot]);
-  const [animalName, setAnimalName] = useState('');
-  const [description, setDescription] = useState('');
-  const [reference, setReference] = useState('');
+  const [animalName, setAnimalName] = useState(restored?.name ?? '');
+  const [description, setDescription] = useState(restored?.description ?? '');
+  const [reference, setReference] = useState(restored?.reference ?? '');
   const [kind, setKind] = useState<'rescue_alert' | 'lost' | 'adoption'>(
-    askedKind === 'lost' ? 'lost' : askedKind === 'adoption' ? 'adoption' : 'rescue_alert',
+    askedKind === 'lost'
+      ? 'lost'
+      : askedKind === 'adoption'
+        ? 'adoption'
+        : (restored?.kind ?? 'rescue_alert'),
   );
   const [appliedKind, setAppliedKind] = useState(askedKind);
   if (askedKind !== appliedKind) {
     setAppliedKind(askedKind);
     if (askedKind === 'lost' || askedKind === 'adoption') setKind(askedKind);
   }
-  const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>('dog');
-  const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [sex, setSex] = useState<'male' | 'female' | 'unknown'>('unknown');
-  const [age, setAge] = useState<AgeBand | null>(null);
-  const [care, setCare] = useState<Partial<Record<CareKey, true>>>({});
+  const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>(restored?.species ?? 'dog');
+  const [size, setSize] = useState<'small' | 'medium' | 'large'>(restored?.size ?? 'medium');
+  const [sex, setSex] = useState<'male' | 'female' | 'unknown'>(restored?.sex ?? 'unknown');
+  const [age, setAge] = useState<AgeBand | null>(restored?.age ?? null);
+  const [care, setCare] = useState<Partial<Record<CareKey, true>>>(restored?.care ?? {});
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>(
-    askedKind === 'adoption' ? 'low' : 'high',
+    restored?.urgency ?? (askedKind === 'adoption' ? 'low' : 'high'),
   );
-  const [manual, setManual] = useState<MapPoint | null>(null);
-  const [moved, setMoved] = useState(false);
+  const [manual, setManual] = useState<MapPoint | null>(restored?.point ?? null);
+  const [moved, setMoved] = useState(Boolean(restored?.point));
+  // Only species and size are asked up front; the rest waits behind "Mais detalhes".
+  const [detailsOpen, setDetailsOpen] = useState(
+    Boolean(
+      restored &&
+      (restored.name ||
+        restored.age ||
+        restored.sex !== 'unknown' ||
+        Object.keys(restored.care).length > 0),
+    ),
+  );
   const [message, setMessageState] = useState<{ text: string; settings: boolean } | null>(() =>
     bootShot && 'error' in bootShot
       ? { text: bootShot.error, settings: bootShot.blocked === true }
@@ -158,6 +185,63 @@ export default function CreateScreen() {
   const located = gps.fix && insideServiceArea(gps.fix) ? gps.fix : null;
   const point = moved ? manual : located;
   const { address, looking } = useAddress(point);
+
+  // Keeps the form on the phone while the person fills it, a moment after each change.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveCreateDraft({
+        version: 1,
+        savedAt: new Date().toISOString(),
+        photos,
+        description,
+        kind,
+        species,
+        size,
+        sex,
+        name: animalName,
+        age,
+        care,
+        urgency,
+        reference,
+        point: moved ? manual : null,
+      }).catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'create-draft:save' });
+      });
+    }, DRAFT_SAVE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    photos,
+    description,
+    kind,
+    species,
+    size,
+    sex,
+    animalName,
+    age,
+    care,
+    urgency,
+    reference,
+    manual,
+    moved,
+  ]);
+
+  const startOver = useCallback(() => {
+    photosRef.current = [];
+    setCreatePhotoCount(0);
+    setPhotos([]);
+    setDescription('');
+    setAnimalName('');
+    setReference('');
+    setAge(null);
+    setCare({});
+    setSex('unknown');
+    setManual(null);
+    setMoved(false);
+    setDraftNotice(false);
+    clearCreateDraft().catch((error: unknown) => {
+      reportError(error, { source: 'handled', where: 'create-draft:clear' });
+    });
+  }, []);
 
   const removePhoto = useCallback((uri: string) => {
     const next = photosRef.current.filter((photo) => photo !== uri);
@@ -292,6 +376,9 @@ export default function CreateScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         logBestEffort('create:haptic'),
       );
+      await clearCreateDraft().catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'create-draft:clear' });
+      });
       router.push(`/post/${created.id}`);
     } catch (error) {
       if (isOfflineError(error)) {
@@ -344,6 +431,12 @@ export default function CreateScreen() {
             setColumnWidth((current) => (current === next ? current : next));
           }}
         >
+          {draftNotice ? (
+            <Notice
+              message="Recuperamos o que você estava preenchendo da última vez."
+              action={{ label: 'Começar do zero', onPress: startOver }}
+            />
+          ) : null}
           <View style={styles.intro}>
             <Mascot pose={kind === 'lost' ? 'search' : 'sit'} size={INTRO_MASCOT} />
             <AppText variant="h1" style={styles.introTitle}>
@@ -592,63 +685,75 @@ export default function CreateScreen() {
                     ))}
                   </View>
                 </View>
-                <View style={styles.group}>
-                  <AppText variant="bodyStrong">Sexo</AppText>
-                  <View style={styles.chips}>
-                    {sexOptions.map((option) => (
-                      <Chip
-                        key={option.value}
-                        label={option.label}
-                        selected={sex === option.value}
-                        onPress={() => setSex(option.value)}
-                      />
-                    ))}
-                  </View>
-                </View>
-                <View style={styles.group}>
-                  <AppText variant="bodyStrong">Idade</AppText>
-                  <View style={styles.chips}>
-                    {ageBands.map((option) => (
-                      <Chip
-                        key={option.value}
-                        label={option.label}
-                        selected={age === option.value}
-                        onPress={() => setAge(age === option.value ? null : option.value)}
-                      />
-                    ))}
-                  </View>
-                </View>
-                <View style={styles.group}>
-                  <AppText variant="bodyStrong">O que você já sabe</AppText>
-                  <AppText variant="bodySmall" color="textSecondary">
-                    Marque só o que tem certeza. É o que quem adota pergunta primeiro.
-                  </AppText>
-                  <View style={styles.chips}>
-                    {careKeys.map((key) => (
-                      <Chip
-                        key={key}
-                        label={careQuestion[key]}
-                        selected={care[key] === true}
-                        onPress={() =>
-                          setCare((current) => {
-                            const next = { ...current };
-                            if (next[key]) delete next[key];
-                            else next[key] = true;
-                            return next;
-                          })
-                        }
-                      />
-                    ))}
-                  </View>
-                </View>
-                <Input
-                  label="Nome (se souber)"
-                  value={animalName}
-                  onChangeText={setAnimalName}
-                  placeholder="Ex.: Pretinho da esquina"
-                  maxLength={80}
-                  helper="Vira o título do card. Sem nome, o card mostra a espécie."
+                <Button
+                  title={detailsOpen ? 'Menos detalhes' : 'Mais detalhes (opcional)'}
+                  icon={detailsOpen ? 'chevron-up' : 'chevron-down'}
+                  iconPosition="right"
+                  variant="ghost"
+                  accessibilityHint="Sexo, idade, nome e o que você já sabe sobre ele"
+                  onPress={() => setDetailsOpen((open) => !open)}
                 />
+                {detailsOpen ? (
+                  <>
+                    <View style={styles.group}>
+                      <AppText variant="bodyStrong">Sexo</AppText>
+                      <View style={styles.chips}>
+                        {sexOptions.map((option) => (
+                          <Chip
+                            key={option.value}
+                            label={option.label}
+                            selected={sex === option.value}
+                            onPress={() => setSex(option.value)}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={styles.group}>
+                      <AppText variant="bodyStrong">Idade</AppText>
+                      <View style={styles.chips}>
+                        {ageBands.map((option) => (
+                          <Chip
+                            key={option.value}
+                            label={option.label}
+                            selected={age === option.value}
+                            onPress={() => setAge(age === option.value ? null : option.value)}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={styles.group}>
+                      <AppText variant="bodyStrong">O que você já sabe</AppText>
+                      <AppText variant="bodySmall" color="textSecondary">
+                        Marque só o que tem certeza. É o que quem adota pergunta primeiro.
+                      </AppText>
+                      <View style={styles.chips}>
+                        {careKeys.map((key) => (
+                          <Chip
+                            key={key}
+                            label={careQuestion[key]}
+                            selected={care[key] === true}
+                            onPress={() =>
+                              setCare((current) => {
+                                const next = { ...current };
+                                if (next[key]) delete next[key];
+                                else next[key] = true;
+                                return next;
+                              })
+                            }
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    <Input
+                      label="Nome (se souber)"
+                      value={animalName}
+                      onChangeText={setAnimalName}
+                      placeholder="Ex.: Pretinho da esquina"
+                      maxLength={80}
+                      helper="Vira o título do card. Sem nome, o card mostra a espécie."
+                    />
+                  </>
+                ) : null}
               </View>
               {missing.length > 0 ? (
                 <AppText variant="bodySmall" color="textSecondary">
