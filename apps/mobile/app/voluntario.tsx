@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, messageFrom } from '../src/api';
+import { reportError } from '../src/crash/reporter';
 import {
   AppText,
   Badge,
@@ -21,6 +22,9 @@ import { screenColumn, spacing, useTheme } from '../src/theme';
 import { Mascot } from '../src/mascot';
 import { useVolunteerAvailability } from '../src/volunteer/availability';
 import { badgeArtFor } from '../src/volunteer/badgeArt';
+import { LevelUpBanner } from '../src/volunteer/LevelUpBanner';
+import { leveledUp } from '../src/volunteer/levelUp';
+import { readSeenFloor, writeSeenFloor } from '../src/volunteer/seenLevel';
 import type { VolunteerBadge, VolunteerSettings, VolunteerStatus } from '../src/volunteer/types';
 
 const petChoices = [
@@ -55,6 +59,27 @@ export default function VolunteerScreen() {
     if (!status.data) return;
     sync(status.data.settings.isFosterAvailable);
   }, [status.data, sync]);
+
+  const [newLevel, setNewLevel] = useState<string | null>(null);
+  const levelFloor = status.data?.level.floor;
+  const levelName = status.data?.level.name;
+  useEffect(() => {
+    if (levelFloor === undefined || !levelName) return undefined;
+    let active = true;
+    readSeenFloor()
+      .then(async (seen) => {
+        // Leaving before this point keeps the old floor, so the party waits for the next visit.
+        if (!active) return;
+        if (leveledUp(seen, levelFloor)) setNewLevel(levelName);
+        await writeSeenFloor(levelFloor);
+      })
+      .catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'volunteer:seen-level' });
+      });
+    return () => {
+      active = false;
+    };
+  }, [levelFloor, levelName]);
 
   const save = useMutation({
     mutationFn: (body: VolunteerSettings) =>
@@ -125,6 +150,9 @@ export default function VolunteerScreen() {
                 message={messageFrom(status.error)}
                 action={{ label: 'Tentar de novo', onPress: () => void status.refetch() }}
               />
+            ) : null}
+            {newLevel ? (
+              <LevelUpBanner levelName={newLevel} onClose={() => setNewLevel(null)} />
             ) : null}
             <Card elevation="md">
               {status.isLoading ? (
