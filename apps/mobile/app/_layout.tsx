@@ -20,6 +20,7 @@ import {
 import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
 import { syncNearbyPresence } from '../src/nearby/presence';
+import { primeCreateDraft } from '../src/place/createDraftStore';
 import { flushOutbox } from '../src/place/outbox';
 import { queryClient } from '../src/queryClient';
 import { useSession } from '../src/session';
@@ -35,6 +36,9 @@ installGlobalErrorHandlers(setFatalError);
 // First real work of the app: ask the VPS for a newer APK. It runs alongside fonts and session,
 // gives up after 3 s and never throws, so a dead VPS cannot hold the splash.
 void startStartupUpdateCheck();
+
+// A half-filled rescue from the last time the app closed, read before anyone opens Criar.
+void primeCreateDraft();
 
 // The splash stays up until fonts and the saved session are ready, so nothing jumps or flashes.
 void SplashScreen.preventAutoHideAsync().catch(logBestEffort('splash'));
