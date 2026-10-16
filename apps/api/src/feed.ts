@@ -44,6 +44,10 @@ interface PostRow {
   age_estimate: string | null;
   health_notes: string | null;
   temperament: string | null;
+  neutered: boolean | null;
+  vaccinated: boolean | null;
+  good_with_kids: boolean | null;
+  good_with_animals: boolean | null;
   animal_id: string;
   approx_lat: number;
   approx_lng: number;
@@ -92,6 +96,12 @@ export async function listPosts(
   if (query.status) where.push(`p.status = ${add(query.status)}`);
   if (query.type) where.push(`p.type = ${add(query.type)}`);
   if (query.authorId) where.push(`p.author_id = ${add(query.authorId)}`);
+  if (query.age) where.push(`a.age_estimate ILIKE ${add(`${query.age}%`)}`);
+  if (query.place) where.push(`p.approx_label ILIKE ${add(`%${likeText(query.place)}%`)}`);
+  if (query.neutered) where.push('a.neutered = true');
+  if (query.vaccinated) where.push('a.vaccinated = true');
+  if (query.goodWithKids) where.push('a.good_with_kids = true');
+  if (query.goodWithAnimals) where.push('a.good_with_animals = true');
   if (query.adopted === 'true' && viewer) {
     where.push(
       `p.status = 'adopted' AND (p.author_id = ${add(viewer.id)} OR a.current_owner_id = ${add(viewer.id)})`,
@@ -233,8 +243,11 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     await client.query('BEGIN');
     const openingStatus = input.type === 'adoption' ? 'for_adoption' : 'open';
     const animal = await client.query<{ id: string }>(
-      `INSERT INTO animals (species, size, sex, age_estimate, health_notes, temperament, status, name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      `INSERT INTO animals (
+         species, size, sex, age_estimate, health_notes, temperament, status, name,
+         neutered, vaccinated, good_with_kids, good_with_animals
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
       [
         input.species,
         input.size,
@@ -244,6 +257,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.temperament ?? null,
         openingStatus,
         input.name?.trim() || null,
+        input.care?.neutered ?? null,
+        input.care?.vaccinated ?? null,
+        input.care?.goodWithKids ?? null,
+        input.care?.goodWithAnimals ?? null,
       ],
     );
     const animalId = animal.rows[0]?.id;
@@ -406,6 +423,36 @@ export async function updatePost(
         [postId, animalName === '' ? null : animalName],
       );
     }
+    if (input.ageEstimate !== undefined) {
+      await client.query(
+        `UPDATE animals SET age_estimate = $2
+         WHERE id = (SELECT animal_id FROM posts WHERE id = $1)`,
+        [postId, input.ageEstimate],
+      );
+    }
+    if (input.care) {
+      // Only the facts sent change; leaving one out keeps what was there.
+      const care = input.care;
+      await client.query(
+        `UPDATE animals SET
+           neutered = CASE WHEN $2 THEN $3 ELSE neutered END,
+           vaccinated = CASE WHEN $4 THEN $5 ELSE vaccinated END,
+           good_with_kids = CASE WHEN $6 THEN $7 ELSE good_with_kids END,
+           good_with_animals = CASE WHEN $8 THEN $9 ELSE good_with_animals END
+         WHERE id = (SELECT animal_id FROM posts WHERE id = $1)`,
+        [
+          postId,
+          care.neutered !== undefined,
+          care.neutered ?? null,
+          care.vaccinated !== undefined,
+          care.vaccinated ?? null,
+          care.goodWithKids !== undefined,
+          care.goodWithKids ?? null,
+          care.goodWithAnimals !== undefined,
+          care.goodWithAnimals ?? null,
+        ],
+      );
+    }
     await client.query(`DELETE FROM post_media WHERE post_id = $1`, [postId]);
     for (const [position, url] of urls.entries()) {
       await client.query(
@@ -533,6 +580,7 @@ function postColumns(viewerParam: string): string {
     u.id AS author_id, u.name AS author_name, u.handle AS author_handle, u.avatar_url AS author_avatar,
     u.role AS author_role, u.verified AS author_verified, u.phone AS author_phone, u.whatsapp_opt_in AS author_whatsapp,
     a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.sex, a.age_estimate, a.health_notes, a.temperament,
+    a.neutered, a.vaccinated, a.good_with_kids, a.good_with_animals,
     ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
     ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
     ST_Y(p.location::geometry) AS exact_lat,
@@ -599,6 +647,13 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         ageEstimate: row.age_estimate,
         healthNotes: row.health_notes,
         temperament: row.temperament,
+        // Added later: older APKs ignore it.
+        care: {
+          neutered: row.neutered,
+          vaccinated: row.vaccinated,
+          goodWithKids: row.good_with_kids,
+          goodWithAnimals: row.good_with_animals,
+        },
       },
       location: exact
         ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }
@@ -695,6 +750,11 @@ export function diaryKind(description: string, status: string): DiaryKind {
   if (description === NOT_FOUND_NOTE) return 'not_found';
   if (description === statusLabel(status as AnimalStatus)) return 'status';
   return 'note';
+}
+
+/** Escapes LIKE wildcards in what a person typed, so "50%" searches for the text. */
+function likeText(raw: string): string {
+  return raw.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 function statusLabel(status: AnimalStatus): string {

@@ -6,6 +6,8 @@ export {
   type ServiceCheck,
 } from './health.js';
 export {
+  ageBandSchema,
+  animalCareSchema,
   animalStatusSchema,
   canTransitionStatus,
   createPostSchema,
@@ -26,6 +28,7 @@ export {
   updateMeSchema,
   updatePostSchema,
   urgencySchema,
+  type AnimalCare,
   type AnimalStatus,
   type CreatePostInput,
   type LeaveHelpOutcome,

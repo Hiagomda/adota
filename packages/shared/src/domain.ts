@@ -67,6 +67,19 @@ export function looksLikeAnimalSale(description: string): boolean {
   return salePattern.test(description);
 }
 
+/** Care facts about the animal. Null or missing means nobody said yet. */
+export const animalCareSchema = z
+  .object({
+    neutered: z.boolean().nullable().optional(),
+    vaccinated: z.boolean().nullable().optional(),
+    goodWithKids: z.boolean().nullable().optional(),
+    goodWithAnimals: z.boolean().nullable().optional(),
+  })
+  .strict();
+
+/** Age bands people filter by. Older posts may hold other free text. */
+export const ageBandSchema = z.enum(['filhote', 'adulto', 'idoso']);
+
 export const createPostSchema = z.object({
   type: postTypeSchema.default('rescue_alert'),
   species: speciesSchema,
@@ -76,6 +89,7 @@ export const createPostSchema = z.object({
   ageEstimate: z.string().max(40).optional(),
   healthNotes: z.string().max(500).optional(),
   temperament: z.string().max(200).optional(),
+  care: animalCareSchema.optional(),
   urgency: urgencySchema,
   description: z.string().trim().min(1).max(2000),
   latitude: z.number().gte(-90).lte(90),
@@ -120,6 +134,13 @@ export const feedQuerySchema = z.object({
   authorId: z.string().uuid().optional(),
   saved: z.enum(['true', 'false']).optional(),
   adopted: z.enum(['true', 'false']).optional(),
+  // Adoption filters. Each care flag only narrows to animals marked yes.
+  age: ageBandSchema.optional(),
+  place: z.string().trim().min(2).max(60).optional(),
+  neutered: z.enum(['true']).optional(),
+  vaccinated: z.enum(['true']).optional(),
+  goodWithKids: z.enum(['true']).optional(),
+  goodWithAnimals: z.enum(['true']).optional(),
 });
 
 export const updatePostSchema = z
@@ -127,6 +148,8 @@ export const updatePostSchema = z
     description: z.string().trim().min(1).max(2000),
     urgency: urgencySchema,
     name: z.string().trim().max(80).optional(),
+    ageEstimate: ageBandSchema.optional(),
+    care: animalCareSchema.optional(),
     media: z
       .array(
         z.object({
@@ -206,6 +229,7 @@ export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
 export type LeaveHelpOutcome = z.infer<typeof leaveHelpOutcomeSchema>;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
+export type AnimalCare = z.infer<typeof animalCareSchema>;
 export type AnimalStatus = z.infer<typeof animalStatusSchema>;
 export type PostType = z.infer<typeof postTypeSchema>;
 export type Urgency = z.infer<typeof urgencySchema>;
