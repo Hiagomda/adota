@@ -1,11 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 22,
+  "androidVersionCode": 23,
   "notes": [
-    "Adoção, lar temporário e resgate agora se combinam pelo WhatsApp.",
-    "Nova tela Para adoção, com filtros de idade, porte, bairro e cuidados.",
-    "Vi esse animal: marque onde viu, sem precisar ir até lá.",
-    "Ajudar no resgate ficou mais claro: Encontrei o animal ou Não deu certo.",
-    "Precisa-se, ranking dos bairros e rascunho que não se perde ao fechar o app."
+    "Entrar com Google e com e-mail voltou a funcionar.",
+    "Sua foto de perfil e a de outras pessoas aparecem de novo.",
+    "O mapa busca os resgates sozinho quando você arrasta ou dá zoom.",
+    "Ícone e tela de abertura sem a borda branca."
   ]
 }
