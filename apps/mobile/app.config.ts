@@ -14,6 +14,24 @@ const release = JSON.parse(readFileSync(path.join(appDir, 'version.json'), 'utf8
   build: number;
 };
 
+// The release bundle bakes these in. Build 22 shipped without the Google client id and nobody
+// could sign in with Google, so a production bundle missing any of them stops the build here.
+const requiredForRelease = [
+  'EXPO_PUBLIC_API_URL',
+  'EXPO_PUBLIC_DOWNLOAD_URL',
+  'EXPO_PUBLIC_FIREBASE_API_KEY',
+  'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
+  'EXPO_PUBLIC_FIREBASE_APP_ID',
+  'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+];
+if (process.env.NODE_ENV === 'production') {
+  const missing = requiredForRelease.filter((name) => !process.env[name]?.trim());
+  if (missing.length > 0) {
+    throw new Error(`Release build without ${missing.join(', ')}. Fill apps/mobile/.env first.`);
+  }
+}
+
 // Recorded when the config is evaluated, which happens on every native build (expo-constants
 // regenerates app.config at Gradle preBuild) and on every `expo export`.
 function gitCommit(): string | null {
