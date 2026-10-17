@@ -60,7 +60,7 @@ const cameraBounds = {
   sw: [serviceCamera.west, serviceCamera.south] as [number, number],
 };
 
-const FOLLOW_DISTANCE_M = 25;
+const PUCK_DISTANCE_M = 25;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
 
@@ -76,7 +76,7 @@ Logger.setLogCallback((log) => {
  * is never unmounted while the screen is alive (hiding it is what `visible` does).
  */
 const UserPuck = memo(function UserPuck({ visible }: { visible: boolean }) {
-  return <UserLocation visible={visible} animated={false} minDisplacement={FOLLOW_DISTANCE_M} />;
+  return <UserLocation visible={visible} animated={false} minDisplacement={PUCK_DISTANCE_M} />;
 });
 
 export function MapCanvas({
@@ -109,7 +109,6 @@ export function MapCanvas({
   const commitRef = useRef(onCommitBounds);
   const dismissRef = useRef(onDismiss);
   const pressedPin = useRef(false);
-  const [hud, setHud] = useState(initialCameraState);
   const [gps, setGps] = useState<GpsHud>('loading');
   const framedPin = useRef<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -160,10 +159,7 @@ export function MapCanvas({
 
   const apply = useCallback((event: CameraEvent) => {
     const step = reduceCamera(policy.current, event);
-    const changed =
-      step.state.follow !== policy.current.follow || step.state.armed !== policy.current.armed;
     policy.current = step.state;
-    if (changed) setHud(step.state);
     if (step.move) {
       programmaticUntil.current = Date.now() + 1000;
       camera.current?.setCamera({
@@ -206,8 +202,10 @@ export function MapCanvas({
           got = true;
           setGps('ready');
           const point: LngLat = [fix.longitude, fix.latitude];
+          // A pin asked for by "Ver no mapa" wins over the first center, but only until it is on
+          // screen: later fixes must not pull the camera back to it.
           const pending = focusRef.current;
-          if (pending) apply({ type: 'pin', point: pending });
+          if (pending && !landed.current) apply({ type: 'pin', point: pending });
           apply({
             type: 'gps',
             point,
@@ -235,35 +233,6 @@ export function MapCanvas({
       active = false;
     };
   }, [apply, attempt]);
-
-  useEffect(() => {
-    if (!hud.follow) return;
-    let active = true;
-    let subscription: Location.LocationSubscription | null = null;
-    void Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.Balanced, distanceInterval: FOLLOW_DISTANCE_M },
-      (position) => {
-        if (!active || !policy.current.follow) return;
-        const point: LngLat = [position.coords.longitude, position.coords.latitude];
-        apply({
-          type: 'gps',
-          point,
-          inside: insideServiceArea({ longitude: point[0], latitude: point[1] }),
-        });
-      },
-    )
-      .then((next) => {
-        if (!active) next.remove();
-        else subscription = next;
-      })
-      .catch((error: unknown) => {
-        reportError(error, { source: 'handled', where: 'map:follow' });
-      });
-    return () => {
-      active = false;
-      subscription?.remove();
-    };
-  }, [apply, hud.follow]);
 
   // setCamera before the style exists, or while this tab is frozen, is ignored.
   // The default center is Belém, so keep trying once the map is actually on screen.
@@ -426,16 +395,17 @@ export function MapCanvas({
             ? 'O GPS demorou. Toque no alvo para tentar de novo.'
             : null;
 
-  const locateLabel = hud.follow
-    ? 'Parar de seguir minha localização'
-    : gps === 'blocked' || gps === 'denied'
+  const locateLabel =
+    gps === 'blocked' || gps === 'denied'
       ? openSettingsLabel
       : gps === 'loading' || gps === 'timeout'
         ? 'Buscando sua localização'
         : 'Minha localização';
 
   return (
-    <View style={styles.fill}>
+    // Any touch on the map hands the camera to the person, even when Android does not flag the
+    // camera change as a user gesture.
+    <View style={styles.fill} onTouchStart={() => apply({ type: 'gesture' })}>
       <MapView
         style={styles.fill}
         mapStyle={mapStyleUrl}
@@ -512,7 +482,7 @@ export function MapCanvas({
           <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
             <IconButton
               icon="crosshair"
-              variant={hud.follow ? 'filled' : 'tonal'}
+              variant="tonal"
               accessibilityLabel={locateLabel}
               onPress={() => void onLocate()}
             />

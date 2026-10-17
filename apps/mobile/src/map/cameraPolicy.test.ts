@@ -60,20 +60,24 @@ describe('map camera', () => {
     }
   });
 
-  it('follows only after a second tap and stops on the first gesture', () => {
+  it('centers on every tap of Minha localização and never follows the person afterwards', () => {
     const ready = at(initialCameraState, home).state;
     const firstTap = reduceCamera(ready, { type: 'locate' });
-    assert.equal(firstTap.move?.reason, 'locate');
-    assert.equal(firstTap.state.follow, false);
-    const secondTap = reduceCamera(firstTap.state, { type: 'locate' });
-    assert.equal(secondTap.move?.reason, 'follow');
-    assert.equal(secondTap.state.follow, true);
-    const tick = at(secondTap.state, moved);
-    assert.equal(tick.move?.reason, 'follow');
-    const gesture = reduceCamera(tick.state, { type: 'gesture' });
-    assert.equal(gesture.move, null);
-    assert.equal(gesture.state.follow, false);
-    assert.equal(at(gesture.state, home).move, null);
+    assert.deepEqual(firstTap.move, { center: home, zoom: USER_ZOOM, reason: 'locate' });
+    const walked = at(firstTap.state, moved);
+    assert.equal(walked.move, null);
+    const secondTap = reduceCamera(walked.state, { type: 'locate' });
+    assert.deepEqual(secondTap.move, { center: moved, zoom: USER_ZOOM, reason: 'locate' });
+    assert.equal(at(secondTap.state, home).move, null);
+  });
+
+  it('keeps the camera where the person left it after a touch on the map', () => {
+    const ready = at(initialCameraState, home).state;
+    const touched = reduceCamera(ready, { type: 'gesture' });
+    assert.equal(touched.move, null);
+    for (const point of [moved, home, moved]) {
+      assert.equal(at(touched.state, point).move, null);
+    }
   });
 
   it('locate without a fix does not move the camera', () => {
@@ -84,7 +88,6 @@ describe('map camera', () => {
     const ready = at(initialCameraState, home).state;
     const framed = reduceCamera(ready, { type: 'pin', point: pin });
     assert.deepEqual(framed.move, { center: pin, zoom: 15, reason: 'pin' });
-    assert.equal(framed.state.follow, false);
     const closed = reduceCamera(framed.state, { type: 'dismissPin' });
     assert.equal(closed.move, null);
     assert.equal(at(closed.state, moved).move, null);
@@ -102,7 +105,6 @@ describe('map camera', () => {
     const pan = reduceCamera(opened.state, { type: 'region', bounds: far, fromUser: true });
     assert.equal(pan.move, null);
     assert.equal(pan.state.userMoved, true);
-    assert.equal(pan.state.follow, false);
     assert.deepEqual(pan.state.loaded, far);
   });
 
