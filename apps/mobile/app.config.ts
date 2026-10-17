@@ -1,4 +1,7 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import type { ConfigPlugin } from 'expo/config-plugins';
+// The config loads as ESM: the CommonJS entry needs its extension and a default import.
+import configPlugins from 'expo/config-plugins.js';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -50,8 +53,17 @@ function gitCommit(): string | null {
   }
 }
 const buildInfo = { commit: gitCommit(), builtAt: new Date().toISOString() };
-// Expo's Android config type omits this field. The test API is plain HTTP.
-const androidCleartext = { usesCleartextTraffic: true };
+// API, MinIO and imgproxy are plain HTTP until there is a domain with TLS. Expo ignores an
+// `android.usesCleartextTraffic` field, so the manifest gets it here. Build 23 lost it on prebuild
+// and every request to the API failed.
+const withCleartextTraffic: ConfigPlugin = (expo) =>
+  configPlugins.withAndroidManifest(expo, (mod) => {
+    const application = configPlugins.AndroidConfig.Manifest.getMainApplicationOrThrow(
+      mod.modResults,
+    );
+    application.$['android:usesCleartextTraffic'] = 'true';
+    return mod;
+  });
 // Crash reports. The DSN is public and lives in EXPO_PUBLIC_SENTRY_DSN; the upload token for
 // source maps is SENTRY_AUTH_TOKEN at build time and is never written into the app.
 const sentryPlugin = {
@@ -86,7 +98,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'app.egua.adota',
     versionCode: release.build,
-    ...androidCleartext,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#F3E8D2',
@@ -140,6 +151,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-notifications',
     'expo-apple-authentication',
+    withCleartextTraffic,
     ['@sentry/react-native/expo', sentryPlugin],
     [
       'expo-splash-screen',
