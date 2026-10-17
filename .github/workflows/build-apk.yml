@@ -1,0 +1,127 @@
+name: Compilar APK
+
+# APK de release numa máquina limpa, para que nenhum .env ou pasta android/ ajustada à mão de um PC
+# decida o que vai para os celulares. Só roda à mão (Actions → Compilar APK → Run workflow).
+# Gradle local, nunca EAS.
+#
+# Secrets do repositório:
+#   MOBILE_ENV                  conteúdo inteiro do apps/mobile/.env (valores EXPO_PUBLIC_*)
+#   EGUA_UPLOAD_KEYSTORE_BASE64 a chave privada de upload em base64. Deixe sem definir até a troca
+#                               de chave: aí o build assina com a chave de debug dos celulares.
+#   EGUA_UPLOAD_STORE_PASSWORD, EGUA_UPLOAD_KEY_ALIAS, EGUA_UPLOAD_KEY_PASSWORD
+# Variável do repositório:
+#   EXPECTED_SIGNER_SHA256      SHA-256 do certificado de assinatura; o check-apk reprova outra chave.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Criar o release apk-<versão>-<build> com o egua-adota.apk'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: APK de release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_ENV: production
+      EXPECTED_SIGNER_SHA256: ${{ vars.EXPECTED_SIGNER_SHA256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Também aplica os patches/ (correção do MapLibre para release na New Architecture).
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+      - name: Compilar o pacote compartilhado
+        run: pnpm --filter @patinha/shared build
+
+      - name: Escrever apps/mobile/.env
+        env:
+          MOBILE_ENV: ${{ secrets.MOBILE_ENV }}
+        run: |
+          set -eu
+          test -n "$MOBILE_ENV" || { echo "O secret MOBILE_ENV está vazio"; exit 1; }
+          printf '%s\n' "$MOBILE_ENV" > apps/mobile/.env
+
+      - name: Chave de upload
+        env:
+          KEYSTORE_BASE64: ${{ secrets.EGUA_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.EGUA_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.EGUA_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.EGUA_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Ainda sem chave de upload: o release sai assinado com a chave de debug."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/egua-upload.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$key"
+          # O Gradle lê ORG_GRADLE_PROJECT_* como propriedades do projeto (plugins/releaseSigning.mjs).
+          {
+            echo "ORG_GRADLE_PROJECT_EGUA_UPLOAD_STORE_FILE=$key"
+            echo "ORG_GRADLE_PROJECT_EGUA_UPLOAD_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "ORG_GRADLE_PROJECT_EGUA_UPLOAD_KEY_ALIAS=$KEY_ALIAS"
+            echo "ORG_GRADLE_PROJECT_EGUA_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Gerar a pasta android/
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: '1'
+
+      - name: Gradle release
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Conferir o APK
+        run: |
+          set -eu
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          node apps/mobile/scripts/check-apk.mjs "$apk"
+          cp "$apk" "$RUNNER_TEMP/egua-adota.apk"
+
+      - name: Guardar o APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: egua-adota-apk
+          path: ${{ runner.temp }}/egua-adota.apk
+          retention-days: 14
+
+      - name: Release no GitHub
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          version=$(node -p "require('./apps/mobile/version.json').version")
+          build=$(node -p "require('./apps/mobile/version.json').build")
+          tag="apk-$version-$build"
+          node -p "require('./apps/mobile/version.json').notes.map((n) => '- ' + n).join('\n')" > "$RUNNER_TEMP/notes.md"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$RUNNER_TEMP/egua-adota.apk" --clobber
+          else
+            gh release create "$tag" "$RUNNER_TEMP/egua-adota.apk" \
+              --target "$GITHUB_SHA" --title "Égua, adota! $version (build $build)" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+          fi
