@@ -287,6 +287,7 @@ const personalTables = [
   'verification_requests',
   'staff_totp',
   'staff_recovery_codes',
+  'staff_passwords',
   'admin_sessions',
 ] as const;
 

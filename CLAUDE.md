@@ -7,7 +7,7 @@ App de Belém/PA para animais de rua: resgate, adoção, Casa Amiga (lar tempor�
 - Monorepo pnpm 9.15.9 (`packageManager`; o pnpm 10 não instala este lockfile), Node 22, `node-linker=hoisted`.
 - `apps/mobile`: Expo SDK 57, RN 0.86, React 19.2, Expo Router (rotas tipadas), TanStack Query 5, Zustand, FlashList 2, expo-image, MapLibre 10.4.2 (com patch em `patches/`), Firebase JS 11 + `react-native-nitro-google-signin`, Sentry.
 - `apps/api`: Fastify 5 rodando via `tsx` (sem build), SQL direto com `pg` e um pouco de Drizzle, BullMQ + Redis, PostgreSQL 16 + PostGIS, MinIO + imgproxy para fotos, firebase-admin para validar tokens.
-- `apps/web`: Next.js com as páginas públicas (post, perfil, mapa). `apps/admin`: painel da equipe (Next.js, porta 3020, login com TOTP).
+- `apps/web`: Next.js com as páginas públicas (post, perfil, mapa). O painel da equipe agora mora no repositório `Hiagomda/AdotaSite` (pasta `admin/`); o `apps/admin` daqui é a versão antiga. O login do painel é só usuário e senha (`POST /admin/v1/login`, tabela `staff_passwords`). Para criar ou trocar um login: `pnpm --filter @patinha/api staff:login -- --username <usuario> --name "<Nome>" --role superadmin` (a senha é pedida no terminal ou vem de `STAFF_PASSWORD`; mínimo 12 caracteres).
 - `packages/shared`: schemas Zod e tipos usados pela API e pelo app. Rode `pnpm --filter @patinha/shared build` antes do resto (os scripts da raiz já fazem isso).
 
 ## Comandos (raiz)
@@ -121,7 +121,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 apps/api/src/register.ts      rotas principais (auth no hook onRequest → request.user)
 apps/api/src/feed.ts          posts, status, localização aproximada
 apps/api/src/adoptionChat.ts  conversa de adoção
-apps/api/src/staff/           rotas da equipe (TOTP, auditoria)
+apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)
