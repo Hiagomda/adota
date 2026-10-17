@@ -98,7 +98,10 @@ jobs:
 
       - name: Gradle release
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+        # O padrão do prebuild (2 GB) estourou no mergeReleaseArtProfile; a máquina tem 16 GB.
+        run: >-
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+          "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
 
       - name: Conferir o APK
         run: |
