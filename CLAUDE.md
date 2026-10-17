@@ -55,7 +55,7 @@ Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não r
 3. `pnpm --filter @patinha/mobile version:bump` **ou** edite o JSON e rode `node apps/mobile/scripts/bump-build.mjs --sync` depois na árvore de compile.
 4. Rode também o que grava a página: `node apps/mobile/scripts/bump-build.mjs --publish` (atualiza `download/version.json` com o mesmo `version` / `androidVersionCode` / `notes`).
 5. Em `docker/download.Dockerfile`, `ARG APK_URL=` → `https://github.com/Hiagomda/adota/releases/download/apk-<version>-<build>/egua-adota.apk` (ex.: `apk-0.1.0-22`).
-6. Commit Conventional Commits em inglês + push em **`master`** (`origin` = `Hiagomda/adota`). Auto-review pode bloquear push: peça aprovação nativa e repita o mesmo `git push`.
+6. Commit Conventional Commits em português + push em **`master`** (`origin` = `Hiagomda/adota`). Auto-review pode bloquear push: peça aprovação nativa e repita o mesmo `git push`.
 
 ### 2. Sincronizar e compilar o APK
 
@@ -145,7 +145,7 @@ download/                     página de download servida pelo container `downlo
 - Privacidade: feed e API pública devolvem localização aproximada (grade de ~500 m). Casa Amiga é casa de alguém: só autor, equipe e quem vai ajudar veem a lista, em km inteiros. A exata vai só para o autor, a equipe e quem respondeu "vou ajudar". Telefone nunca aparece no feed.
 - Proibido vender animais. PIX só aparece em pedido de ajuda de perfil verificado.
 - Antes de instalar biblioteca, diga qual, por quê e o impacto no tamanho. Para pacotes Expo use `pnpm expo install` dentro de `apps/mobile`.
-- Código, tabelas e commits em inglês (Conventional Commits). Textos da interface em português do Brasil.
+- Nomes no código e tabelas em inglês. Commits (Conventional Commits com a descrição em português), comentários no código, textos do GitHub (releases, workflows) e textos da interface em português do Brasil. Pedido do Hiago em 17/10/2026; comentários antigos em inglês são traduzidos quando o arquivo for mexido.
 - Não crie documentação além deste arquivo, salvo pedido.
 
 ## Armadilhas conhecidas
