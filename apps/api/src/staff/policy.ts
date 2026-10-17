@@ -1,11 +1,17 @@
 import { HttpError } from '../http.js';
 
-/** Named permissions. Routes check these, not a raw role string. */
+/** Permissões nomeadas. As rotas conferem estas, nunca o papel cru. */
 export const permissions = [
   'audit.read',
   'team.read',
   'team.manage',
   'session.revoke_own',
+  'overview.read',
+  'reports.manage',
+  'verifications.manage',
+  'posts.moderate',
+  'users.read',
+  'users.suspend',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -32,13 +38,29 @@ export const assignableRoles = [
 ] as const;
 export type AssignableRole = (typeof assignableRoles)[number];
 
+const moderation: readonly Permission[] = [
+  'overview.read',
+  'reports.manage',
+  'verifications.manage',
+  'posts.moderate',
+  'users.read',
+  'users.suspend',
+];
+
 const byRole: Record<StaffRole, readonly Permission[]> = {
-  moderator: ['session.revoke_own'],
-  support: ['session.revoke_own'],
-  ong_reviewer: ['session.revoke_own'],
-  finance_reviewer: ['session.revoke_own'],
-  admin: ['session.revoke_own', 'audit.read', 'team.read'],
-  superadmin: ['session.revoke_own', 'audit.read', 'team.read', 'team.manage'],
+  moderator: [
+    'session.revoke_own',
+    'overview.read',
+    'reports.manage',
+    'posts.moderate',
+    'users.read',
+    'users.suspend',
+  ],
+  support: ['session.revoke_own', 'overview.read', 'users.read'],
+  ong_reviewer: ['session.revoke_own', 'overview.read', 'verifications.manage', 'users.read'],
+  finance_reviewer: ['session.revoke_own', 'overview.read'],
+  admin: ['session.revoke_own', 'audit.read', 'team.read', ...moderation],
+  superadmin: ['session.revoke_own', 'audit.read', 'team.read', 'team.manage', ...moderation],
 };
 
 export function isStaffRole(role: string): role is StaffRole {
@@ -62,8 +84,8 @@ export function requirePresentedCredential(token: string | null | undefined): st
 }
 
 /**
- * Superadmin-only role change. The last superadmin cannot be demoted.
- * The same role is a no-op. A stale expected role is a conflict.
+ * Troca de papel só pelo superadmin. O último superadmin não pode ser rebaixado.
+ * O mesmo papel não muda nada. Papel esperado desatualizado é conflito.
  */
 export function decideRoleChange(input: {
   actorRole: string;
