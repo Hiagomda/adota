@@ -8,13 +8,12 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
-  Share,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, loadFeed, loadPost, messageFrom, siteUrl } from '../../src/api';
+import { api, loadFeed, loadPost, messageFrom } from '../../src/api';
 import { requestMapFocus } from '../../src/map/focusRequest';
 import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
@@ -55,6 +54,7 @@ import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
+import { postLinkFor, sharePost } from '../../src/post/sharePost';
 import { PostEditor } from '../../src/post/PostEditor';
 import { isTeamRole, useSession } from '../../src/session';
 import {
@@ -384,7 +384,7 @@ export default function PostScreen() {
       ? `${helpers} ${helpers === 1 ? 'pessoa' : 'pessoas'} a caminho`
       : null;
 
-  const postLink = `${siteUrl}/p/${item.id}`;
+  const postLink = postLinkFor(item.id);
   // "a Mel" reads wrong without knowing the sex, so the name goes alone or "um gato".
   const animalRef = item.animal.name?.trim() || `um ${speciesName.toLowerCase()}`;
   const authorFirstName = item.author.name.split(' ')[0] ?? item.author.name;
@@ -408,10 +408,7 @@ export default function PostScreen() {
 
   function share() {
     if (!item) return;
-    Share.share({
-      message: `${animalHeadline(item.animal)} em ${item.approxLabel} no Égua, adota! ${siteUrl}/p/${item.id}`,
-      url: `${siteUrl}/p/${item.id}`,
-    }).catch((error: unknown) => {
+    sharePost(item).catch((error: unknown) => {
       reportError(error, { source: 'handled', where: 'post:share' });
       setNote('Não consegui abrir o compartilhamento. Tente de novo.');
     });

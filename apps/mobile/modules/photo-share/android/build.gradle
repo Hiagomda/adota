@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.egua.adota'
+version = '1.0.0'
+
+android {
+  namespace "app.egua.adota.photoshare"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
