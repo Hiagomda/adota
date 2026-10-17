@@ -1,10 +1,9 @@
 {
   "version": "0.1.0",
-  "build": 25,
+  "build": 26,
   "notes": [
-    "Feed mais claro: cada resgate mostra se está a caminho, não encontrado ou resgatado.",
-    "Urgentes mostram o bairro e a distância.",
-    "Perfil mais limpo: seguir em destaque, denunciar e bloquear no menu ⋯.",
-    "Feed, fotos e login funcionando."
+    "O mapa centraliza em você só ao abrir e depois fica livre. O alvo centraliza quando você quiser.",
+    "Nova aba Adotados na tela de Adoção, com os animais que ganharam uma família.",
+    "Fundo novo com ossinhos e peixinhos."
   ]
 }
