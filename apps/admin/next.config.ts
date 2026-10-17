@@ -5,9 +5,6 @@ const scriptSrc =
     ? "script-src 'self' 'unsafe-inline'"
     : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
-// Miniaturas dos posts vêm do imgproxy, em outro host. Lido no build.
-const mediaOrigin = process.env.ADMIN_MEDIA_ORIGIN ?? 'http://localhost:8080';
-
 const nextConfig: NextConfig = {
   agentRules: false,
   async headers() {
@@ -25,7 +22,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               scriptSrc,
               "style-src 'self' 'unsafe-inline'",
-              `img-src 'self' data: ${mediaOrigin}`,
+              "img-src 'self' data:",
               "connect-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",

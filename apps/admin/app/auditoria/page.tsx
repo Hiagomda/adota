@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Empty, Frame, Loading, PageHeader, useStaff } from '../painel';
+import { Frame, Loading, useStaff } from '../painel';
 
 interface AuditEvent {
   id: string;
@@ -13,21 +13,6 @@ interface AuditEvent {
   after: unknown;
   createdAt: string;
 }
-
-const actionLabel: Record<string, string> = {
-  'staff.session_open': 'Entrou no painel',
-  'staff.role_change': 'Mudou o papel',
-  'report.hide': 'Tirou denúncia do ar',
-  'report.dismiss': 'Arquivou denúncia',
-  'verification.approve': 'Aprovou verificação',
-  'verification.reject': 'Recusou verificação',
-  'post.review_approve': 'Publicou post',
-  'post.review_reject': 'Recusou post',
-  'post.hide': 'Tirou post do ar',
-  'post.unhide': 'Voltou post ao ar',
-  'user.suspend': 'Suspendeu conta',
-  'user.unsuspend': 'Liberou conta',
-};
 
 export default function AuditPage() {
   const me = useStaff();
@@ -52,32 +37,25 @@ export default function AuditPage() {
     };
   }, [me]);
 
-  if (me === undefined)
-    return (
-      <main className="content">
-        <Loading />
-      </main>
-    );
+  if (me === undefined) return <Loading />;
   if (!me)
     return (
-      <main className="content">
-        <Empty>Entre no painel para ver a auditoria.</Empty>
+      <main>
+        <p>Entre no painel para ver a auditoria.</p>
       </main>
     );
   if (!me.permissions.includes('audit.read')) {
     return (
       <Frame me={me}>
-        <Empty>Sua conta não abre a auditoria.</Empty>
+        <p>Sua conta não abre a auditoria.</p>
       </Frame>
     );
   }
 
   return (
     <Frame me={me}>
-      <PageHeader
-        title="Auditoria"
-        subtitle="Registro só de inclusão. A API não tem rota para editar ou apagar."
-      />
+      <h1>Auditoria</h1>
+      <p className="muted">Registro só de inclusão. A API não tem rota para editar ou apagar.</p>
       {message ? <p className="error">{message}</p> : null}
       {events === null ? <Loading /> : null}
       {events && events.length === 0 ? <p>Nenhuma ação registrada ainda.</p> : null}
@@ -95,7 +73,7 @@ export default function AuditPage() {
             <tr key={event.id}>
               <td>{new Date(event.createdAt).toLocaleString('pt-BR')}</td>
               <td>
-                <strong>{actionLabel[event.action] ?? event.action}</strong>
+                {event.action}
                 <div className="muted">{event.targetId ?? ''}</div>
               </td>
               <td>
