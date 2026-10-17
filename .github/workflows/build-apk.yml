@@ -35,6 +35,9 @@ jobs:
     env:
       NODE_ENV: production
       EXPECTED_SIGNER_SHA256: ${{ vars.EXPECTED_SIGNER_SHA256 }}
+      # O prebuild liga o envio dos source maps ao Sentry, que pede organização e token. Fica
+      # desligado até existir o secret SENTRY_AUTH_TOKEN; o app continua mandando os erros.
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
