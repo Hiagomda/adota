@@ -1,10 +1,10 @@
 {
   "version": "0.1.0",
-  "build": 23,
+  "build": 24,
   "notes": [
-    "Entrar com Google e com e-mail voltou a funcionar.",
-    "Sua foto de perfil e a de outras pessoas aparecem de novo.",
-    "O mapa busca os resgates sozinho quando você arrasta ou dá zoom.",
-    "Ícone e tela de abertura sem a borda branca."
+    "O feed e as outras telas voltaram a carregar e atualizar.",
+    "Fotos de perfil e dos animais aparecem de novo.",
+    "Entrar com Google e com e-mail funciona.",
+    "O mapa busca os resgates sozinho quando você arrasta ou dá zoom."
   ]
 }
