@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -7,9 +6,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api, loadFeed, messageFrom } from '../../src/api';
 import {
   AnimalCard,
-  AppText,
-  Avatar,
-  Badge,
   BottomSheet,
   Button,
   CampaignCard,
@@ -21,11 +17,11 @@ import {
   Notice,
   SectionHeader,
   SkeletonRows,
-  StatCard,
-  Touchable,
 } from '../../src/components/ui';
 import { useSession } from '../../src/session';
-import { motion, spacing, useTheme } from '../../src/theme';
+import { PostGrid } from '../../src/components/profile/PostGrid';
+import { ProfileHeader } from '../../src/components/profile/ProfileHeader';
+import { spacing, useTheme } from '../../src/theme';
 import { animalHeadline, placeOf } from '../../src/animalLabels';
 import { openHelpRequests } from '../../src/post/helpRequests';
 import { reportReasons, reportSentNote } from '../../src/reportReasons';
@@ -41,7 +37,7 @@ interface Profile {
   counts: {
     posts: number;
     helped: number;
-    /** Animals that left the street. Older API builds did not send it. */
+    /** Animais que saíram da rua. Builds antigos da API não mandavam. */
     rescued?: number;
     followers: number;
     following: number;
@@ -69,7 +65,7 @@ export default function UserScreen() {
     enabled: Boolean(profile.data),
   });
   const person = profile.data;
-  // ONGs and protectors get their help requests and animals for adoption up front.
+  // ONGs e protetores mostram primeiro os pedidos de ajuda e os animais para adoção.
   const organization = Boolean(
     person && (person.verified || person.role === 'ngo' || person.role === 'protector'),
   );
@@ -139,41 +135,20 @@ export default function UserScreen() {
           />
         ) : (
           <>
-            <View style={styles.head}>
-              <Avatar
-                name={person.name}
-                uri={person.avatarUrl}
-                size="xl"
-                verified={person.verified}
-              />
-              <View style={styles.headText}>
-                <AppText variant="h1" numberOfLines={2}>
-                  {person.name}
-                </AppText>
-                {person.city ? (
-                  <AppText variant="bodySmall" color="textSecondary">
-                    {person.city}
-                  </AppText>
-                ) : null}
-                {person.verified ? <Badge kind="label" label="Verificado" tone="primary" /> : null}
-              </View>
-            </View>
-            <View style={styles.stats}>
-              <StatCard value={person.counts.posts} label="publicações" icon="image" />
-              <StatCard
-                value={person.counts.followers}
-                label="seguidores"
-                icon="users"
-                tone="secondary"
-              />
-              <StatCard
-                value={person.counts.rescued ?? person.counts.helped}
-                label={person.counts.rescued === undefined ? 'resgates' : 'saíram da rua'}
-                icon="heart"
-                tone="success"
-              />
-            </View>
-            <View style={styles.actions}>
+            <ProfileHeader
+              name={person.name}
+              avatarUrl={person.avatarUrl}
+              verified={person.verified}
+              subtitle={person.city}
+              stats={[
+                { value: person.counts.posts, label: 'publicações' },
+                { value: person.counts.followers, label: 'seguidores' },
+                {
+                  value: person.counts.rescued ?? person.counts.helped,
+                  label: person.counts.rescued === undefined ? 'resgates' : 'saíram da rua',
+                },
+              ]}
+            >
               <Button
                 title={person.following ? 'Seguindo' : 'Seguir'}
                 icon={person.following ? 'check' : 'user-plus'}
@@ -181,14 +156,15 @@ export default function UserScreen() {
                 onPress={() => void toggleFollow()}
                 style={styles.follow}
               />
-              {/* Report and block are rare and heavy: they live behind one quiet button. */}
+              {/* Denunciar e bloquear são raros e pesados: ficam atrás de um botão discreto. */}
               <IconButton
                 icon="more-horizontal"
                 variant="tonal"
                 accessibilityLabel="Mais opções: denunciar ou bloquear"
                 onPress={() => setMenuOpen(true)}
               />
-            </View>
+            </ProfileHeader>
+            <View style={styles.gap} />
             {note ? (
               <View style={styles.note}>
                 <Notice message={note} />
@@ -245,31 +221,7 @@ export default function UserScreen() {
             {organization && (campaigns.length > 0 || adoptable.length > 0) ? (
               <SectionHeader title="Todas as publicações" />
             ) : null}
-            <View style={styles.grid}>
-              {(posts.data?.posts ?? []).map((post) => (
-                <Touchable
-                  key={post.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Abrir resgate em ${post.approxLabel}`}
-                  pressedScale={0.97}
-                  style={styles.cell}
-                  onPress={() => router.push(`/post/${post.id}`)}
-                >
-                  <View style={[styles.cellFill, { backgroundColor: colors.surfaceMuted }]}>
-                    {post.media[0] ? (
-                      <Image
-                        source={{ uri: post.media[0].thumbUrl }}
-                        style={styles.image}
-                        contentFit="cover"
-                        transition={motion.base}
-                        cachePolicy="memory-disk"
-                        recyclingKey={post.id}
-                      />
-                    ) : null}
-                  </View>
-                </Touchable>
-              ))}
-            </View>
+            <PostGrid posts={posts.data?.posts ?? []} />
             {(posts.data?.posts.length ?? 0) === 0 && !posts.isLoading ? (
               <EmptyState
                 pose="sit"
@@ -340,25 +292,12 @@ export default function UserScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, padding: spacing.lg },
-  headText: { flex: 1, gap: spacing.xs, alignItems: 'flex-start' },
-  stats: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.lg,
-  },
+  gap: { height: spacing.lg },
   follow: { flex: 1 },
   note: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  // The 1 px inset on each cell draws thin lines between the photos.
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 1 },
   block: { gap: spacing.sm, paddingBottom: spacing.md },
   rail: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm },
-  cell: { width: '33.33%', aspectRatio: 1, padding: 1 },
-  cellFill: { flex: 1 },
-  image: { width: '100%', height: '100%' },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
