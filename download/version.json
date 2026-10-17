@@ -1,8 +1,8 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 30,
+  "androidVersionCode": 31,
   "notes": [
-    "Marcador novo no mapa: gota na cor da urgência com a patinha dentro.",
-    "A ponta do marcador mostra o lugar exato do animal."
+    "Compartilhar um post agora manda a foto do animal com um link para abrir no app ou baixar.",
+    "O botão \"Vou procurar\" não fica mais cortado na tela do post."
   ]
 }
