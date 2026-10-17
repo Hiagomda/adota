@@ -11,3 +11,4 @@ apps/mobile/expo-env.d.ts
 apps/mobile/src/map/serviceArea.ts
 packages/shared/src/serviceArea.ts
 apps/web/app/mapa/serviceArea.ts
+download/js

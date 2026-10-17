@@ -3,6 +3,8 @@ ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-30/egu
 COPY docker/download-nginx.conf /etc/nginx/conf.d/default.conf
 COPY download/index.html /usr/share/nginx/html/index.html
 COPY download/google.html /usr/share/nginx/html/google.html
+COPY download/img /usr/share/nginx/html/img
+COPY download/js /usr/share/nginx/html/js
 COPY download/version.json /usr/share/nginx/html/version.json
 COPY download/version.json /opt/version.json
 COPY apps/mobile/assets/paw-low.png /usr/share/nginx/html/paw.png
