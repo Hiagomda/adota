@@ -6,36 +6,46 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
-import { animalHeadline, neighborhoodOf } from '../../src/animalLabels';
+import { animalHeadline, neighborhoodOf, placeOf } from '../../src/animalLabels';
 import { PostCard } from '../../src/components/PostCard';
 import {
+  AnimalCard,
   AppText,
   Avatar,
   Badge,
   Chip,
   EmptyState,
   ErrorState,
+  HeroCarousel,
+  Icon,
   IconButton,
   SearchBar,
   SectionHeader,
   SkeletonCard,
+  SkeletonRail,
   Touchable,
+  type HeroSlide,
 } from '../../src/components/ui';
+import { openCreateCamera } from '../../src/createCamera';
+import { adoptionQuery, noAdoptionFilters } from '../../src/post/adoptionQuery';
+import { ageBandOf, ageBands } from '../../src/post/care';
 import { onFeedRefresh } from '../../src/feedRefresh';
 import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
-import { screenColumn, size, spacing, useTheme } from '../../src/theme';
+import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { Mascot } from '../../src/mascot';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
-/** "Perto de mim agora": how far the urgent strip looks first. */
+/** Quantos animais para adoção se revezam no banner do topo. */
+const HERO_SLIDES = 5;
+/** "Perto de mim agora": até onde a faixa de urgentes procura primeiro. */
 const NEARBY_KM = 2;
 
-/** Rounds the phone's point to about 100 m, so the nearby query is not redone on every GPS tick. */
+/** Arredonda o ponto do celular para uns 100 m, para a busca de perto não refazer a cada leitura do GPS. */
 function nearbyKey(here: DeviceFix | null): string | null {
   if (!here) return null;
   return `${here.latitude.toFixed(3)},${here.longitude.toFixed(3)}`;
@@ -68,26 +78,54 @@ const Stories = memo(function Stories({
   posts,
   here,
   nearby,
+  me,
+  onCreate,
 }: {
   posts: Post[];
   here: DeviceFix | null;
   nearby: boolean;
+  me: { name: string; avatarUrl: string | null } | null;
+  onCreate: () => void;
 }) {
   const router = useRouter();
-  if (posts.length === 0) return null;
+  const { colors } = useTheme();
   return (
-    <View>
-      <SectionHeader
-        title="Urgentes"
-        subtitle={nearby ? `A até ${NEARBY_KM} km de você` : 'Precisam de ajuda agora'}
-        actionLabel="Ver no mapa"
-        onAction={() => router.navigate('/explore')}
-      />
+    <View style={styles.storyBlock}>
+      <AppText variant="caption" color="textSecondary" style={styles.storyTitle}>
+        {posts.length === 0
+          ? 'Viu um animal precisando de ajuda?'
+          : nearby
+            ? `Urgentes a até ${NEARBY_KM} km de você`
+            : 'Urgentes, precisam de ajuda agora'}
+      </AppText>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.stories}
       >
+        {/* A primeira bolha é sempre "Publicar", como o "Seu story" dos apps sociais. */}
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel="Publicar um resgate"
+          pressedScale={0.94}
+          onPress={onCreate}
+          style={styles.story}
+        >
+          <View>
+            <Avatar name={me?.name ?? 'Você'} uri={me?.avatarUrl} size="lg" ring="seen" />
+            <View
+              style={[
+                styles.storyPlus,
+                { backgroundColor: colors.primary, borderColor: colors.background },
+              ]}
+            >
+              <Icon name="plus" size="sm" color={colors.onPrimary} />
+            </View>
+          </View>
+          <AppText variant="caption" numberOfLines={1} style={styles.storyLine}>
+            Publicar
+          </AppText>
+        </Touchable>
         {posts.map((post) => {
           const place = neighborhoodOf(post.approxLabel);
           const away = distanceLabel(here, post.location);
@@ -100,7 +138,7 @@ const Stories = memo(function Stories({
               onPress={() => router.push(`/story/${post.id}`)}
               style={styles.story}
             >
-              <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="urgent" />
+              <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="story" />
               <View style={styles.storyText}>
                 <AppText variant="caption" numberOfLines={1} style={styles.storyLine}>
                   {place}
@@ -120,6 +158,57 @@ const Stories = memo(function Stories({
           );
         })}
       </ScrollView>
+    </View>
+  );
+});
+
+/** Subtítulo do pôster: bairro e faixa de idade, como o ano e o gênero de um título. */
+function posterSubtitle(post: Post): string {
+  const band = ageBandOf(post.animal.ageEstimate);
+  const age = band ? ageBands.find((item) => item.value === band)?.label : null;
+  return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
+}
+
+/** Fileira de pôsteres de adoção que rola para o lado, no estilo dos catálogos de streaming. */
+const PosterRail = memo(function PosterRail({
+  title,
+  subtitle,
+  posts,
+  loading,
+  onSeeAll,
+}: {
+  title: string;
+  subtitle?: string;
+  posts: Post[];
+  loading: boolean;
+  onSeeAll: () => void;
+}) {
+  const router = useRouter();
+  if (!loading && posts.length === 0) return null;
+  return (
+    <View>
+      <SectionHeader title={title} subtitle={subtitle} actionLabel="Ver tudo" onAction={onSeeAll} />
+      {loading ? (
+        <SkeletonRail width={size.animalCompact.width} height={size.animalCompact.height} />
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
+          {posts.map((post, index) => (
+            <AnimalCard
+              key={post.id}
+              variant="compact"
+              index={index}
+              photoUri={post.media[0]?.thumbUrl || post.media[0]?.url}
+              title={animalHeadline(post.animal)}
+              subtitle={posterSubtitle(post)}
+              onPress={() => router.push(`/post/${post.id}`)}
+            />
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 });
@@ -144,6 +233,7 @@ export default function HomeScreen() {
   const listRef = useRef<FlashListRef<Post>>(null);
   const [seek, setSeek] = useState('');
   const [lens, setLens] = useState<HomeLens>('all');
+  const [searchOpen, setSearchOpen] = useState(false);
   const here = useViewerLocation();
 
   const feed = useQuery({
@@ -166,6 +256,14 @@ export default function HomeScreen() {
     },
     enabled: nearPoint !== null,
   });
+  const adoption = useQuery({
+    queryKey: ['home-adoption', token],
+    queryFn: () => loadFeed(token, adoptionQuery(noAdoptionFilters)),
+  });
+  const adoptionCats = useQuery({
+    queryKey: ['home-adoption', 'cat', token],
+    queryFn: () => loadFeed(token, adoptionQuery({ ...noAdoptionFilters, species: 'cat' })),
+  });
   const me = useQuery({
     queryKey: ['me', token],
     queryFn: () => loadMe(token ?? ''),
@@ -178,7 +276,7 @@ export default function HomeScreen() {
   });
 
   const keep = useCallback((post: Post) => matchesLens(post, lens, seek), [lens, seek]);
-  // Close ones first when there are any; otherwise every urgent rescue in Belém.
+  // Os de perto primeiro, quando houver; senão, todo resgate urgente de Belém.
   const closePosts = (nearbyStories.data?.posts ?? emptyPosts)
     .filter((post) => !post.helpRequest && keep(post))
     .sort((a, b) =>
@@ -194,6 +292,19 @@ export default function HomeScreen() {
   const unreadNotifications = (notifications.data?.notifications ?? []).some(
     (item) => item.readAt === null,
   );
+  const adoptionPosts = (adoption.data?.posts ?? emptyPosts).filter((post) => keep(post));
+  const heroSlides: HeroSlide[] = adoptionPosts.slice(0, HERO_SLIDES).map((post) => ({
+    id: post.id,
+    photoUri: post.media[0]?.url || post.media[0]?.thumbUrl,
+    tag: 'Para adoção',
+    title: animalHeadline(post.animal),
+    subtitle: posterSubtitle(post),
+  }));
+  // A fileira de cães começa depois do banner, para as mesmas carinhas não se repetirem logo abaixo.
+  const dogPosts = adoptionPosts.filter((post) => post.animal.species === 'dog');
+  const dogRail = dogPosts.length > HERO_SLIDES ? dogPosts.slice(HERO_SLIDES) : dogPosts;
+  const catRail = (adoptionCats.data?.posts ?? emptyPosts).filter((post) => keep(post));
+  const searching = seek.trim().length > 0;
   const refetchFeed = feed.refetch;
   const pageGeneration = useRef(0);
 
@@ -265,12 +376,14 @@ export default function HomeScreen() {
     failedCursor.current = null;
     void feed.refetch();
     void stories.refetch();
+    void adoption.refetch();
+    void adoptionCats.refetch();
     if (nearPoint) void nearbyStories.refetch();
     if (token) {
       void me.refetch();
       void notifications.refetch();
     }
-  }, [feed, me, nearPoint, nearbyStories, notifications, stories, token]);
+  }, [adoption, adoptionCats, feed, me, nearPoint, nearbyStories, notifications, stories, token]);
 
   useEffect(() => {
     return onFeedRefresh(() => {
@@ -278,6 +391,18 @@ export default function HomeScreen() {
       refreshAll();
     });
   }, [refreshAll]);
+
+  const startRescue = useCallback(() => {
+    const pending = openCreateCamera();
+    if (!pending) {
+      router.navigate('/create');
+      return;
+    }
+    void pending.then((shot) => {
+      if ('canceled' in shot) return;
+      router.navigate('/create');
+    });
+  }, [router]);
 
   const renderPost = useCallback(
     ({ item }: { item: Post }) => (
@@ -290,22 +415,26 @@ export default function HomeScreen() {
 
   const header = (
     <View>
-      <View style={[styles.mast, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.mast, { paddingTop: insets.top + spacing.xs }]}>
+        {/* Barra do topo como num app social: o nome do app à esquerda, ações rápidas à direita. */}
         <View style={styles.mastRow}>
-          {token ? (
-            <Avatar name={me.data?.name ?? 'Você'} uri={me.data?.avatarUrl} size="md" />
-          ) : (
-            // Same footprint as the avatar it stands in for when nobody is signed in.
-            <Mascot pose="wave" size={size.avatar.md} />
-          )}
+          <Mascot pose="wave" size={size.avatar.md} />
           <View style={styles.heroText}>
-            <AppText variant="caption" color="textSecondary">
-              {greeting()}
+            <AppText variant="h2" numberOfLines={1} style={{ color: colors.primary }}>
+              Égua, adota!
             </AppText>
-            <AppText variant="h2" numberOfLines={1}>
-              {me.data?.name ? firstName(me.data.name) : 'Égua, adota!'}
+            <AppText variant="caption" color="textSecondary" numberOfLines={1}>
+              {me.data?.name ? `${greeting()}, ${firstName(me.data.name)}` : greeting()}
             </AppText>
           </View>
+          <IconButton
+            icon={searchOpen ? 'x' : 'search'}
+            accessibilityLabel={searchOpen ? 'Fechar busca' : 'Buscar'}
+            onPress={() => {
+              if (searchOpen) setSeek('');
+              setSearchOpen(!searchOpen);
+            }}
+          />
           <View>
             <IconButton
               icon="bell"
@@ -321,14 +450,66 @@ export default function HomeScreen() {
             ) : null}
           </View>
         </View>
-        <SearchBar
-          value={seek}
-          onChangeText={setSeek}
-          placeholder="Buscar animal, bairro ou pessoa"
-          accessibilityLabel="Buscar animal, bairro ou pessoa"
-        />
+        {searchOpen ? (
+          <SearchBar
+            value={seek}
+            onChangeText={setSeek}
+            placeholder="Buscar animal, bairro ou pessoa"
+            accessibilityLabel="Buscar animal, bairro ou pessoa"
+          />
+        ) : null}
       </View>
 
+      {searching ? null : (
+        <Stories
+          posts={storyPosts}
+          here={here}
+          nearby={nearbyFirst}
+          me={me.data ? { name: me.data.name, avatarUrl: me.data.avatarUrl ?? null } : null}
+          onCreate={startRescue}
+        />
+      )}
+
+      {/* Atalhos para as telas próprias, como as categorias de um catálogo. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chips}
+      >
+        <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
+        <Chip
+          label="Adotados"
+          icon="smile"
+          onPress={() => router.push({ pathname: '/adocao', params: { aba: 'adotados' } })}
+        />
+        <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
+        <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
+      </ScrollView>
+
+      {searching ? null : (
+        <>
+          <View style={styles.hero}>
+            <HeroCarousel slides={heroSlides} actionLabel="Quero conhecer" onOpen={openPost} />
+          </View>
+          <PosterRail
+            title="Cães para adotar"
+            posts={dogRail}
+            loading={adoption.isLoading}
+            onSeeAll={() => router.push('/adocao')}
+          />
+          <PosterRail
+            title="Gatos para adotar"
+            posts={catRail}
+            loading={adoptionCats.isLoading}
+            onSeeAll={() => router.push('/adocao')}
+          />
+        </>
+      )}
+
+      <SectionHeader
+        title={searching ? 'Resultados' : 'Resgates recentes'}
+        subtitle={searching ? undefined : 'Toque duas vezes na foto para curtir'}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -342,17 +523,7 @@ export default function HomeScreen() {
             onPress={() => setLens(item.id)}
           />
         ))}
-        {/* Shortcuts to their own screens, after the filters of this list. */}
-        <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
-        <Chip
-          label="Adotados"
-          icon="smile"
-          onPress={() => router.push({ pathname: '/adocao', params: { aba: 'adotados' } })}
-        />
-        <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
-        <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
       </ScrollView>
-      <Stories posts={storyPosts} here={here} nearby={nearbyFirst} />
     </View>
   );
 
@@ -415,12 +586,31 @@ const styles = StyleSheet.create({
   mastRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroText: { flex: 1 },
   unread: { position: 'absolute', top: spacing.xs, right: spacing.xs },
-  // Vertical padding keeps the chips' 4 px hit slop inside the scroll view.
+  // O respiro vertical mantém a área de toque extra de 4 px dos chips dentro da rolagem.
   chips: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  storyBlock: { paddingTop: spacing.xs },
+  storyTitle: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  storyPlus: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: spacing.xl + 2,
+    height: spacing.xl + 2,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hero: { ...screenColumn, paddingTop: spacing.sm },
+  rail: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: spacing.md,
   },
   stories: {
     paddingHorizontal: spacing.lg,
@@ -433,5 +623,5 @@ const styles = StyleSheet.create({
   storyLine: { textAlign: 'center' },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
