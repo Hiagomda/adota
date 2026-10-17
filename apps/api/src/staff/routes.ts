@@ -288,7 +288,8 @@ export async function registerStaffRoutes(
     const ip = clientIp(request);
     allowlisted(env, ip);
     const body = parseBody(loginSchema, request.body);
-    await assertUnlocked(pool, `ip:${ip}`);
+    // O painel chama a API do próprio servidor, então o IP é o mesmo para toda a equipe.
+    // O bloqueio conta por usuário para um erro de alguém não trancar todo mundo.
     await assertUnlocked(pool, `login:${body.username}`);
     const found = await pool.query<{ user_id: string; password_hash: string; role: string }>(
       `SELECT p.user_id, p.password_hash, u.role
@@ -300,11 +301,9 @@ export async function registerStaffRoutes(
     // Sem conta, compara com um hash qualquer: a resposta demora o mesmo tanto.
     const ok = await verifyPassword(body.password, row?.password_hash ?? (await decoyHash()));
     if (!row || !ok || !isStaffRole(row.role)) {
-      await recordFailure(pool, `ip:${ip}`);
       await recordFailure(pool, `login:${body.username}`);
       throw new HttpError(401, 'Usuário ou senha incorretos.');
     }
-    await clearFailures(pool, `ip:${ip}`);
     await clearFailures(pool, `login:${body.username}`);
     const session = await openSession(pool, env, reply, row.user_id, request);
     return { token: session.token, csrf: session.csrf };
