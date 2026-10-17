@@ -1,9 +1,8 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 27,
+  "androidVersionCode": 28,
   "notes": [
-    "O selo do resgate no feed aparece inteiro, como Não encontrado e A caminho.",
-    "O mapa centraliza em você só ao abrir e depois fica livre.",
-    "Aba Adotados na tela de Adoção e fundo com ossinhos e peixinhos."
+    "Quando algo dá errado no app, a equipe fica sabendo na hora e corrige mais rápido.",
+    "Nada pessoal vai junto: nem telefone, nem e-mail."
   ]
 }

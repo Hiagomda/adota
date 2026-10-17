@@ -28,6 +28,8 @@ const requiredForRelease = [
   'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
   'EXPO_PUBLIC_FIREBASE_APP_ID',
   'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+  // Sem ele nenhum erro dos celulares chega à equipe.
+  'EXPO_PUBLIC_SENTRY_DSN',
 ];
 if (process.env.NODE_ENV === 'production') {
   const missing = requiredForRelease.filter((name) => !process.env[name]?.trim());

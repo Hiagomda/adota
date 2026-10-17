@@ -5,7 +5,8 @@ name: Compilar APK
 # Gradle local, nunca EAS.
 #
 # Secrets do repositório:
-#   MOBILE_ENV                  conteúdo inteiro do apps/mobile/.env (valores EXPO_PUBLIC_*)
+#   MOBILE_ENV                  conteúdo inteiro do apps/mobile/.env (valores EXPO_PUBLIC_*, inclusive
+#                               o EXPO_PUBLIC_SENTRY_DSN dos relatos de erro)
 #   EGUA_UPLOAD_KEYSTORE_BASE64 a chave privada de upload em base64. Deixe sem definir até a troca
 #                               de chave: aí o build assina com a chave de debug dos celulares.
 #   EGUA_UPLOAD_STORE_PASSWORD, EGUA_UPLOAD_KEY_ALIAS, EGUA_UPLOAD_KEY_PASSWORD
@@ -38,6 +39,8 @@ jobs:
       # O prebuild liga o envio dos source maps ao Sentry, que pede organização e token. Fica
       # desligado até existir o secret SENTRY_AUTH_TOKEN; o app continua mandando os erros.
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
+      SENTRY_ORG: hiago-uq
+      SENTRY_PROJECT: react-native
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
