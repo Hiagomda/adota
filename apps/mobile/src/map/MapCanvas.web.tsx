@@ -104,7 +104,7 @@ export function MapCanvas({
           event.stopPropagation();
           onSelectRef.current(post);
         };
-        return new maplibregl.Marker({ element, anchor: 'center' })
+        return new maplibregl.Marker({ element, anchor: 'bottom' })
           .setLngLat([post.location.longitude, post.location.latitude])
           .addTo(map);
       });

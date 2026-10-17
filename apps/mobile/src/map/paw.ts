@@ -2,7 +2,10 @@ import { Image, type ImageSourcePropType } from 'react-native';
 
 export type Urgency = 'low' | 'medium' | 'high';
 
-/** A arte da patinha, já pintada: verde baixa, laranja média, vermelha alta. */
+/**
+ * Marcador do mapa (gota com patinha), já pintado: verde baixa, caramelo média, vermelha alta.
+ * Gerado por scripts/paw-pins.mjs.
+ */
 export const pawSource: Record<Urgency, ImageSourcePropType> = {
   high: require('../../assets/paw-high.png'),
   medium: require('../../assets/paw-medium.png'),
@@ -11,8 +14,8 @@ export const pawSource: Record<Urgency, ImageSourcePropType> = {
 
 export function pawUri(urgency: Urgency): string {
   const source = pawSource[urgency];
-  // On the web an image module already is `{ uri }`, and react-native-web has no
-  // resolveAssetSource: calling it threw inside the map's moveend and no paw was drawn.
+  // No web o módulo de imagem já é `{ uri }` e o react-native-web não tem o
+  // resolveAssetSource: chamá-lo dava erro no moveend do mapa e nenhuma pata aparecia.
   if (!Array.isArray(source) && typeof source === 'object' && typeof source.uri === 'string') {
     return source.uri;
   }

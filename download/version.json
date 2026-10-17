@@ -1,8 +1,8 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 29,
+  "androidVersionCode": 30,
   "notes": [
-    "O mapa não volta mais sozinho para a sua localização: fica onde você deixou.",
-    "As patas não piscam nem somem quando você arrasta o mapa."
+    "Marcador novo no mapa: gota na cor da urgência com a patinha dentro.",
+    "A ponta do marcador mostra o lugar exato do animal."
   ]
 }

@@ -472,10 +472,12 @@ export function MapCanvas({
           <ShapeSource key={sprite} id="alerts" shape={shape} onPress={onPinPress}>
             <CircleLayer
               id="pin-hit"
+              // Área de toque sobre a cabeça da gota, que fica acima do ponto (scripts/paw-pins.mjs).
               style={{
-                circleRadius: 36,
+                circleRadius: 32,
                 circleColor: '#000000',
                 circleOpacity: 0.01,
+                circleTranslate: [0, -44],
               }}
             />
             <SymbolLayer
@@ -492,7 +494,9 @@ export function MapCanvas({
                   'pawLow',
                   'pawMedium',
                 ],
-                iconSize: 0.55,
+                iconSize: 0.6,
+                // A ponta da gota é o ponto do animal.
+                iconAnchor: 'bottom',
                 iconAllowOverlap: true,
                 iconIgnorePlacement: true,
               }}
