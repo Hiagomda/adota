@@ -20,6 +20,16 @@ export function animalHeadline(animal: Post['animal']): string {
 }
 
 /** First part of "Marco, Belém": the neighborhood or street, without the city. */
+/** "Rua X · Umarizal · Belém" → "Umarizal". Labels without the dotted parts stay as they are. */
+export function neighborhoodOf(approxLabel: string): string {
+  const parts = approxLabel
+    .split('·')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) return parts[parts.length - 2] ?? approxLabel;
+  return placeOf(approxLabel);
+}
+
 export function placeOf(approxLabel: string): string {
   return approxLabel.split(',')[0]?.trim() || approxLabel;
 }

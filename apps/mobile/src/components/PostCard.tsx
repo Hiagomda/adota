@@ -167,7 +167,12 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
               </AppText>
             </Touchable>
             <View style={styles.overlayMeta} pointerEvents="none">
-              <StatusPill urgency={post.urgency} />
+              {/* Urgency only matters while nobody has the animal yet. */}
+              {post.status === 'open' ? (
+                <StatusPill urgency={post.urgency} />
+              ) : (
+                <StatusPill status={post.status} />
+              )}
               {post.media.length > 1 ? (
                 <Badge kind="label" label={`${photoIndex + 1}/${post.media.length}`} />
               ) : null}

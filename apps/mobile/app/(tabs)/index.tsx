@@ -6,7 +6,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
-import { animalHeadline, placeOf } from '../../src/animalLabels';
+import { animalHeadline, neighborhoodOf } from '../../src/animalLabels';
 import { PostCard } from '../../src/components/PostCard';
 import {
   AppText,
@@ -25,9 +25,10 @@ import { onFeedRefresh } from '../../src/feedRefresh';
 import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
-import { screenColumn, spacing, useTheme } from '../../src/theme';
+import { screenColumn, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
+import { Mascot } from '../../src/mascot';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
@@ -63,12 +64,6 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
-function placeDistance(post: Post, here: DeviceFix | null): string {
-  const place = placeOf(post.approxLabel);
-  const away = distanceLabel(here, post.location);
-  return away ? `${place} · ${away}` : place;
-}
-
 const Stories = memo(function Stories({
   posts,
   here,
@@ -83,7 +78,8 @@ const Stories = memo(function Stories({
   return (
     <View>
       <SectionHeader
-        title={nearby ? `Urgentes a até ${NEARBY_KM} km de você` : 'Urgentes agora'}
+        title="Urgentes"
+        subtitle={nearby ? `A até ${NEARBY_KM} km de você` : 'Precisam de ajuda agora'}
         actionLabel="Ver no mapa"
         onAction={() => router.navigate('/explore')}
       />
@@ -93,21 +89,33 @@ const Stories = memo(function Stories({
         contentContainerStyle={styles.stories}
       >
         {posts.map((post) => {
-          const place = placeOf(post.approxLabel);
-          const label = placeDistance(post, here);
+          const place = neighborhoodOf(post.approxLabel);
+          const away = distanceLabel(here, post.location);
           return (
             <Touchable
               key={post.id}
               accessibilityRole="button"
-              accessibilityLabel={`Resgate urgente em ${label}`}
+              accessibilityLabel={`Resgate urgente em ${away ? `${place}, ${away}` : place}`}
               pressedScale={0.94}
               onPress={() => router.push(`/story/${post.id}`)}
               style={styles.story}
             >
               <Avatar name={place} uri={post.media[0]?.thumbUrl} size="lg" ring="urgent" />
-              <AppText variant="caption" color="textSecondary" numberOfLines={2}>
-                {label}
-              </AppText>
+              <View style={styles.storyText}>
+                <AppText variant="caption" numberOfLines={1} style={styles.storyLine}>
+                  {place}
+                </AppText>
+                {away ? (
+                  <AppText
+                    variant="caption"
+                    color="textSecondary"
+                    numberOfLines={1}
+                    style={styles.storyLine}
+                  >
+                    {away}
+                  </AppText>
+                ) : null}
+              </View>
             </Touchable>
           );
         })}
@@ -284,7 +292,12 @@ export default function HomeScreen() {
     <View>
       <View style={[styles.mast, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.mastRow}>
-          <Avatar name={me.data?.name ?? 'Você'} uri={me.data?.avatarUrl} size="md" />
+          {token ? (
+            <Avatar name={me.data?.name ?? 'Você'} uri={me.data?.avatarUrl} size="md" />
+          ) : (
+            // Same footprint as the avatar it stands in for when nobody is signed in.
+            <Mascot pose="wave" size={size.avatar.md} />
+          )}
           <View style={styles.heroText}>
             <AppText variant="caption" color="textSecondary">
               {greeting()}
@@ -411,6 +424,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   story: { width: STORY_WIDTH, alignItems: 'center', gap: spacing.xs },
+  storyText: { alignSelf: 'stretch', alignItems: 'center' },
+  storyLine: { textAlign: 'center' },
 });
 
 // One broken screen must not take the whole app down.
