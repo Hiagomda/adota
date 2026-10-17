@@ -2,398 +2,1241 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Égua, adota! · Baixe o app</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Égua, adota! · App de resgate e adoção em Belém</title>
     <meta
       name="description"
-      content="App de Belém para resgate, adoção e lar temporário de animais de rua. Baixe para Android."
+      content="Viu um bichinho na rua? Avisa no mapa, oferece lar temporário ou adota. O app de Belém que junta vizinhos, protetores e ONGs. Grátis para Android."
     />
     <meta property="og:title" content="Égua, adota!" />
     <meta
       property="og:description"
-      content="Resgate, adoção e lar temporário para os animais de rua de Belém."
+      content="Resgate, lar temporário e adoção para os animais de rua de Belém. Grátis para Android."
     />
-    <meta property="og:image" content="/img/cupu-wave.webp" />
+    <meta property="og:image" content="/img/cupu-oi.webp" />
     <meta property="og:locale" content="pt_BR" />
-    <meta name="theme-color" content="#1F7A7A" />
+    <meta name="theme-color" content="#0F3F3F" />
     <link rel="icon" href="/img/icone.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
-      /* Tokens da identidade "calor de casa paraense" (mesmos de apps/mobile/src/theme) */
+      /*
+        Layout: faixas de largura total que alternam creme e turquesa profundo;
+        o herói é escuro com o celular mostrando o mapa de patas, e o resto
+        conta a jornada de um animal, do alerta até a adoção.
+        Cores e fontes seguem apps/mobile/src/theme/tokens.ts.
+      */
       :root {
         color-scheme: light;
-        --turquesa: #1f7a7a;
-        --turquesa-escuro: #145757;
-        --coral: #f26b4e;
-        --caramelo: #d98a3d;
         --creme: #fff8ee;
-        --tinta: #20302f;
-        --tinta-suave: #4f5f5e;
-        --borda: #eadfce;
-        --cartao: #ffffff;
-        --raio: 20px;
+        --creme-fundo: #f8eddd;
+        --branco: #ffffff;
+        --tinta: #1b2b2b;
+        --tinta-suave: #4a5a5a;
+        --linha: #ecdfcb;
+        --turquesa-50: #e8f5f5;
+        --turquesa-100: #c9e8e8;
+        --turquesa-300: #6fbbbb;
+        --turquesa: #1f7a7a;
+        --turquesa-700: #155353;
+        --turquesa-800: #0f3f3f;
+        --turquesa-900: #0a2b2b;
+        --coral: #f26b4e;
+        --coral-600: #d9553a;
+        --coral-50: #fef0ec;
+        --caramelo: #d98a3d;
+        --caramelo-100: #f6e4ce;
+        --caramelo-700: #a8661f;
+        --urgente: #d93b3b;
+        --atencao: #e8a33d;
+        --espera: #2e9a6a;
+
+        --titulo: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+        --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+        --t-xs: 0.8125rem;
+        --t-sm: 0.9375rem;
+        --t-md: 1.0625rem;
+        --t-lg: 1.25rem;
+        --t-xl: clamp(1.75rem, 3.2vw, 2.5rem);
+        --t-2xl: clamp(2.5rem, 5.6vw, 4.25rem);
+
+        --raio-sm: 10px;
+        --raio: 18px;
+        --raio-lg: 28px;
+        --largura: 1160px;
+        --gutter-e: max(20px, env(safe-area-inset-left, 0px));
+        --gutter-d: max(20px, env(safe-area-inset-right, 0px));
       }
-      * {
+
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
       html {
         scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
       }
       body {
         margin: 0;
-        background-color: var(--creme);
-        /* Textura leve de ossinho e peixinho, como o PetPattern do app */
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='%23D98A3D' stroke-opacity='.13' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M18 30h22M14 26a4 4 0 1 1 4 4 4 4 0 1 1-4-4M44 26a4 4 0 1 0-4 4 4 4 0 1 0 4-4'/%3E%3Cpath d='M70 88c8-8 20-8 28 0-8 8-20 8-28 0zM70 88l-8-6M70 88l-8 6'/%3E%3C/svg%3E");
+        background: var(--creme);
         color: var(--tinta);
-        font-family: Nunito, system-ui, sans-serif;
-        font-size: 17px;
-        line-height: 1.55;
+        font-family: var(--texto);
+        font-size: var(--t-md);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      img,
+      svg {
+        display: block;
+        max-width: 100%;
       }
       h1,
       h2,
       h3 {
-        font-family: 'Baloo 2', Nunito, system-ui, sans-serif;
-        line-height: 1.1;
+        margin: 0;
+        font-family: var(--titulo);
+        line-height: 1.08;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+      p {
         margin: 0;
       }
       a {
         color: inherit;
       }
-      img {
-        max-width: 100%;
-        display: block;
+      :focus-visible {
+        outline: 3px solid var(--coral);
+        outline-offset: 3px;
+        border-radius: 6px;
       }
       .contido {
-        width: min(1080px, 100% - 32px);
+        width: 100%;
+        max-width: calc(var(--largura) + 40px);
         margin-inline: auto;
+        padding-left: var(--gutter-e);
+        padding-right: var(--gutter-d);
+      }
+      .rotulo {
+        font-size: var(--t-xs);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--turquesa);
       }
 
-      /* Cabeçalho com as duas abas */
-      header {
-        position: sticky;
-        top: 0;
-        z-index: 5;
-        background: color-mix(in srgb, var(--creme) 92%, transparent);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--borda);
+      /* ---------- Cabeçalho ---------- */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0 0 auto;
+        height: env(safe-area-inset-top, 0px);
+        z-index: 30;
+        background: var(--turquesa-900);
       }
-      header .contido {
+      .topo {
+        position: sticky;
+        top: env(safe-area-inset-top, 0px);
+        z-index: 20;
+        background: rgb(10 43 43 / 0.92);
+        backdrop-filter: saturate(1.4) blur(12px);
+        color: var(--creme);
+      }
+      .topo .contido {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        min-height: 64px;
+        gap: 16px;
+        min-height: 68px;
       }
       .marca {
         display: flex;
         align-items: center;
         gap: 10px;
         text-decoration: none;
-        font-family: 'Baloo 2', Nunito, sans-serif;
+        font-family: var(--titulo);
         font-weight: 800;
-        font-size: 22px;
-        color: var(--turquesa-escuro);
+        font-size: 1.375rem;
+        line-height: 1;
+        margin-right: auto;
       }
       .marca img {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
       }
-      nav[role='tablist'] {
+      .abas {
         display: flex;
-        gap: 4px;
+        gap: 2px;
         padding: 4px;
         border-radius: 999px;
-        background: #f3e7d6;
+        background: rgb(255 255 255 / 0.08);
       }
-      nav[role='tablist'] a {
-        padding: 8px 16px;
+      .abas a {
+        padding: 7px 16px;
         border-radius: 999px;
+        font-size: var(--t-sm);
         font-weight: 700;
-        font-size: 15px;
         text-decoration: none;
-        color: var(--tinta-suave);
+        color: var(--turquesa-100);
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
-      nav[role='tablist'] a[aria-selected='true'] {
-        background: var(--turquesa);
-        color: #fff;
+      .abas a:hover {
+        color: var(--branco);
+      }
+      .abas a[aria-selected='true'] {
+        background: var(--creme);
+        color: var(--turquesa-800);
       }
 
-      /* Painéis: só o da aba ativa aparece */
-      [role='tabpanel'][hidden] {
-        display: none;
-      }
-
-      /* Apresentação */
-      .heroi {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        align-items: center;
-        gap: 32px;
-        padding: 56px 0 40px;
-      }
-      .selo {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 999px;
-        background: #fde3dc;
-        color: #8a2f1c;
-        font-weight: 700;
-        font-size: 14px;
-      }
-      .heroi h1 {
-        margin-top: 14px;
-        font-size: clamp(40px, 6vw, 64px);
-        font-weight: 800;
-        color: var(--turquesa-escuro);
-      }
-      .heroi p {
-        margin: 16px 0 0;
-        font-size: 19px;
-        color: var(--tinta-suave);
-        max-width: 34ch;
-      }
-      .acoes {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 28px;
-      }
+      /* ---------- Botões ---------- */
       .botao {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
-        min-height: 52px;
-        padding: 0 24px;
-        border-radius: 16px;
+        min-height: 54px;
+        padding: 0 26px;
+        border-radius: 14px;
         border: 0;
-        font:
-          700 17px Nunito,
-          system-ui,
-          sans-serif;
+        font: 800 var(--t-md) / 1 var(--texto);
         text-decoration: none;
         cursor: pointer;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s,
+          background 0.15s;
       }
-      /* Superfície coral usa texto escuro (branco não passa contraste) */
-      .botao.principal {
+      .botao svg {
+        width: 20px;
+        height: 20px;
+        flex: none;
+      }
+      /* Superfície coral sempre com texto escuro: branco sobre coral não passa contraste */
+      .botao-coral {
         background: var(--coral);
         color: var(--tinta);
-        box-shadow: 0 6px 18px rgb(242 107 78 / 0.3);
+        box-shadow: 0 10px 24px -10px rgb(242 107 78 / 0.8);
       }
-      .botao.secundario {
-        background: transparent;
-        color: var(--turquesa-escuro);
-        border: 2px solid var(--turquesa);
+      .botao-coral:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 28px -10px rgb(242 107 78 / 0.9);
+      }
+      .botao-linha {
+        color: var(--creme);
+        box-shadow: inset 0 0 0 2px rgb(255 248 238 / 0.35);
+      }
+      .botao-linha:hover {
+        box-shadow: inset 0 0 0 2px var(--creme);
       }
       .botao[aria-disabled='true'] {
-        background: #e9dcc6;
-        box-shadow: none;
+        background: var(--caramelo-100);
         color: var(--tinta-suave);
+        box-shadow: none;
         pointer-events: none;
       }
-      .heroi figure {
-        margin: 0;
-        justify-self: center;
+
+      /* ---------- Herói ---------- */
+      .heroi {
         position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(60rem 30rem at 85% 10%, rgb(31 122 122 / 0.55), transparent 60%),
+          radial-gradient(40rem 24rem at 0% 100%, rgb(217 138 61 / 0.18), transparent 70%),
+          var(--turquesa-900);
+        color: var(--creme);
       }
-      .heroi figure::before {
-        content: '';
-        position: absolute;
-        inset: 12% 6% 0;
-        border-radius: 50%;
-        background: radial-gradient(circle, #fbd9b5 0%, transparent 70%);
-        z-index: -1;
-      }
-      .heroi figure img {
-        width: min(380px, 80vw);
-      }
-
-      .secao {
-        padding: 40px 0;
-      }
-      .secao > h2 {
-        font-size: clamp(28px, 4vw, 38px);
-        color: var(--turquesa-escuro);
-      }
-      .secao > p {
-        margin: 8px 0 0;
-        color: var(--tinta-suave);
-        max-width: 60ch;
-      }
-      .grade {
+      .heroi .contido {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 16px;
-        margin-top: 24px;
-      }
-      .cartao {
-        background: var(--cartao);
-        border: 1px solid var(--borda);
-        border-radius: var(--raio);
-        padding: 22px;
-      }
-      .cartao .icone {
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
-        display: grid;
-        place-items: center;
-        font-size: 22px;
-        background: #e3f1f0;
-      }
-      .cartao h3 {
-        margin-top: 14px;
-        font-size: 21px;
-      }
-      .cartao p {
-        margin: 6px 0 0;
-        color: var(--tinta-suave);
-        font-size: 16px;
-      }
-
-      .faixa {
-        display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
         align-items: center;
-        gap: 28px;
-        margin: 24px 0 56px;
-        padding: 28px;
-        border-radius: 28px;
-        background: var(--turquesa);
-        color: #fff;
+        gap: 48px;
+        padding-block: 72px 0;
       }
-      .faixa img {
-        width: 160px;
+      .heroi-texto {
+        padding-bottom: 72px;
       }
-      .faixa h2 {
-        font-size: clamp(26px, 4vw, 34px);
+      .heroi .rotulo {
+        color: var(--turquesa-300);
       }
-      .faixa p {
-        margin: 8px 0 18px;
-        opacity: 0.92;
+      .heroi h1 {
+        margin-top: 16px;
+        font-size: var(--t-2xl);
+        font-weight: 800;
+      }
+      .heroi h1 em {
+        font-style: normal;
+        color: var(--coral);
+      }
+      .heroi-sub {
+        margin-top: 20px;
+        max-width: 34rem;
+        font-size: var(--t-lg);
+        line-height: 1.55;
+        color: var(--turquesa-100);
+      }
+      .heroi-acoes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 32px;
+      }
+      .heroi-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 20px;
+        margin-top: 22px;
+        font-size: var(--t-sm);
+        color: var(--turquesa-300);
+      }
+      .heroi-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .heroi-meta svg {
+        width: 16px;
+        height: 16px;
       }
 
-      /* Download */
-      .baixar {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        padding: 48px 0 56px;
-        align-items: start;
+      /* Celular com o mapa de patas */
+      .vitrine {
+        position: relative;
+        align-self: end;
+        justify-self: center;
+        width: min(470px, 100%);
       }
-      .baixar .cartao.destaque {
-        text-align: center;
-        padding: 32px 24px;
+      .celular {
+        position: relative;
+        margin-left: auto;
+        margin-right: 0;
+        width: 300px;
+        max-width: 100%;
+        aspect-ratio: 300 / 560;
+        border-radius: 44px 44px 0 0;
+        padding: 12px 12px 0;
+        background: #0b1414;
+        box-shadow:
+          0 0 0 2px #2b3a3a,
+          0 40px 80px -20px rgb(0 0 0 / 0.6);
       }
-      .baixar .cartao.destaque img {
-        width: 180px;
-        margin: 0 auto 8px;
+      .tela {
+        position: relative;
+        height: 100%;
+        border-radius: 34px 34px 0 0;
+        overflow: hidden;
+        background: #eef3ea;
       }
-      .baixar h1 {
-        font-size: 36px;
-        color: var(--turquesa-escuro);
-      }
-      .versao {
-        margin: 6px 0 22px;
-        color: var(--tinta-suave);
-        font-size: 15px;
-      }
-      .baixar .botao {
+      .tela .mapa {
+        position: absolute;
+        inset: 0;
         width: 100%;
+        height: 100%;
       }
-      #aviso {
-        display: block;
-        margin-top: 12px;
+      .tela-busca {
+        position: absolute;
+        top: 40px;
+        left: 14px;
+        right: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 14px;
+        border-radius: 999px;
+        background: var(--branco);
+        box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+        font-size: 0.8rem;
         color: var(--tinta-suave);
-        font-size: 14px;
       }
-      .novidades ul,
-      .passos {
-        margin: 12px 0 0;
-        padding-left: 22px;
-      }
-      .novidades li,
-      .passos li {
-        margin: 6px 0;
-      }
-      .passos li::marker {
-        font-weight: 800;
+      .tela-busca svg {
+        width: 15px;
+        height: 15px;
         color: var(--turquesa);
       }
-      .baixar h2 {
-        font-size: 24px;
-        color: var(--turquesa-escuro);
+      .pata {
+        position: absolute;
+        width: 38px;
+        height: 38px;
+        transform: translate(-50%, -100%);
+        filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.2));
       }
-      .baixar .cartao + .cartao {
-        margin-top: 16px;
+      .pata.p1 {
+        animation: pulo 2.8s ease-in-out infinite;
       }
-      .nota {
-        margin-top: 12px;
-        padding: 12px 14px;
-        border-radius: 14px;
-        background: #fdf0de;
-        font-size: 15px;
+      @keyframes pulo {
+        0%,
+        70%,
+        100% {
+          transform: translate(-50%, -100%);
+        }
+        80% {
+          transform: translate(-50%, -118%);
+        }
+        90% {
+          transform: translate(-50%, -100%);
+        }
+      }
+      .folha {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        padding: 14px;
+        border-radius: 20px;
+        background: var(--branco);
+        box-shadow: 0 -6px 24px rgb(0 0 0 / 0.12);
+        color: var(--tinta);
+      }
+      .folha-topo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        color: var(--tinta-suave);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 800;
+      }
+      .chip::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .chip-urgente {
+        background: #fde4e4;
+        color: #a32626;
+      }
+      .folha strong {
+        display: block;
+        margin-top: 8px;
+        font-family: var(--titulo);
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+      .folha p {
+        margin-top: 4px;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        color: var(--tinta-suave);
+      }
+      .folha-botao {
+        margin-top: 10px;
+        height: 36px;
+        border-radius: 11px;
+        background: var(--turquesa);
+        color: var(--branco);
+        display: grid;
+        place-items: center;
+        font-size: 0.8rem;
+        font-weight: 800;
+      }
+      .vitrine .cupu {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 165px;
       }
 
-      footer {
-        border-top: 1px solid var(--borda);
-        padding: 24px 0 32px;
+      /* ---------- Faixa de compromissos ---------- */
+      .compromissos {
+        background: var(--creme);
+        border-bottom: 1px solid var(--linha);
+      }
+      .compromissos ul {
+        list-style: none;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 24px;
+        padding: 28px 0;
+      }
+      .compromissos li {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-size: var(--t-sm);
+        line-height: 1.45;
         color: var(--tinta-suave);
-        font-size: 14px;
+      }
+      .compromissos b {
+        display: block;
+        color: var(--tinta);
+        font-size: var(--t-md);
+      }
+      .icone {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: var(--turquesa-50);
+        color: var(--turquesa);
+      }
+      .icone svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* ---------- Seções ---------- */
+      .secao {
+        padding-block: 96px;
+      }
+      .secao-cabeca {
+        max-width: 40rem;
+      }
+      .secao-cabeca h2 {
+        margin-top: 10px;
+        font-size: var(--t-xl);
+        font-weight: 800;
+        color: var(--turquesa-800);
+      }
+      .secao-cabeca p {
+        margin-top: 14px;
+        font-size: var(--t-lg);
+        color: var(--tinta-suave);
+      }
+
+      /* Jornada: os status reais de um post, em ordem */
+      .jornada {
+        list-style: none;
+        margin: 48px 0 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        counter-reset: passo;
+        position: relative;
+      }
+      .jornada::before {
+        content: '';
+        position: absolute;
+        top: 23px;
+        left: 24px;
+        right: 24px;
+        border-top: 2px dashed var(--caramelo);
+        opacity: 0.6;
+      }
+      .jornada li {
+        position: relative;
+        counter-increment: passo;
+      }
+      .jornada li::before {
+        content: counter(passo);
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--turquesa);
+        color: var(--branco);
+        font-family: var(--titulo);
+        font-weight: 800;
+        font-size: 1.25rem;
+        box-shadow: 0 0 0 6px var(--creme);
+      }
+      .jornada li:last-child::before {
+        background: var(--coral);
+        color: var(--tinta);
+      }
+      .jornada h3 {
+        margin-top: 18px;
+        font-size: 1.375rem;
+        font-weight: 700;
+      }
+      .jornada p {
+        margin-top: 6px;
+        color: var(--tinta-suave);
+        font-size: var(--t-sm);
+        max-width: 17rem;
+      }
+      .status {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 2px 10px;
+        border-radius: 6px;
+        background: var(--caramelo-100);
+        color: var(--caramelo-700);
+        font-size: var(--t-xs);
+        font-weight: 800;
+      }
+
+      /* Recursos em blocos alternados */
+      .recursos {
+        background: var(--creme-fundo);
+      }
+      .recurso {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: center;
+        gap: 64px;
+      }
+      .recurso + .recurso {
+        margin-top: 96px;
+      }
+      .recurso:nth-child(even) .recurso-arte {
+        order: -1;
+      }
+      .recurso h3 {
+        margin-top: 10px;
+        font-size: clamp(1.625rem, 2.6vw, 2.125rem);
+        font-weight: 800;
+        color: var(--turquesa-800);
+      }
+      .recurso > div > p {
+        margin-top: 14px;
+        color: var(--tinta-suave);
+        max-width: 32rem;
+      }
+      .lista {
+        list-style: none;
+        margin: 22px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+      .lista li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .lista svg {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        margin-top: 2px;
+        color: var(--turquesa);
+      }
+      .recurso-arte {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 360px;
+        border-radius: var(--raio-lg);
+        background: var(--turquesa-50);
+        overflow: hidden;
+      }
+      .recurso-arte.quente {
+        background: var(--caramelo-100);
+      }
+      .recurso-arte img.cupu {
+        width: min(300px, 70%);
+        position: relative;
+      }
+      .legenda-urgencia {
+        position: absolute;
+        left: 20px;
+        bottom: 20px;
+        display: grid;
+        gap: 8px;
+        padding: 14px 16px;
+        border-radius: var(--raio);
+        background: var(--branco);
+        box-shadow: 0 10px 30px -12px rgb(15 63 63 / 0.35);
+        font-size: var(--t-sm);
+        font-weight: 700;
+      }
+      .legenda-urgencia span {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .legenda-urgencia img {
+        width: 26px;
+        height: 26px;
+      }
+      .cartao-flutuante {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        max-width: 220px;
+        padding: 12px 14px;
+        border-radius: var(--raio);
+        background: var(--branco);
+        box-shadow: 0 10px 30px -12px rgb(15 63 63 / 0.35);
+        font-size: var(--t-xs);
+        line-height: 1.4;
+        color: var(--tinta-suave);
+      }
+      .cartao-flutuante b {
+        display: block;
+        font-size: var(--t-sm);
+        color: var(--tinta);
+      }
+
+      /* Selos de voluntariado */
+      .selos {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 28px;
+        margin-top: 48px;
+      }
+      .selo {
         text-align: center;
       }
+      .selo img {
+        width: 100%;
+        max-width: 180px;
+        margin-inline: auto;
+        border-radius: 50%;
+        box-shadow: 0 18px 36px -18px rgb(15 63 63 / 0.55);
+        transition: transform 0.25s;
+      }
+      .selo:hover img {
+        transform: rotate(-4deg) scale(1.03);
+      }
+      .selo h3 {
+        margin-top: 16px;
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+      .selo p {
+        margin-top: 4px;
+        font-size: var(--t-sm);
+        color: var(--tinta-suave);
+      }
 
-      @media (max-width: 760px) {
-        .heroi,
-        .baixar {
-          grid-template-columns: 1fr;
+      /* Cuidados: faixa escura */
+      .cuidados {
+        background: var(--turquesa-800);
+        color: var(--creme);
+      }
+      .cuidados .secao-cabeca h2 {
+        color: var(--creme);
+      }
+      .cuidados .secao-cabeca p {
+        color: var(--turquesa-100);
+      }
+      .cuidados .rotulo {
+        color: var(--turquesa-300);
+      }
+      .regras {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 48px;
+        border-radius: var(--raio-lg);
+        overflow: hidden;
+        background: rgb(255 255 255 / 0.12);
+      }
+      .regra {
+        display: flex;
+        gap: 16px;
+        padding: 28px;
+        background: var(--turquesa-800);
+      }
+      .regra .icone {
+        background: rgb(255 255 255 / 0.08);
+        color: var(--turquesa-300);
+      }
+      .regra h3 {
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+      .regra p {
+        margin-top: 6px;
+        font-size: var(--t-sm);
+        color: var(--turquesa-100);
+      }
+
+      /* Chamada final em coral */
+      .chamada {
+        padding-block: 96px;
+      }
+      .chamada-caixa {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 32px;
+        padding: 56px;
+        border-radius: var(--raio-lg);
+        background: var(--coral);
+        color: var(--tinta);
+        overflow: hidden;
+      }
+      .chamada-caixa h2 {
+        font-size: var(--t-xl);
+        font-weight: 800;
+      }
+      .chamada-caixa p {
+        margin-top: 10px;
+        max-width: 30rem;
+        font-size: var(--t-lg);
+      }
+      .chamada-caixa .botao {
+        margin-top: 26px;
+        background: var(--turquesa-900);
+        color: var(--creme);
+        box-shadow: none;
+      }
+      .chamada-caixa .botao:hover {
+        background: var(--tinta);
+      }
+      .chamada-caixa img {
+        width: 220px;
+        margin-block: -56px;
+        align-self: end;
+      }
+
+      /* ---------- Aba Baixar ---------- */
+      .baixar-heroi {
+        background: var(--turquesa-900);
+        color: var(--creme);
+      }
+      .baixar-heroi .contido {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+        gap: 48px;
+        align-items: center;
+        padding-block: 64px;
+      }
+      .baixar-heroi h1 {
+        margin-top: 12px;
+        font-size: clamp(2.25rem, 4.4vw, 3.25rem);
+        font-weight: 800;
+      }
+      .baixar-heroi .rotulo {
+        color: var(--turquesa-300);
+      }
+      .baixar-heroi .heroi-sub {
+        font-size: var(--t-md);
+      }
+      .ficha {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+      .ficha span {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 0.08);
+        font-size: var(--t-sm);
+        font-weight: 700;
+        color: var(--turquesa-100);
+        font-variant-numeric: tabular-nums;
+      }
+      .baixar-acao {
+        margin-top: 30px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px 18px;
+      }
+      #aviso {
+        font-size: var(--t-sm);
+        color: var(--turquesa-300);
+      }
+      .qr {
+        justify-self: end;
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        padding: 22px;
+        border-radius: var(--raio-lg);
+        background: var(--creme);
+        color: var(--tinta);
+        text-align: center;
+        max-width: 280px;
+      }
+      .qr-codigo {
+        width: 200px;
+        height: 200px;
+        display: grid;
+        place-items: center;
+      }
+      .qr-codigo svg {
+        width: 100%;
+        height: 100%;
+      }
+      .qr p {
+        font-size: var(--t-sm);
+        line-height: 1.4;
+        color: var(--tinta-suave);
+      }
+      .qr b {
+        color: var(--tinta);
+      }
+
+      .baixar-corpo {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        gap: 56px;
+        padding-block: 72px 96px;
+      }
+      .baixar-corpo h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--turquesa-800);
+      }
+      .passos {
+        list-style: none;
+        margin: 24px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+        counter-reset: passo;
+      }
+      .passos li {
+        counter-increment: passo;
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--linha);
+      }
+      .passos li::before {
+        content: counter(passo);
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--turquesa-50);
+        color: var(--turquesa);
+        font-family: var(--titulo);
+        font-weight: 800;
+      }
+      .passos b {
+        display: block;
+      }
+      .passos span {
+        font-size: var(--t-sm);
+        color: var(--tinta-suave);
+      }
+      .novidades {
+        margin-top: 40px;
+        padding: 24px;
+        border-radius: var(--raio);
+        background: var(--branco);
+        border: 1px solid var(--linha);
+      }
+      .novidades h2 {
+        font-size: 1.25rem;
+      }
+      .novidades ul {
+        margin: 12px 0 0;
+        padding-left: 20px;
+        color: var(--tinta-suave);
+      }
+      .novidades li + li {
+        margin-top: 6px;
+      }
+      .duvidas {
+        margin-top: 24px;
+        display: grid;
+        gap: 10px;
+      }
+      details {
+        border-radius: var(--raio);
+        background: var(--branco);
+        border: 1px solid var(--linha);
+      }
+      summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 20px;
+        font-weight: 800;
+        cursor: pointer;
+        list-style: none;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      summary::after {
+        content: '+';
+        flex: none;
+        font-size: 1.4rem;
+        line-height: 1;
+        color: var(--turquesa);
+        transition: transform 0.2s;
+      }
+      details[open] summary::after {
+        transform: rotate(45deg);
+      }
+      details p {
+        padding: 0 20px 18px;
+        color: var(--tinta-suave);
+        font-size: var(--t-sm);
+      }
+
+      /* ---------- Rodapé ---------- */
+      .rodape {
+        background: var(--turquesa-900);
+        color: var(--turquesa-100);
+        font-size: var(--t-sm);
+      }
+      .rodape .contido {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px 24px;
+        padding-block: 32px calc(32px + env(safe-area-inset-bottom, 0px));
+      }
+      .rodape .marca {
+        font-size: 1.125rem;
+        color: var(--creme);
+        margin-right: 0;
+      }
+      .rodape .marca img {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      /* ---------- Telas menores ---------- */
+      @media (max-width: 960px) {
+        .heroi .contido,
+        .baixar-heroi .contido,
+        .recurso,
+        .baixar-corpo {
+          grid-template-columns: minmax(0, 1fr);
         }
-        .heroi {
-          padding-top: 32px;
-          text-align: center;
+        .heroi .contido {
+          padding-top: 48px;
+          gap: 40px;
         }
-        .heroi p {
-          margin-inline: auto;
+        .heroi-texto {
+          padding-bottom: 0;
         }
-        .acoes {
-          justify-content: center;
+        .vitrine .cupu {
+          width: 140px;
         }
-        .heroi figure {
-          order: -1;
+        .compromissos ul,
+        .selos {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        .heroi figure img {
-          width: min(240px, 65vw);
+        .jornada {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          row-gap: 40px;
         }
-        .faixa {
-          grid-template-columns: 1fr;
-          text-align: center;
+        .jornada::before {
+          display: none;
         }
-        .faixa img {
+        .recurso {
+          gap: 32px;
+        }
+        .recurso:nth-child(even) .recurso-arte {
+          order: 0;
+        }
+        .qr {
+          display: none;
+        }
+        .chamada-caixa {
+          grid-template-columns: minmax(0, 1fr);
+          padding: 40px 28px 0;
+        }
+        .chamada-caixa > div {
+          padding-bottom: 8px;
+        }
+        .chamada-caixa img {
           margin: 0 auto;
-          width: 120px;
+          width: 180px;
         }
+      }
+      @media (max-width: 600px) {
         .marca span {
           display: none;
+        }
+        .abas a {
+          padding: 7px 14px;
+        }
+        .secao,
+        .chamada {
+          padding-block: 64px;
+        }
+        .recurso + .recurso {
+          margin-top: 64px;
+        }
+        .compromissos ul,
+        .jornada,
+        .regras {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .selos {
+          gap: 20px;
+        }
+        .recurso-arte {
+          min-height: 300px;
+        }
+        .vitrine .cupu {
+          display: none;
+        }
+        .heroi-acoes .botao {
+          flex: 1 1 100%;
+        }
+        .baixar-acao .botao {
+          width: 100%;
+        }
+        .regra {
+          padding: 22px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
         }
       }
     </style>
   </head>
   <body>
-    <header>
+    <!-- Ícones de linha reaproveitados com <use> -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol
+          id="i-baixar"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+        </symbol>
+        <symbol
+          id="i-pino"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </symbol>
+        <symbol
+          id="i-busca"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </symbol>
+        <symbol
+          id="i-pix"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linejoin="round"
+        >
+          <path
+            d="m12 2.8 4.3 4.3-4.3 4.3-4.3-4.3zM12 12.6l4.3 4.3-4.3 4.3-4.3-4.3zM2.8 12l4.3-4.3 4.3 4.3-4.3 4.3zM12.6 12l4.3-4.3 4.3 4.3-4.3 4.3z"
+          />
+        </symbol>
+        <symbol
+          id="i-olho"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M3 3l18 18M10.6 5.1A9.8 9.8 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-2.6 3.4M6.4 6.4C3.9 8.1 2.5 12 2.5 12S6 19 12 19a9.4 9.4 0 0 0 5.6-1.8"
+          />
+          <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+        </symbol>
+        <symbol
+          id="i-proibido"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M5.6 5.6l12.8 12.8" />
+        </symbol>
+        <symbol
+          id="i-escudo"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z" />
+          <path d="m9 12 2 2 4-4" />
+        </symbol>
+        <symbol
+          id="i-casa"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+        </symbol>
+        <symbol
+          id="i-ok"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="9.5" />
+          <path d="m8 12.5 2.8 2.8L16.5 9" />
+        </symbol>
+        <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M17.6 9.5H6.4a1 1 0 0 0-1 1v6.2a1 1 0 0 0 1 1h1v2.6a1.2 1.2 0 0 0 2.4 0v-2.6h4.4v2.6a1.2 1.2 0 0 0 2.4 0v-2.6h1a1 1 0 0 0 1-1v-6.2a1 1 0 0 0-1-1zM3.4 9.3a1.2 1.2 0 0 0-1.2 1.2v4.8a1.2 1.2 0 0 0 2.4 0v-4.8a1.2 1.2 0 0 0-1.2-1.2zm17.2 0a1.2 1.2 0 0 0-1.2 1.2v4.8a1.2 1.2 0 0 0 2.4 0v-4.8a1.2 1.2 0 0 0-1.2-1.2zM15.5 4.1l1-1.6a.3.3 0 0 0-.5-.3l-1 1.6a6.3 6.3 0 0 0-6 0l-1-1.6a.3.3 0 0 0-.5.3l1 1.6a5.4 5.4 0 0 0-3 4.4h13a5.4 5.4 0 0 0-3-4.4zM9.6 6.9a.7.7 0 1 1 .7-.7.7.7 0 0 1-.7.7zm4.8 0a.7.7 0 1 1 .7-.7.7.7 0 0 1-.7.7z"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <header class="topo">
       <div class="contido">
         <a class="marca" href="#sobre">
-          <img src="/img/icone.png" alt="" width="36" height="36" />
+          <img src="/img/icone.png" alt="" width="38" height="38" />
           <span>Égua, adota!</span>
         </a>
-        <nav role="tablist" aria-label="Seções do site">
+        <nav class="abas" role="tablist" aria-label="Seções do site">
           <a role="tab" id="aba-sobre" href="#sobre" aria-controls="sobre" aria-selected="true"
-            >Apresentação</a
+            >Conheça</a
           >
           <a role="tab" id="aba-baixar" href="#baixar" aria-controls="baixar" aria-selected="false"
             >Baixar</a
@@ -403,150 +1246,554 @@
     </header>
 
     <main>
-      <section id="sobre" role="tabpanel" aria-labelledby="aba-sobre">
-        <div class="contido">
-          <div class="heroi">
-            <div>
-              <span class="selo">Feito em Belém do Pará</span>
-              <h1>Todo bichinho merece um lar.</h1>
-              <p>
-                O Égua, adota! junta quem encontra, quem cuida e quem adota os animais de rua de
-                Belém num lugar só.
+      <!-- ================= Apresentação ================= -->
+      <div id="sobre" role="tabpanel" aria-labelledby="aba-sobre">
+        <section class="heroi">
+          <div class="contido">
+            <div class="heroi-texto">
+              <span class="rotulo">Belém do Pará · Grátis para Android</span>
+              <h1>Viu um bichinho na rua? <em>Belém inteira</em> ajuda.</h1>
+              <p class="heroi-sub">
+                Marca no mapa com foto, acha um lar temporário e encontra quem quer adotar. O Égua,
+                adota! junta vizinhos, protetores e ONGs da cidade num lugar só.
               </p>
-              <div class="acoes">
-                <a class="botao principal" href="#baixar">Baixar o app</a>
-                <a class="botao secundario" href="#como-funciona">Como funciona</a>
+              <div class="heroi-acoes">
+                <a class="botao botao-coral" href="#baixar">
+                  <svg aria-hidden="true"><use href="#i-baixar" /></svg>
+                  Baixar o app
+                </a>
+                <a class="botao botao-linha" href="#como-funciona">Ver como funciona</a>
+              </div>
+              <div class="heroi-meta">
+                <span
+                  ><svg aria-hidden="true"><use href="#i-android" /></svg
+                  ><span class="js-versao">Android</span></span
+                >
+                <span
+                  ><svg aria-hidden="true"><use href="#i-pix" /></svg>Doação vai direto para quem
+                  cuida</span
+                >
               </div>
             </div>
-            <figure>
-              <img
-                src="/img/cupu-wave.webp"
-                alt="Cupu, o vira-lata caramelo mascote do app, acenando"
-                width="488"
-                height="560"
-              />
-            </figure>
-          </div>
-        </div>
 
-        <div class="contido secao" id="como-funciona">
-          <h2>O que dá pra fazer no app</h2>
-          <p>Do primeiro alerta até a família nova, tudo acontece perto de você.</p>
-          <div class="grade">
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">🚨</div>
-              <h3>Resgate</h3>
+            <div class="vitrine" aria-hidden="true">
+              <div class="celular">
+                <div class="tela">
+                  <!-- Mapa ilustrativo: baía à esquerda, ruas e um parque -->
+                  <svg class="mapa" viewBox="0 0 276 548" preserveAspectRatio="xMidYMid slice">
+                    <rect width="276" height="548" fill="#EEF3EA" />
+                    <path
+                      d="M0 0h70c-14 60 10 110-6 170s-30 120-8 200-10 130-20 178H0z"
+                      fill="#BFE0E4"
+                    />
+                    <path
+                      d="M150 120c40-10 80 6 98 34s-6 64-42 70-78-10-86-40 0-58 30-64z"
+                      fill="#D4E8C8"
+                    />
+                    <g stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" fill="none">
+                      <path d="M70 60 276 120" />
+                      <path d="M60 230 276 260" />
+                      <path d="M64 380 276 360" />
+                      <path d="M120 0 150 548" />
+                      <path d="M210 0 230 548" />
+                    </g>
+                    <g stroke="#FFFFFF" stroke-width="3" fill="none" opacity="0.9">
+                      <path d="M80 150 276 190" />
+                      <path d="M66 310 276 310" />
+                      <path d="M90 460 276 440" />
+                      <path d="M175 0 190 548" />
+                    </g>
+                  </svg>
+                  <div class="tela-busca">
+                    <svg aria-hidden="true"><use href="#i-busca" /></svg>
+                    Batista Campos, Belém
+                  </div>
+                  <img
+                    class="pata p1"
+                    src="/img/pata-high.png"
+                    alt=""
+                    style="left: 46%; top: 39%"
+                  />
+                  <img class="pata" src="/img/pata-medium.png" alt="" style="left: 76%; top: 28%" />
+                  <img class="pata" src="/img/pata-low.png" alt="" style="left: 64%; top: 55%" />
+                  <img class="pata" src="/img/pata-medium.png" alt="" style="left: 34%; top: 61%" />
+                  <div class="folha">
+                    <div class="folha-topo">
+                      <span class="chip chip-urgente">Urgente</span> a ~1 km · há 12 min
+                    </div>
+                    <strong>Filhote magrinho debaixo da mangueira</strong>
+                    <p>Está na calçada, assustado, mas deixa chegar perto.</p>
+                    <div class="folha-botao">Vou ajudar</div>
+                  </div>
+                </div>
+              </div>
+              <img class="cupu" src="/img/cupu-oi.webp" alt="" width="170" height="195" />
+            </div>
+          </div>
+        </section>
+
+        <section class="compromissos" aria-label="Nossos compromissos">
+          <div class="contido">
+            <ul>
+              <li>
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-pino" /></svg
+                ></span>
+                <span
+                  ><b>Feito em Belém</b>Pensado para os bairros, as praças e o jeito da nossa
+                  terra.</span
+                >
+              </li>
+              <li>
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-pix" /></svg
+                ></span>
+                <span
+                  ><b>Doação direta</b>O PIX vai para quem cuida. O app nunca recebe dinheiro.</span
+                >
+              </li>
+              <li>
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-olho" /></svg
+                ></span>
+                <span
+                  ><b>Endereço protegido</b>No mapa público aparece só a região, nunca a casa.</span
+                >
+              </li>
+              <li>
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-proibido" /></svg
+                ></span>
+                <span><b>Venda proibida</b>Aqui bicho se adota. Anúncio de venda sai do ar.</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="secao" id="como-funciona">
+          <div class="contido">
+            <div class="secao-cabeca">
+              <span class="rotulo">Como funciona</span>
+              <h2>Do alerta na calçada até a família nova</h2>
               <p>
-                Viu um animal precisando de ajuda? Avise com foto e local e a vizinhança vê no mapa.
+                Cada aviso vira uma história que todo mundo acompanha, com o status atualizado a
+                cada passo.
               </p>
+            </div>
+            <ol class="jornada">
+              <li>
+                <h3>Tu avisas</h3>
+                <p>Tira a foto, marca o lugar e diz se é urgente. Leva menos de um minuto.</p>
+                <span class="status">Aberto</span>
+              </li>
+              <li>
+                <h3>Alguém vai</h3>
+                <p>Quem está perto vê a pata no mapa e toca em “Vou ajudar”.</p>
+                <span class="status">A caminho</span>
+              </li>
+              <li>
+                <h3>Lar temporário</h3>
+                <p>Uma Casa Amiga recebe o bichinho enquanto ele se recupera.</p>
+                <span class="status">Lar temporário</span>
+              </li>
+              <li>
+                <h3>Ganha uma família</h3>
+                <p>Ele vai para adoção e a conversa com quem quer adotar acontece no app.</p>
+                <span class="status">Adotado</span>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="secao recursos" aria-label="O que tem no app">
+          <div class="contido">
+            <article class="recurso">
+              <div>
+                <span class="rotulo">Resgate</span>
+                <h3>Um mapa de patas pela cidade inteira</h3>
+                <p>
+                  Cada alerta vira uma pata no mapa, colorida pela urgência. Quem mora perto vê
+                  primeiro e pode responder na hora.
+                </p>
+                <ul class="lista">
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Foto, local e urgência em
+                    poucos toques
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Funciona mesmo com sinal
+                    fraco: o envio espera a internet voltar
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Perdidos e achados no mesmo
+                    lugar
+                  </li>
+                </ul>
+              </div>
+              <div class="recurso-arte">
+                <img
+                  class="cupu"
+                  src="/img/cupu-fareja.webp"
+                  alt="Cupu, o mascote, procurando com uma lupa"
+                  width="365"
+                  height="420"
+                  loading="lazy"
+                />
+                <div class="legenda-urgencia" aria-label="Cores das patas no mapa">
+                  <span><img src="/img/pata-high.png" alt="" width="26" height="26" />Urgente</span>
+                  <span
+                    ><img src="/img/pata-medium.png" alt="" width="26" height="26" />Atenção</span
+                  >
+                  <span
+                    ><img src="/img/pata-low.png" alt="" width="26" height="26" />Pode esperar</span
+                  >
+                </div>
+              </div>
             </article>
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">🏡</div>
-              <h3>Adoção</h3>
-              <p>Conheça quem está esperando uma família e converse direto com quem cuida dele.</p>
+
+            <article class="recurso">
+              <div>
+                <span class="rotulo">Casa Amiga</span>
+                <h3>Um teto por uns dias muda tudo</h3>
+                <p>
+                  Tens um espaço sobrando? Oferece lar temporário e recebe um bichinho enquanto ele
+                  se recupera ou espera a adoção.
+                </p>
+                <ul class="lista">
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Tu dizes quando estás
+                    disponível para acolher
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Só quem vai ajudar vê a
+                    distância até a tua casa
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Combina tudo pela conversa do
+                    app
+                  </li>
+                </ul>
+              </div>
+              <div class="recurso-arte quente">
+                <img
+                  class="cupu"
+                  src="/img/cupu-casa.webp"
+                  alt="Cupu deitado na frente de uma casinha"
+                  width="420"
+                  height="420"
+                  loading="lazy"
+                />
+              </div>
             </article>
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">🛏️</div>
-              <h3>Casa Amiga</h3>
-              <p>Ofereça um lar temporário enquanto o bichinho se recupera ou espera adoção.</p>
-            </article>
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">🤝</div>
-              <h3>ONGs e protetores</h3>
-              <p>Perfis verificados mostram seus pedidos de ajuda e a chave PIX deles.</p>
-            </article>
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">💚</div>
-              <h3>Doação direta</h3>
-              <p>O app só mostra o PIX de quem está ajudando. O dinheiro nunca passa por nós.</p>
-            </article>
-            <article class="cartao">
-              <div class="icone" aria-hidden="true">⭐</div>
-              <h3>Voluntariado</h3>
-              <p>Cada ajuda vale XP, níveis e selos. Quem ajuda mais, aparece mais.</p>
+
+            <article class="recurso">
+              <div>
+                <span class="rotulo">Adoção e ONGs</span>
+                <h3>Quem cuida e quem quer adotar, frente a frente</h3>
+                <p>
+                  Conhece os bichinhos disponíveis, conversa direto com o protetor e acompanha os
+                  pedidos de ajuda das ONGs da cidade.
+                </p>
+                <ul class="lista">
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Conversa de adoção dentro do
+                    app, sem expor o teu número
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>Perfis verificados para ONGs e
+                    protetores
+                  </li>
+                  <li>
+                    <svg aria-hidden="true"><use href="#i-ok" /></svg>PIX aparece só em pedido de
+                    perfil verificado
+                  </li>
+                </ul>
+              </div>
+              <div class="recurso-arte">
+                <img
+                  class="cupu"
+                  src="/img/cupu-feliz.webp"
+                  alt="Cupu feliz"
+                  width="227"
+                  height="360"
+                  loading="lazy"
+                />
+                <div class="cartao-flutuante">
+                  <b>Pedido de ajuda</b>
+                  Ração e vacina para 12 resgatados · Perfil verificado
+                </div>
+              </div>
             </article>
           </div>
-        </div>
+        </section>
 
-        <div class="contido">
-          <div class="faixa">
-            <img src="/img/cupu-home.webp" alt="" width="160" height="160" loading="lazy" />
+        <section class="secao" aria-labelledby="titulo-selos">
+          <div class="contido">
+            <div class="secao-cabeca">
+              <span class="rotulo">Voluntariado</span>
+              <h2 id="titulo-selos">Cada boa ação vale XP, nível e selo</h2>
+              <p>
+                Ajudou num resgate, acolheu, doou ou adotou? Tu sobes de nível e liberas selos
+                pintados à mão.
+              </p>
+            </div>
+            <div class="selos">
+              <figure class="selo">
+                <img
+                  src="/img/selo-heroi-local.webp"
+                  alt=""
+                  width="180"
+                  height="180"
+                  loading="lazy"
+                />
+                <h3>Herói Local</h3>
+                <p>Para quem resolve na própria rua</p>
+              </figure>
+              <figure class="selo">
+                <img src="/img/selo-olheiro.webp" alt="" width="180" height="180" loading="lazy" />
+                <h3>Olheiro da Vizinhança</h3>
+                <p>Para quem vê e avisa primeiro</p>
+              </figure>
+              <figure class="selo">
+                <img
+                  src="/img/selo-portas-abertas.webp"
+                  alt=""
+                  width="180"
+                  height="180"
+                  loading="lazy"
+                />
+                <h3>Portas Abertas</h3>
+                <p>Para quem vira Casa Amiga</p>
+              </figure>
+              <figure class="selo">
+                <img
+                  src="/img/selo-padrinho-nota-10.webp"
+                  alt=""
+                  width="180"
+                  height="180"
+                  loading="lazy"
+                />
+                <h3>Padrinho Nota 10</h3>
+                <p>Para quem apoia de verdade</p>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        <section class="secao cuidados" aria-labelledby="titulo-cuidados">
+          <div class="contido">
+            <div class="secao-cabeca">
+              <span class="rotulo">Segurança</span>
+              <h2 id="titulo-cuidados">Feito com cuidado, para os bichos e para as pessoas</h2>
+              <p>Regras que valem para todo mundo, checadas no servidor e não só na tela.</p>
+            </div>
+            <div class="regras">
+              <div class="regra">
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-olho" /></svg
+                ></span>
+                <div>
+                  <h3>Localização aproximada</h3>
+                  <p>
+                    O feed mostra a região num raio de uns 500 metros. O ponto exato fica com quem
+                    vai ajudar.
+                  </p>
+                </div>
+              </div>
+              <div class="regra">
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-casa" /></svg
+                ></span>
+                <div>
+                  <h3>Casa Amiga é casa de alguém</h3>
+                  <p>
+                    A lista de lares temporários só aparece para a equipe e para quem vai ajudar, em
+                    quilômetros.
+                  </p>
+                </div>
+              </div>
+              <div class="regra">
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-escudo" /></svg
+                ></span>
+                <div>
+                  <h3>Telefone fora do feed</h3>
+                  <p>Teu número não aparece nas publicações. A conversa acontece pelo app.</p>
+                </div>
+              </div>
+              <div class="regra">
+                <span class="icone"
+                  ><svg aria-hidden="true"><use href="#i-proibido" /></svg
+                ></span>
+                <div>
+                  <h3>Nada de venda</h3>
+                  <p>
+                    Vender animal é proibido. A equipe modera denúncias e verifica ONGs e
+                    protetores.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="chamada" aria-labelledby="titulo-chamada">
+          <div class="contido">
+            <div class="chamada-caixa">
+              <div>
+                <h2 id="titulo-chamada">Bora ajudar, égua!</h2>
+                <p>
+                  É grátis, leva um minuto para instalar e tem bichinho esperando por ti agora
+                  mesmo.
+                </p>
+                <a class="botao" href="#baixar">
+                  <svg aria-hidden="true"><use href="#i-baixar" /></svg>
+                  Baixar para Android
+                </a>
+              </div>
+              <img src="/img/cupu-oi.webp" alt="" width="220" height="252" loading="lazy" />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ================= Download ================= -->
+      <div id="baixar" role="tabpanel" aria-labelledby="aba-baixar" hidden>
+        <section class="baixar-heroi">
+          <div class="contido">
             <div>
-              <h2>Bora ajudar?</h2>
-              <p>O app é gratuito e por enquanto está disponível só para Android.</p>
-              <a class="botao principal" href="#baixar">Ir para o download</a>
+              <span class="rotulo">Download</span>
+              <h1>Instala o Égua, adota! no teu Android</h1>
+              <p class="heroi-sub">
+                O app ainda não está na Play Store. Baixa o arquivo oficial aqui mesmo e ele te
+                avisa sozinho quando sair versão nova.
+              </p>
+              <div class="ficha">
+                <span class="js-versao">Android</span>
+                <span id="tamanho" hidden></span>
+                <span>Grátis</span>
+              </div>
+              <div class="baixar-acao">
+                <a
+                  class="botao botao-coral"
+                  id="botao-baixar"
+                  href="/egua-adota.apk"
+                  download
+                  aria-disabled="true"
+                >
+                  <svg aria-hidden="true"><use href="#i-baixar" /></svg>
+                  <span id="botao-texto">Preparando o arquivo…</span>
+                </a>
+                <span id="aviso">Se o botão não liberar, atualiza a página daqui a pouco.</span>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="baixar" role="tabpanel" aria-labelledby="aba-baixar" hidden>
-        <div class="contido baixar">
-          <div class="cartao destaque">
-            <img
-              src="/img/cupu-search.webp"
-              alt="Cupu, o mascote, farejando"
-              width="180"
-              height="207"
-              loading="lazy"
-            />
-            <h1>Baixe o Égua, adota!</h1>
-            <p class="versao" id="versao">Android</p>
-            <a
-              class="botao principal"
-              id="botao-baixar"
-              href="/egua-adota.apk"
-              download
-              aria-disabled="true"
-              >Preparando o arquivo...</a
-            >
-            <small id="aviso">Se o botão não liberar, atualize a página daqui a pouco.</small>
-          </div>
-
-          <div>
-            <div class="cartao">
-              <h2>Como instalar</h2>
-              <ol class="passos">
-                <li>Toque em <strong>Baixar o app</strong> e espere o download terminar.</li>
-                <li>
-                  Abra o arquivo <strong>egua-adota.apk</strong> pela notificação ou pela pasta
-                  Downloads.
-                </li>
-                <li>
-                  Se o Android pedir, permita <strong>instalar apps desta fonte</strong> para o
-                  navegador.
-                </li>
-                <li>Toque em <strong>Instalar</strong> e depois em <strong>Abrir</strong>.</li>
-              </ol>
-              <p class="nota">
-                Já tem o app? Ele avisa sozinho quando sai versão nova. Também dá para baixar aqui
-                por cima, sem perder nada.
+            <div class="qr" id="qr" hidden>
+              <div class="qr-codigo" id="qr-codigo"></div>
+              <p>
+                <b>Tá no computador?</b><br />Aponta a câmera do celular para abrir esta página.
               </p>
             </div>
-            <div class="cartao novidades" id="novidades" hidden>
+          </div>
+        </section>
+
+        <div class="contido baixar-corpo">
+          <div>
+            <h2>Como instalar</h2>
+            <ol class="passos">
+              <li>
+                <div>
+                  <b>Baixa o arquivo</b
+                  ><span>Toca em “Baixar o app” e espera o download terminar.</span>
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Abre o egua-adota.apk</b
+                  ><span>Pela notificação do download ou pela pasta Downloads.</span>
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Permite a instalação</b
+                  ><span
+                    >Se o Android pedir, libera “instalar apps desta fonte” para o navegador.</span
+                  >
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Instala e abre</b
+                  ><span>Toca em Instalar, depois em Abrir. Pronto, é só entrar.</span>
+                </div>
+              </li>
+            </ol>
+            <div class="novidades" id="novidades" hidden>
               <h2>Novidades desta versão</h2>
               <ul id="lista-novidades"></ul>
             </div>
           </div>
+
+          <div>
+            <h2>Dúvidas comuns</h2>
+            <div class="duvidas">
+              <details>
+                <summary>É seguro instalar fora da Play Store?</summary>
+                <p>
+                  Sim, desde que tu baixes daqui. Este é o arquivo oficial, o mesmo que a equipe
+                  publica a cada versão. O aviso do Android aparece para qualquer app instalado fora
+                  da loja.
+                </p>
+              </details>
+              <details>
+                <summary>Tem para iPhone?</summary>
+                <p>Ainda não. Por enquanto o app é só para Android.</p>
+              </details>
+              <details>
+                <summary>Como atualizo o app?</summary>
+                <p>
+                  Ao abrir, o app confere se tem versão nova e te avisa. Também dá para baixar aqui
+                  por cima da versão instalada, sem perder nada.
+                </p>
+              </details>
+              <details>
+                <summary>Apareceu “app não instalado”. E agora?</summary>
+                <p>
+                  Confere se tem espaço livre no celular e se o download terminou. Se continuar,
+                  desinstala a versão antiga e instala de novo.
+                </p>
+              </details>
+              <details>
+                <summary>Quanto custa?</summary>
+                <p>
+                  Nada. O app é grátis e nunca recebe dinheiro: as doações vão direto para quem
+                  cuida dos bichos.
+                </p>
+              </details>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
 
-    <footer>
-      <div class="contido">Égua, adota! · Feito com carinho em Belém do Pará 🐾</div>
+    <footer class="rodape">
+      <div class="contido">
+        <a class="marca" href="#sobre">
+          <img src="/img/icone.png" alt="" width="30" height="30" />
+          <span>Égua, adota!</span>
+        </a>
+        <span>Feito em Belém do Pará, com carinho pelos bichos da nossa terra.</span>
+      </div>
     </footer>
 
+    <script src="/js/qrcode.min.js" defer></script>
     <script>
-      // Abas: o hash da URL decide qual painel aparece (#sobre ou #baixar).
-      const abas = { sobre: 'aba-sobre', baixar: 'aba-baixar' };
-
+      // Abas: o hash decide o painel (#sobre ou #baixar). Âncoras internas ficam em "Conheça".
       function mostrarAba() {
         const alvo = location.hash.slice(1);
-        // Âncoras dentro da apresentação (ex.: #como-funciona) ficam na aba Apresentação.
         const painel = alvo === 'baixar' ? 'baixar' : 'sobre';
-        for (const [id, abaId] of Object.entries(abas)) {
+        for (const id of ['sobre', 'baixar']) {
           document.getElementById(id).hidden = id !== painel;
-          document.getElementById(abaId).setAttribute('aria-selected', String(id === painel));
+          document.getElementById('aba-' + id).setAttribute('aria-selected', String(id === painel));
         }
         if (alvo === 'baixar' || alvo === 'sobre' || !alvo) window.scrollTo(0, 0);
       }
@@ -555,15 +1802,19 @@
 
       // O APK fica no volume do container; o botão só libera quando ele existe.
       const botao = document.getElementById('botao-baixar');
-      const aviso = document.getElementById('aviso');
       fetch('/egua-adota.apk', { method: 'HEAD' })
         .then((resposta) => {
           if (!resposta.ok) return;
-          botao.textContent = 'Baixar o app';
+          document.getElementById('botao-texto').textContent = 'Baixar o app';
           botao.setAttribute('aria-disabled', 'false');
+          document.getElementById('aviso').textContent =
+            'Arquivo oficial, direto do nosso servidor.';
           const bytes = Number(resposta.headers.get('content-length'));
-          const tamanho = bytes > 0 ? ` (${Math.round(bytes / 1048576)} MB)` : '';
-          aviso.textContent = `Arquivo para Android${tamanho}. Confirme a instalação ao abrir.`;
+          if (bytes > 0) {
+            const tamanho = document.getElementById('tamanho');
+            tamanho.textContent = `${Math.round(bytes / 1048576)} MB`;
+            tamanho.hidden = false;
+          }
         })
         .catch((erro) => {
           console.warn('Não foi possível conferir o APK', erro);
@@ -574,8 +1825,9 @@
         .then((resposta) => (resposta.ok ? resposta.json() : null))
         .then((dados) => {
           if (!dados) return;
-          document.getElementById('versao').textContent =
-            `Versão ${dados.version} (build ${dados.androidVersionCode}) · Android`;
+          for (const el of document.querySelectorAll('.js-versao')) {
+            el.textContent = `Android · versão ${dados.version} (build ${dados.androidVersionCode})`;
+          }
           const notas = Array.isArray(dados.notes) ? dados.notes : [];
           if (notas.length === 0) return;
           const lista = document.getElementById('lista-novidades');
@@ -589,6 +1841,23 @@
         .catch((erro) => {
           console.warn('Não foi possível ler a versão', erro);
         });
+
+      // QR para quem abriu no computador levar a página para o celular.
+      window.addEventListener('load', () => {
+        if (typeof qrcode !== 'function') {
+          console.warn('Gerador de QR não carregou');
+          return;
+        }
+        const qr = qrcode(0, 'M');
+        qr.addData(`${location.origin}/#baixar`);
+        qr.make();
+        document.getElementById('qr-codigo').innerHTML = qr.createSvgTag({
+          cellSize: 6,
+          margin: 0,
+          scalable: true,
+        });
+        document.getElementById('qr').hidden = false;
+      });
     </script>
   </body>
 </html>
