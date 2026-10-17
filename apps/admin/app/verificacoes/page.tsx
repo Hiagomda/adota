@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import {
+  Empty,
   Frame,
   Guard,
   Loading,
+  PageHeader,
   formatDate,
   labelRole,
   moderate,
@@ -46,17 +48,16 @@ export default function VerificationsPage() {
     <Guard me={me} permission="verifications.manage" label="as verificações">
       {(staff) => (
         <Frame me={staff}>
-          <div className="stack">
-            <h1>Verificações</h1>
-            <p className="muted">
-              Perfil verificado ganha o selo e pode mostrar Pix em pedido de ajuda. Confira a ONG ou
-              o protetor fora do app antes de aprovar.
-            </p>
+          <>
+            <PageHeader
+              title="Verificações"
+              subtitle="Perfil verificado ganha o selo e pode mostrar Pix em pedido de ajuda. Confira a ONG ou o protetor fora do app antes de aprovar."
+            />
             {message ? <p className="error">{message}</p> : null}
             {error ? <p className="error">{error}</p> : null}
             {!data && !message ? <Loading /> : null}
             {data && data.verifications.length === 0 ? (
-              <p className="muted">Nenhum pedido esperando.</p>
+              <Empty>Nenhum pedido esperando.</Empty>
             ) : null}
             {(data?.verifications ?? []).map((item) => (
               <article key={item.id} className="card stack">
@@ -65,8 +66,12 @@ export default function VerificationsPage() {
                   {item.name} <span className="muted">@{item.handle}</span> · {labelRole(item.role)}
                   <span className="muted"> · pedido em {formatDate(item.createdAt)}</span>
                 </p>
-                {item.note ? <p>{item.note}</p> : <p className="muted">Sem observação.</p>}
-                <div className="row">
+                {item.note ? (
+                  <p className="quote">{item.note}</p>
+                ) : (
+                  <p className="muted">Sem observação.</p>
+                )}
+                <div className="actions">
                   <button
                     type="button"
                     disabled={busy === item.id}
@@ -92,7 +97,7 @@ export default function VerificationsPage() {
                 </div>
               </article>
             ))}
-          </div>
+          </>
         </Frame>
       )}
     </Guard>

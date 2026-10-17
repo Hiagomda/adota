@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Frame, Loading, labelRole, useStaff } from '../painel';
+import { Empty, Frame, Loading, PageHeader, labelRole, useStaff } from '../painel';
 
 interface Member {
   id: string;
@@ -45,17 +45,22 @@ export default function TeamPage() {
     };
   }, [me]);
 
-  if (me === undefined || (me && team === null && !message)) return <Loading />;
+  if (me === undefined || (me && team === null && !message))
+    return (
+      <main className="content">
+        <Loading />
+      </main>
+    );
   if (!me)
     return (
-      <main>
-        <p>Entre no painel para ver a equipe.</p>
+      <main className="content">
+        <Empty>Entre no painel para ver a equipe.</Empty>
       </main>
     );
   if (!me.permissions.includes('team.read')) {
     return (
       <Frame me={me}>
-        <p>Sua conta não abre a equipe.</p>
+        <Empty>Sua conta não abre a equipe.</Empty>
       </Frame>
     );
   }
@@ -82,8 +87,10 @@ export default function TeamPage() {
 
   return (
     <Frame me={me}>
-      <h1>Equipe</h1>
-      <p className="muted">Só o superadmin muda papéis, com motivo e código do autenticador.</p>
+      <PageHeader
+        title="Equipe"
+        subtitle="Só o superadmin muda papéis, com motivo e código do autenticador."
+      />
       {message ? <p className="error">{message}</p> : null}
       {team && team.length === 0 ? <p>Ninguém da equipe encontrado.</p> : null}
       <table>

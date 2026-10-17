@@ -1,7 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Frame, Guard, Loading, formatDate, moderate, useModeration, useStaff } from '../painel';
+import {
+  Empty,
+  Frame,
+  Guard,
+  Loading,
+  PageHeader,
+  formatDate,
+  moderate,
+  useModeration,
+  useStaff,
+} from '../painel';
 
 interface Report {
   id: string;
@@ -53,12 +63,11 @@ export default function ReportsPage() {
     <Guard me={me} permission="reports.manage" label="as denúncias">
       {(staff) => (
         <Frame me={staff}>
-          <div className="stack">
-            <h1>Denúncias</h1>
-            <p className="muted">
-              Quem denunciou recebe um aviso no app quando a equipe decide. O alvo não sabe quem
-              denunciou.
-            </p>
+          <>
+            <PageHeader
+              title="Denúncias"
+              subtitle="Quem denunciou recebe um aviso no app quando a equipe decide. O alvo não sabe quem denunciou."
+            />
             <div className="tabs">
               {tabs.map((tab) => (
                 <button
@@ -74,17 +83,17 @@ export default function ReportsPage() {
             {message ? <p className="error">{message}</p> : null}
             {error ? <p className="error">{error}</p> : null}
             {!data && !message ? <Loading /> : null}
-            {data && data.reports.length === 0 ? (
-              <p className="muted">Nenhuma denúncia aqui.</p>
-            ) : null}
+            {data && data.reports.length === 0 ? <Empty>Nenhuma denúncia aqui.</Empty> : null}
             {(data?.reports ?? []).map((report) => (
-              <article key={report.id} className="card stack">
+              <article key={report.id} className={`card stack accent-${report.targetType}`}>
                 <div className="row">
                   <span className="badge">{targetLabel[report.targetType]}</span>
                   {report.reportCount > 1 ? (
                     <span className="badge warn">{report.reportCount} denúncias no mesmo alvo</span>
                   ) : null}
-                  {report.targetHidden ? <span className="badge">Já está fora do ar</span> : null}
+                  {report.targetHidden ? (
+                    <span className="badge ok">Já está fora do ar</span>
+                  ) : null}
                   <span className="muted">{formatDate(report.createdAt)}</span>
                 </div>
                 <p>
@@ -93,12 +102,12 @@ export default function ReportsPage() {
                     <span className="muted"> · por @{report.reporterHandle}</span>
                   ) : null}
                 </p>
-                <blockquote className="card">
+                <blockquote className="quote" style={{ margin: 0 }}>
                   {report.targetText ?? <span className="muted">O conteúdo não existe mais.</span>}
                   {report.targetHandle ? <div className="muted">@{report.targetHandle}</div> : null}
                 </blockquote>
                 {report.status === 'open' ? (
-                  <div className="row">
+                  <div className="actions">
                     <button
                       type="button"
                       className="danger"
@@ -119,7 +128,7 @@ export default function ReportsPage() {
                 ) : null}
               </article>
             ))}
-          </div>
+          </>
         </Frame>
       )}
     </Guard>

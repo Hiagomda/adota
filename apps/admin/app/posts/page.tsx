@@ -1,7 +1,18 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { Frame, Guard, Loading, formatDate, moderate, useModeration, useStaff } from '../painel';
+import { icons } from '../icons';
+import {
+  Empty,
+  Frame,
+  Guard,
+  Loading,
+  PageHeader,
+  formatDate,
+  moderate,
+  useModeration,
+  useStaff,
+} from '../painel';
 
 interface Post {
   id: string;
@@ -46,6 +57,15 @@ const urgencyLabel: Record<string, string> = {
 
 const speciesLabel: Record<string, string> = { dog: 'Cachorro', cat: 'Gato', other: 'Outro' };
 
+/** Foto do post. Se o imgproxy não responder, fica a patinha no lugar. */
+function Thumb({ url }: { url: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return <div className="thumb">{icons.paw}</div>;
+  // Foto vem do imgproxy, fora do domínio do painel.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="thumb" src={url} alt="" loading="lazy" onError={() => setFailed(true)} />;
+}
+
 const filters = [
   { value: 'pending', label: 'Esperando revisão' },
   { value: 'recent', label: 'Recentes' },
@@ -82,8 +102,11 @@ export default function PostsPage() {
     <Guard me={me} permission="posts.moderate" label="os posts">
       {(staff) => (
         <Frame me={staff}>
-          <div className="stack">
-            <h1>Posts</h1>
+          <>
+            <PageHeader
+              title="Posts"
+              subtitle="Revise o que entrou, tire do ar o que fere as regras e devolva o que foi engano."
+            />
             <div className="tabs">
               {filters.map((item) => (
                 <button
@@ -103,35 +126,23 @@ export default function PostsPage() {
                 setQ(search.trim());
               }}
             >
-              <input
-                style={{ flex: 1, minWidth: 200 }}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar no texto, no @ do autor ou no nome do animal"
-              />
+              <span className="search">
+                {icons.search}
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar no texto, no @ do autor ou no nome do animal"
+                />
+              </span>
               <button type="submit">Buscar</button>
             </form>
             {message ? <p className="error">{message}</p> : null}
             {error ? <p className="error">{error}</p> : null}
             {!data && !message ? <Loading /> : null}
-            {data && data.posts.length === 0 ? <p className="muted">Nenhum post aqui.</p> : null}
+            {data && data.posts.length === 0 ? <Empty>Nenhum post aqui.</Empty> : null}
             {(data?.posts ?? []).map((post) => (
               <article key={post.id} className="card item">
-                {post.thumbUrl ? (
-                  // Foto vem do imgproxy, fora do domínio do painel.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    className="thumb"
-                    src={post.thumbUrl}
-                    alt=""
-                    loading="lazy"
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = 'hidden';
-                    }}
-                  />
-                ) : (
-                  <div className="thumb" />
-                )}
+                <Thumb url={post.thumbUrl} />
                 <div className="stack">
                   <div className="row">
                     <span className="badge">{typeLabel[post.type] ?? post.type}</span>
@@ -146,6 +157,9 @@ export default function PostsPage() {
                       <span className="badge">Recusado</span>
                     ) : null}
                     {post.hidden ? <span className="badge warn">Fora do ar</span> : null}
+                    {post.reviewStatus === 'published' && !post.hidden ? (
+                      <span className="badge ok">No ar</span>
+                    ) : null}
                   </div>
                   <strong>
                     {post.animalName ?? speciesLabel[post.species] ?? post.species} ·{' '}
@@ -155,34 +169,31 @@ export default function PostsPage() {
                   <p className="muted">
                     {post.authorName} @{post.authorHandle} · {formatDate(post.createdAt)}
                   </p>
-                  <div className="row">
-                    {post.reviewStatus === 'pending' ? (
-                      <>
-                        <button
-                          type="button"
-                          disabled={busy === post.id}
-                          onClick={() => void run(post, 'review', { action: 'approve' })}
-                        >
-                          Publicar
-                        </button>
-                        <button
-                          type="button"
-                          className="quiet"
-                          disabled={busy === post.id}
-                          onClick={() => void run(post, 'review', { action: 'reject' })}
-                        >
-                          Recusar
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                  <form className="row" onSubmit={(event) => toggleVisibility(post, event)}>
+                  {post.reviewStatus === 'pending' ? (
+                    <div className="actions">
+                      <button
+                        type="button"
+                        disabled={busy === post.id}
+                        onClick={() => void run(post, 'review', { action: 'approve' })}
+                      >
+                        Publicar
+                      </button>
+                      <button
+                        type="button"
+                        className="quiet"
+                        disabled={busy === post.id}
+                        onClick={() => void run(post, 'review', { action: 'reject' })}
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  ) : null}
+                  <form className="actions" onSubmit={(event) => toggleVisibility(post, event)}>
                     <input
                       name="justification"
                       required
                       minLength={10}
                       placeholder="Motivo (vai para a auditoria)"
-                      style={{ flex: 1, minWidth: 200 }}
                     />
                     <button
                       type="submit"
@@ -195,7 +206,7 @@ export default function PostsPage() {
                 </div>
               </article>
             ))}
-          </div>
+          </>
         </Frame>
       )}
     </Guard>
