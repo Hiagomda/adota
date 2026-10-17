@@ -59,6 +59,9 @@ Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não r
 
 ### 2. Sincronizar e compilar o APK
 
+**Caminho preferido:** Actions → **Compilar APK** → Run workflow (marque `publish` para criar o release `apk-<version>-<build>`). Compila numa máquina limpa com o secret `MOBILE_ENV`, roda `apps/mobile/scripts/check-apk.mjs` (chaves gravadas, HTTP no manifest, versionCode, assinatura igual a `vars.EXPECTED_SIGNER_SHA256`, API no ar) e substitui os passos 2 e 3 abaixo. O compilado no PC fica para emergência; nele também rode `pnpm --filter @patinha/mobile apk:check <apk>` antes do release e use `SENTRY_DISABLE_AUTO_UPLOAD=true` se o prebuild religar o envio ao Sentry.
+
+
 1. Robocopy OneDrive → `C:\dev\egua-adota` com `/E`, **excluindo** `android`, `node_modules`, `.expo`, `.git`, `.env`. **Nunca** `/MIR`.
 2. Não rode `pnpm install` completo. Se `@patinha/shared` quebrar o tsc, `pnpm --filter @patinha/shared build` na árvore de compile.
 3. `node apps/mobile/scripts/bump-build.mjs --sync` em `C:\dev\egua-adota` para o `versionCode` do Gradle bater com `version.json`.
