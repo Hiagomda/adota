@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { FlashList } from '@shopify/flash-list';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import {
   ErrorState,
   Header,
   SearchBar,
+  Segmented,
   Skeleton,
 } from '../src/components/ui';
 import {
@@ -22,6 +23,7 @@ import {
   adoptionQuery,
   noAdoptionFilters,
   type AdoptionFilters,
+  type AdoptionShelf,
 } from '../src/post/adoptionQuery';
 import { ageBandOf, ageBands, careKeys, careQuestion, type CareKey } from '../src/post/care';
 import { animalHeadline, placeOf } from '../src/animalLabels';
@@ -43,6 +45,11 @@ const sizeOptions = [
   { value: 'large', label: 'Grande' },
 ] as const;
 
+const shelves = [
+  { value: 'available', label: 'Para adoção' },
+  { value: 'adopted', label: 'Adotados' },
+] as const;
+
 /** The two care facts people filter by most, kept on the quick row. */
 const quickCare: CareKey[] = ['neutered', 'goodWithKids'];
 
@@ -54,7 +61,8 @@ function toggleCare(filters: AdoptionFilters, key: CareKey): AdoptionFilters {
   };
 }
 
-function cardSubtitle(post: Post): string {
+function cardSubtitle(post: Post, shelf: AdoptionShelf): string {
+  if (shelf === 'adopted') return `Adotado · ${placeOf(post.approxLabel)}`;
   const band = ageBandOf(post.animal.ageEstimate);
   const age = band ? ageBands.find((item) => item.value === band)?.label : null;
   return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
@@ -65,6 +73,9 @@ export default function AdoptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
+  // "Adotados" on Home opens this screen on the second tab.
+  const { aba } = useLocalSearchParams<{ aba?: string }>();
+  const [shelf, setShelf] = useState<AdoptionShelf>(aba === 'adotados' ? 'adopted' : 'available');
   const [filters, setFilters] = useState<AdoptionFilters>(noAdoptionFilters);
   const [placeText, setPlaceText] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -78,10 +89,11 @@ export default function AdoptionScreen() {
     return () => clearTimeout(timer);
   }, [placeText]);
 
-  const query = adoptionQuery(filters);
+  const query = adoptionQuery(filters, undefined, shelf);
   const feed = useInfiniteQuery({
     queryKey: ['adoption', query, token],
-    queryFn: ({ pageParam }) => loadFeed(token, adoptionQuery(filters, pageParam ?? undefined)),
+    queryFn: ({ pageParam }) =>
+      loadFeed(token, adoptionQuery(filters, pageParam ?? undefined, shelf)),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
   });
@@ -128,7 +140,15 @@ export default function AdoptionScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.column}>
-        <Header title="Para adoção" large onBack={() => router.back()} />
+        <Header title="Adoção" large onBack={() => router.back()} />
+        <View style={styles.shelf}>
+          <Segmented
+            options={shelves}
+            value={shelf}
+            onChange={setShelf}
+            accessibilityLabel="Ver animais para adoção ou já adotados"
+          />
+        </View>
         <View style={styles.search}>
           <SearchBar
             value={placeText}
@@ -179,16 +199,20 @@ export default function AdoptionScreen() {
             onEndReachedThreshold={0.6}
             ListEmptyComponent={
               <EmptyState
-                pose="search"
+                pose={shelf === 'adopted' ? 'home' : 'search'}
                 title={
                   activeFilterCount(filters) > 0
                     ? 'Nenhum animal com esses filtros'
-                    : 'Nenhum animal para adoção agora'
+                    : shelf === 'adopted'
+                      ? 'Nenhuma adoção ainda'
+                      : 'Nenhum animal para adoção agora'
                 }
                 body={
                   activeFilterCount(filters) > 0
                     ? 'Tire um filtro ou procure em outro bairro.'
-                    : 'Quando alguém colocar um animal para adoção, ele aparece aqui.'
+                    : shelf === 'adopted'
+                      ? 'Quando uma adoção for concluída, o animal aparece aqui com a família nova.'
+                      : 'Quando alguém colocar um animal para adoção, ele aparece aqui.'
                 }
                 actionLabel={activeFilterCount(filters) > 0 ? 'Limpar filtros' : undefined}
                 onAction={
@@ -208,7 +232,7 @@ export default function AdoptionScreen() {
                   index={index}
                   photoUri={item.media[0]?.thumbUrl || item.media[0]?.url}
                   title={animalHeadline(item.animal)}
-                  subtitle={cardSubtitle(item)}
+                  subtitle={cardSubtitle(item, shelf)}
                   onPress={() => router.push(`/post/${item.id}`)}
                 />
               </View>
@@ -281,6 +305,7 @@ export default function AdoptionScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   column: { flex: 1, ...screenColumn },
+  shelf: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   // A horizontal scroll in a column grows to fill it unless told not to.
   chipRow: { flexGrow: 0 },

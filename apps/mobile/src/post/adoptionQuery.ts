@@ -11,9 +11,19 @@ export interface AdoptionFilters {
 
 export const noAdoptionFilters: AdoptionFilters = { care: [], place: '' };
 
+/** "Para adoção" lists who still needs a home; "Adotados" lists the ones that found one. */
+export type AdoptionShelf = 'available' | 'adopted';
+
 /** Query string for GET /posts. The API ignores flags it does not know, so old servers list all. */
-export function adoptionQuery(filters: AdoptionFilters, cursor?: string): string {
-  const params = new URLSearchParams({ status: 'for_adoption', limit: '20' });
+export function adoptionQuery(
+  filters: AdoptionFilters,
+  cursor?: string,
+  shelf: AdoptionShelf = 'available',
+): string {
+  const params = new URLSearchParams({
+    status: shelf === 'adopted' ? 'adopted' : 'for_adoption',
+    limit: '20',
+  });
   if (filters.species) params.set('species', filters.species);
   if (filters.size) params.set('size', filters.size);
   if (filters.age) params.set('age', filters.age);
