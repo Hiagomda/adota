@@ -72,101 +72,105 @@ const sentryPlugin = {
   ...(process.env.SENTRY_PROJECT ? { project: process.env.SENTRY_PROJECT } : {}),
 };
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
-  name: 'Égua, adota!',
-  slug: 'egua',
-  scheme: 'egua',
-  version: release.version,
-  orientation: 'portrait',
-  icon: './assets/icon.png',
-  userInterfaceStyle: 'automatic',
-  ios: {
-    bundleIdentifier: 'app.egua.adota',
-    buildNumber: String(release.build),
-    supportsTablet: true,
-    infoPlist: {
-      NSLocationWhenInUseUsageDescription:
-        'Égua, adota! usa sua localização para indicar onde o animal está e para mostrar resgates perto de você.',
-      NSCameraUsageDescription:
-        'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
-      NSPhotoLibraryUsageDescription:
-        'Égua, adota! acessa suas fotos para você anexar imagens do animal ao resgate.',
-    },
-    ...(existsSync(googleServicesIos) ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
-  },
-  android: {
-    package: 'app.egua.adota',
-    versionCode: release.build,
-    adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#F3E8D2',
-      monochromeImage: './assets/adaptive-icon-mono.png',
-    },
-    predictiveBackGestureEnabled: false,
-    permissions: ['REQUEST_INSTALL_PACKAGES'],
-    ...(existsSync(googleServicesAndroid) ? { googleServicesFile: './google-services.json' } : {}),
-  },
-  web: {
-    bundler: 'metro',
-    favicon: './assets/favicon.png',
-  },
-  extra: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
-    downloadPageUrl:
-      process.env.EXPO_PUBLIC_DOWNLOAD_URL ??
-      'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io',
-    build: buildInfo,
-    eas: {
-      projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
-    },
-  },
-  plugins: [
-    'expo-router',
-    'expo-dev-client',
-    'expo-secure-store',
-    [
-      'expo-location',
-      {
-        locationWhenInUsePermission:
+export default ({ config }: ConfigContext): ExpoConfig =>
+  withCleartextTraffic({
+    ...config,
+    name: 'Égua, adota!',
+    slug: 'egua',
+    scheme: 'egua',
+    version: release.version,
+    orientation: 'portrait',
+    icon: './assets/icon.png',
+    userInterfaceStyle: 'automatic',
+    ios: {
+      bundleIdentifier: 'app.egua.adota',
+      buildNumber: String(release.build),
+      supportsTablet: true,
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
           'Égua, adota! usa sua localização para indicar onde o animal está e para mostrar resgates perto de você.',
-      },
-    ],
-    [
-      'expo-camera',
-      {
-        cameraPermission:
+        NSCameraUsageDescription:
           'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
-        recordAudioAndroid: false,
-      },
-    ],
-    [
-      'expo-image-picker',
-      {
-        photosPermission:
+        NSPhotoLibraryUsageDescription:
           'Égua, adota! acessa suas fotos para você anexar imagens do animal ao resgate.',
-        cameraPermission:
-          'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
       },
-    ],
-    'expo-notifications',
-    'expo-apple-authentication',
-    withCleartextTraffic,
-    ['@sentry/react-native/expo', sentryPlugin],
-    [
-      'expo-splash-screen',
-      {
+      ...(existsSync(googleServicesIos)
+        ? { googleServicesFile: './GoogleService-Info.plist' }
+        : {}),
+    },
+    android: {
+      package: 'app.egua.adota',
+      versionCode: release.build,
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#F3E8D2',
-        image: './assets/splash-icon.png',
-        imageWidth: 200,
-        dark: {
-          backgroundColor: '#173B3F',
-          image: './assets/splash-icon.png',
-        },
+        monochromeImage: './assets/adaptive-icon-mono.png',
       },
+      predictiveBackGestureEnabled: false,
+      permissions: ['REQUEST_INSTALL_PACKAGES'],
+      ...(existsSync(googleServicesAndroid)
+        ? { googleServicesFile: './google-services.json' }
+        : {}),
+    },
+    web: {
+      bundler: 'metro',
+      favicon: './assets/favicon.png',
+    },
+    extra: {
+      apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
+      downloadPageUrl:
+        process.env.EXPO_PUBLIC_DOWNLOAD_URL ??
+        'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io',
+      build: buildInfo,
+      eas: {
+        projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',
+      },
+    },
+    plugins: [
+      'expo-router',
+      'expo-dev-client',
+      'expo-secure-store',
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'Égua, adota! usa sua localização para indicar onde o animal está e para mostrar resgates perto de você.',
+        },
+      ],
+      [
+        'expo-camera',
+        {
+          cameraPermission:
+            'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
+          recordAudioAndroid: false,
+        },
+      ],
+      [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'Égua, adota! acessa suas fotos para você anexar imagens do animal ao resgate.',
+          cameraPermission:
+            'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
+        },
+      ],
+      'expo-notifications',
+      'expo-apple-authentication',
+      ['@sentry/react-native/expo', sentryPlugin],
+      [
+        'expo-splash-screen',
+        {
+          backgroundColor: '#F3E8D2',
+          image: './assets/splash-icon.png',
+          imageWidth: 200,
+          dark: {
+            backgroundColor: '#173B3F',
+            image: './assets/splash-icon.png',
+          },
+        },
+      ],
     ],
-  ],
-  experiments: {
-    typedRoutes: true,
-  },
-});
+    experiments: {
+      typedRoutes: true,
+    },
+  });
