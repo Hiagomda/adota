@@ -16,6 +16,7 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  IconButton,
   ListItem,
   Notice,
   SectionHeader,
@@ -36,6 +37,7 @@ interface Profile {
   avatarUrl?: string | null;
   verified: boolean;
   role: string;
+  city?: string | null;
   counts: {
     posts: number;
     helped: number;
@@ -56,6 +58,7 @@ export default function UserScreen() {
   const client = useQueryClient();
   const [note, setNote] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const profile = useQuery({
     queryKey: ['user', handle],
     queryFn: () => api<Profile>(`/users/${handle}`, { token }),
@@ -147,6 +150,11 @@ export default function UserScreen() {
                 <AppText variant="h1" numberOfLines={2}>
                   {person.name}
                 </AppText>
+                {person.city ? (
+                  <AppText variant="bodySmall" color="textSecondary">
+                    {person.city}
+                  </AppText>
+                ) : null}
                 {person.verified ? <Badge kind="label" label="Verificado" tone="primary" /> : null}
               </View>
             </View>
@@ -171,14 +179,15 @@ export default function UserScreen() {
                 icon={person.following ? 'check' : 'user-plus'}
                 variant={person.following ? 'outline' : 'primary'}
                 onPress={() => void toggleFollow()}
+                style={styles.follow}
               />
-              <Button
-                title="Denunciar"
-                icon="flag"
-                variant="ghost"
-                onPress={() => setReportOpen(true)}
+              {/* Report and block are rare and heavy: they live behind one quiet button. */}
+              <IconButton
+                icon="more-horizontal"
+                variant="tonal"
+                accessibilityLabel="Mais opções: denunciar ou bloquear"
+                onPress={() => setMenuOpen(true)}
               />
-              <Button title="Bloquear" icon="slash" variant="ghost" onPress={() => void block()} />
             </View>
             {note ? (
               <View style={styles.note}>
@@ -271,6 +280,26 @@ export default function UserScreen() {
           </>
         )}
       </ScrollView>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Opções">
+        <ListItem
+          title="Denunciar perfil"
+          icon="flag"
+          showChevron
+          onPress={() => {
+            setMenuOpen(false);
+            setReportOpen(true);
+          }}
+        />
+        <ListItem
+          title="Bloquear"
+          subtitle="Você deixa de ver as publicações desta pessoa"
+          icon="slash"
+          onPress={() => {
+            setMenuOpen(false);
+            void block();
+          }}
+        />
+      </BottomSheet>
       <BottomSheet
         visible={reportOpen}
         onClose={() => setReportOpen(false)}
@@ -316,16 +345,17 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
   actions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.lg,
   },
+  follow: { flex: 1 },
   note: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  // The 1 px inset on each cell draws thin lines between the photos.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 1 },
   block: { gap: spacing.sm, paddingBottom: spacing.md },
   rail: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm },
-  cell: { width: '33.33%', aspectRatio: 1 },
+  cell: { width: '33.33%', aspectRatio: 1, padding: 1 },
   cellFill: { flex: 1 },
   image: { width: '100%', height: '100%' },
 });
