@@ -43,3 +43,6 @@ yarn-error.*
 # Firebase config downloaded from the console. Do not commit.
 google-services.json
 GoogleService-Info.plist
+
+# Private upload key: keep it outside the repo.
+*.keystore
