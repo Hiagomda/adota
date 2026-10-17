@@ -1,10 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 24,
+  "androidVersionCode": 25,
   "notes": [
-    "O feed e as outras telas voltaram a carregar e atualizar.",
-    "Fotos de perfil e dos animais aparecem de novo.",
-    "Entrar com Google e com e-mail funciona.",
-    "O mapa busca os resgates sozinho quando você arrasta ou dá zoom."
+    "Feed mais claro: cada resgate mostra se está a caminho, não encontrado ou resgatado.",
+    "Urgentes mostram o bairro e a distância.",
+    "Perfil mais limpo: seguir em destaque, denunciar e bloquear no menu ⋯.",
+    "Feed, fotos e login funcionando."
   ]
 }
