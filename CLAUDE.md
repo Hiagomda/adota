@@ -53,13 +53,17 @@ Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não r
 1. Lint/typecheck/testes relevantes (API: unidade; integração só com Docker e aviso de TRUNCATE).
 2. Em `apps/mobile/version.json`: suba `build` e escreva 2–4 `notes` em pt-BR (o que o aviso de update mostra).
 3. `pnpm --filter @patinha/mobile version:bump` **ou** edite o JSON e rode `node apps/mobile/scripts/bump-build.mjs --sync` depois na árvore de compile.
-4. Rode também o que grava a página: `node apps/mobile/scripts/bump-build.mjs --publish` (atualiza `download/version.json` com o mesmo `version` / `androidVersionCode` / `notes`).
+4. Rode também o que grava a página: `node apps/mobile/scripts/bump-build.mjs --publish` (atualiza `download/version.json` com o mesmo `version` / `androidVersionCode` / `notes`). Atenção: o `--publish` **também sobe o build** em 1. Caminho simples: escreva as `notes` novas com o build **atual** e rode só o `--publish`; confira que os dois JSON ficaram com o mesmo número.
 5. Em `docker/download.Dockerfile`, `ARG APK_URL=` → `https://github.com/Hiagomda/adota/releases/download/apk-<version>-<build>/egua-adota.apk` (ex.: `apk-0.1.0-22`).
 6. Commit Conventional Commits em português + push em **`master`** (`origin` = `Hiagomda/adota`). Auto-review pode bloquear push: peça aprovação nativa e repita o mesmo `git push`.
 
 ### 2. Sincronizar e compilar o APK
 
 **Caminho preferido:** Actions → **Compilar APK** → Run workflow (marque `publish` para criar o release `apk-<version>-<build>`). Compila numa máquina limpa com o secret `MOBILE_ENV`, roda `apps/mobile/scripts/check-apk.mjs` (chaves gravadas, HTTP no manifest, versionCode, assinatura igual a `vars.EXPECTED_SIGNER_SHA256`, API no ar) e substitui os passos 2 e 3 abaixo. O compilado no PC fica para emergência; nele também rode `pnpm --filter @patinha/mobile apk:check <apk>` antes do release e use `SENTRY_DISABLE_AUTO_UPLOAD=true` se o prebuild religar o envio ao Sentry.
+
+- Disparar sem o navegador: `POST /repos/Hiagomda/adota/actions/workflows/build-apk.yml/dispatches` com `{"ref":"master","inputs":{"publish":true}}`, token via `git credential fill` num script temporário (mesma regra do passo 3). Leva ~15 min.
+- O secret `MOBILE_ENV` é o `.env` inteiro do app. O GitHub não mostra o valor salvo e o _Update_ **substitui tudo**: a cópia completa está em `C:devegua-adotaappsmobile.env`. O agente não escreve secrets; o Hiago cola.
+- `EXPO_PUBLIC_SENTRY_DSN` é obrigatório no release (trava no `app.config.ts` e no `check-apk`), junto com API, download, Firebase e Google.
 
 1. Robocopy OneDrive → `C:\dev\egua-adota` com `/E`, **excluindo** `android`, `node_modules`, `.expo`, `.git`, `.env`. **Nunca** `/MIR`.
 2. Não rode `pnpm install` completo. Se `@patinha/shared` quebrar o tsc, `pnpm --filter @patinha/shared build` na árvore de compile.
@@ -89,7 +93,7 @@ $env:TEMP = "C:\Temp"; $env:TMP = "C:\Temp"
 
 - Painel: `http://painel.86.48.25.233.sslip.io:8000` (não o IP cru — Kaspersky bloqueia). App: `adota:master-…` / id `fpmewu0com3qkbfihrsihc6y`.
 - Compose: `docker-compose.coolify.yml`. Ao subir: API faz `db:migrate` + `db:seed` (`SEED_IF_EMPTY`) + `start`; o serviço `download` rebuilda com o `APK_URL` e copia `version.json` + APK.
-- Clique no **Deploy do cabeçalho** (`wire:click=deploy` / botão roxo), **não** no "Deploy" da sidebar (só expande seção). Não clique Log out, Cancel, Danger Zone, nem upgrade do Coolify. Não toque MetalRiff, chatbot, teste-AtivaFacil.
+- Clique no **Deploy do cabeçalho** (`wire:click=deploy` / botão roxo, ao lado de "More actions"), **não** no "Deploy" da sidebar (só expande seção). O clique às vezes não pega: confira no histórico (`…/application/fpmewu0com3qkbfihrsihc6y/deployment`) uma linha "In progress" antes de esperar; na página `/deployment` o botão do cabeçalho funcionou. Não clique Log out, Cancel, Danger Zone, nem upgrade do Coolify. Não toque MetalRiff, chatbot, teste-AtivaFacil.
 - Websocket "Cannot connect to real-time service" é normal; o deploy ainda roda — acompanhe Deployment Logs / histórico.
 - Auto-review pode bloquear o clique: peça aprovação e repita o **mesmo** clique.
 
@@ -158,3 +162,12 @@ download/                     página de download servida pelo container `downlo
 - Typed routes: rotas novas só existem para o `tsc` depois de regenerar `.expo/types`.
 - Prévia web (`npx expo start --web`, com a API local e `EXPO_PUBLIC_API_URL=http://localhost:3010`): módulo nativo importado direto derruba o bundle inteiro, então ele precisa de variante `.web.ts(x)` (ex.: `googleNative.web.ts`, `MapCanvas.web.tsx`). No web não existe `Image.resolveAssetSource`. Login de teste: `sessionStorage["egua-token"] = "dev:<email do seed>"`.
 - MapLibre no New Architecture: os eventos de localização dele derrubavam o app em release. O patch em `patches/` corrige isso; não atualize o MapLibre sem testar um APK de release.
+- MapLibre `setCamera` vira a prop nativa `stop` via `setNativeProps`, e o Fabric guarda essas props e pode reaplicá-las depois: o mapa voltava sozinho para o primeiro centro. O `MapCanvas` regrava o `stop` com a vista onde a pessoa parou (`lastStop`) e a `<Camera>` só recebe props constantes (nada de objeto literal no JSX). Não volte a mover a câmera por props declarativas.
+- Patas do mapa: `explore.tsx` acumula as já carregadas (`src/map/knownPaws.ts`, `mergePaws`) em vez de trocar a lista a cada arrasto, que fazia patas piscarem. Os marcadores (gota na cor da urgência com patinha) saem de `apps/mobile/scripts/paw-pins.mjs` (usa o `sharp` hoistado; rode em `C:devegua-adota`); a ponta é o ponto do animal (`iconAnchor: 'bottom'`).
+- GitHub Actions: o heap padrão do prebuild estourou ("Java heap space"); o workflow passa `-Xmx6g` ao Gradle.
+- Sentry: org `hiago-uq`, projeto `react-native`, plano grátis. O app manda erros desde o build 28. Sem `SENTRY_AUTH_TOKEN` os source maps não sobem (stack em código compilado) e o agente não lê o Sentry: o Hiago repassa o link do erro.
+
+## Onde paramos (17/10/2026)
+
+- No ar: build 30 (marcador de gota). Build 29 trouxe a correção da câmera e das patas piscando; falta o Hiago confirmar no celular. Se o mapa ainda voltar sozinho, pergunte em que momento (ao abrir, depois de tocar numa pata, ao voltar de outra tela).
+- Roteiro combinado, em ordem: (2) observabilidade — falta o token do Sentry para source maps e logs da API; (3) domínio próprio + HTTPS (o Hiago precisa comprar o domínio; mudar o host quebra APKs antigos, então planejar transição); (4) trocar a keystore de debug por uma chave privada (exige reinstalação, campanha no app e SHA novo no Firebase); (5) produto: fluxo de adoção ponta a ponta, cadastro de ONG, compartilhar por WhatsApp, push por proximidade; (6) design: perfil próprio, Criar, chat, mapa, tema claro, estados vazios.
