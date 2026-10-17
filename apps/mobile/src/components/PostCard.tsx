@@ -75,7 +75,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
   const comments =
     post.counts.comments === 1 ? '1 comentário' : `${post.counts.comments} comentários`;
   const placeLine = away ? `${neighborhoodOf(post.approxLabel)} · ${away}` : post.approxLabel;
-  // Open and urgent reads like a story nobody answered yet: the warm ring around the author.
+  // Aberto e urgente é como um story que ninguém atendeu ainda: o anel quente em volta do autor.
   const ring = post.status === 'open' && post.urgency === 'high' ? 'story' : undefined;
 
   function share() {
@@ -92,7 +92,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
       entering={FadeIn.duration(duration(motion.slow))}
       style={[styles.card, { borderBottomColor: colors.border }]}
     >
-      {/* Header in the style of a social feed: who posted, where, and how things stand. */}
+      {/* Cabeçalho no estilo de feed social: quem postou, onde, e como está o resgate. */}
       <View style={styles.head}>
         <Touchable
           accessibilityRole="button"
@@ -117,7 +117,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
             </AppText>
           </View>
         </Touchable>
-        {/* Urgency only matters while nobody has the animal yet. */}
+        {/* A urgência só importa enquanto ninguém está com o animal. */}
         {post.status === 'open' ? (
           <StatusPill urgency={post.urgency} />
         ) : (
@@ -302,7 +302,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
 });
 
 const styles = StyleSheet.create({
-  // Edge to edge like a social feed: no side margin, a thin line between posts.
+  // De ponta a ponta como num feed social: sem margem lateral, uma linha fina entre os posts.
   card: { paddingBottom: spacing.lg, marginBottom: spacing.sm, borderBottomWidth: 1 },
   head: {
     flexDirection: 'row',
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  // The author's name gives way first; the status pill always shows in full.
+  // O nome do autor encolhe primeiro; a pílula de status sempre aparece inteira.
   author: {
     flex: 1,
     flexDirection: 'row',
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
     paddingTop: spacing.xs,
   },
-  // 44 px targets around the 26 px icons.
+  // Alvos de 44 px em volta dos ícones de 26 px.
   action: {
     alignItems: 'center',
     justifyContent: 'center',

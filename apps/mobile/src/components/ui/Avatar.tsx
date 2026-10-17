@@ -10,8 +10,8 @@ export interface AvatarProps {
   uri?: string | null;
   size?: keyof typeof sizeTokens.avatar;
   /**
-   * Colored ring: red for an urgent rescue, white over the turquoise header, `story` is the
-   * warm gradient of a story not seen yet and `seen` the gray one after it was opened.
+   * Anel colorido: vermelho para resgate urgente, branco sobre o cabeçalho turquesa, `story` é o
+   * degradê quente de um story ainda não visto e `seen` o cinza depois de aberto.
    */
   ring?: 'urgent' | 'light' | 'story' | 'seen';
   verified?: boolean;
@@ -22,7 +22,7 @@ export function Avatar({ name, uri, size = 'md', ring, verified = false }: Avata
   const dimension = sizeTokens.avatar[size];
   const circle = { width: dimension, height: dimension, borderRadius: radius.pill };
   const badge = Math.max(16, Math.round(dimension * 0.34));
-  // Gradient rings are drawn by an Svg behind the photo; the flat ones are a plain border.
+  // Os anéis em degradê são desenhados por um Svg atrás da foto; os lisos são uma borda simples.
   const drawn = ring === 'story' || ring === 'seen';
   const outer = dimension + (ring ? 8 : 0);
   const stroke = ring === 'story' ? 2.5 : 1.5;
@@ -103,7 +103,7 @@ export function Avatar({ name, uri, size = 'md', ring, verified = false }: Avata
 
 const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%' },
-  // Room between the gradient ring and the photo, like a story bubble.
+  // Espaço entre o anel em degradê e a foto, como uma bolha de story.
   drawn: { padding: 4 },
   letter: { alignItems: 'center', justifyContent: 'center' },
   verified: {

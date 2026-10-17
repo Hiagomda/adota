@@ -19,7 +19,7 @@ import { Touchable } from './Touchable';
 export interface HeroSlide {
   id: string;
   photoUri?: string | null;
-  /** Small label over the title, like "Para adoção". */
+  /** Etiqueta pequena acima do título, como "Para adoção". */
   tag: string;
   title: string;
   subtitle?: string;
@@ -31,13 +31,13 @@ export interface HeroCarouselProps {
   onOpen: (id: string) => void;
 }
 
-/** Time each slide stays before the next one comes in. */
+/** Tempo que cada destaque fica antes de o próximo entrar. */
 const ADVANCE_MS = 6000;
 
 /**
- * Full-width banner that pages sideways, in the style of streaming apps: a big photo, a strong
- * gradient at the bottom with the name, and a button. It advances alone until the person touches
- * it, and never under a screen reader.
+ * Banner de largura total que pagina para o lado, no estilo dos apps de streaming: foto grande,
+ * degradê forte embaixo com o nome e um botão. Passa sozinho até a pessoa tocar nele, e nunca
+ * com leitor de tela ligado.
  */
 export function HeroCarousel({ slides, actionLabel, onOpen }: HeroCarouselProps) {
   const { colors } = useTheme();
@@ -47,11 +47,11 @@ export function HeroCarousel({ slides, actionLabel, onOpen }: HeroCarouselProps)
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [touched, setTouched] = useState(false);
-  // Reduced motion turns durations to zero: then the banner stays put too.
+  // Movimento reduzido zera as durações: aí o banner também fica parado.
   const still = duration(motion.base) === 0;
   const count = slides.length;
 
-  // The list can shrink after a refresh: past the end means back to the first slide.
+  // A lista pode encolher depois de atualizar: passou do fim, volta ao primeiro destaque.
   const current = index < count ? index : 0;
 
   useEffect(() => {
@@ -91,30 +91,32 @@ export function HeroCarousel({ slides, actionLabel, onOpen }: HeroCarouselProps)
           onMomentumScrollEnd={onSettle}
         >
           {slides.map((slide, position) => (
-            <Touchable
-              key={slide.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${slide.tag}: ${slide.title}${slide.subtitle ? `, ${slide.subtitle}` : ''}. Destaque ${position + 1} de ${count}`}
-              pressedScale={0.99}
-              onPress={() => onOpen(slide.id)}
-              style={{ width, height: size.homeFeature }}
-            >
-              {slide.photoUri ? (
-                <Image
-                  source={{ uri: slide.photoUri }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  transition={motion.base}
-                  cachePolicy="memory-disk"
-                  recyclingKey={slide.id}
-                />
-              ) : (
-                <View style={[styles.empty, { backgroundColor: colors.surfaceMuted }]}>
-                  <Icon name="camera" size="xl" color={colors.textDisabled} />
-                </View>
-              )}
-              <PhotoScrim edge="top" stop={0.75} />
-              <PhotoScrim stop={0.3} />
+            <View key={slide.id} style={{ width, height: size.homeFeature }}>
+              {/* Foto e botão são irmãos: botão dentro de botão quebra no web. */}
+              <Touchable
+                accessibilityRole="button"
+                accessibilityLabel={`${slide.tag}: ${slide.title}${slide.subtitle ? `, ${slide.subtitle}` : ''}. Destaque ${position + 1} de ${count}`}
+                pressedScale={0.99}
+                onPress={() => onOpen(slide.id)}
+                style={StyleSheet.absoluteFill}
+              >
+                {slide.photoUri ? (
+                  <Image
+                    source={{ uri: slide.photoUri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={motion.base}
+                    cachePolicy="memory-disk"
+                    recyclingKey={slide.id}
+                  />
+                ) : (
+                  <View style={[styles.empty, { backgroundColor: colors.surfaceMuted }]}>
+                    <Icon name="camera" size="xl" color={colors.textDisabled} />
+                  </View>
+                )}
+                <PhotoScrim edge="top" stop={0.75} />
+                <PhotoScrim stop={0.3} />
+              </Touchable>
               <View style={styles.copy} pointerEvents="box-none">
                 <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
                   <AppText variant="caption" style={{ color: colors.onSecondary }}>
@@ -137,7 +139,7 @@ export function HeroCarousel({ slides, actionLabel, onOpen }: HeroCarouselProps)
                   <Button title={actionLabel} icon="heart" onPress={() => onOpen(slide.id)} />
                 </View>
               </View>
-            </Touchable>
+            </View>
           ))}
         </ScrollView>
       ) : null}

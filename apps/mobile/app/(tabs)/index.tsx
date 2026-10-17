@@ -40,12 +40,12 @@ import { Mascot } from '../../src/mascot';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
-/** How many adoption animals take turns on the banner at the top. */
+/** Quantos animais para adoção se revezam no banner do topo. */
 const HERO_SLIDES = 5;
-/** "Perto de mim agora": how far the urgent strip looks first. */
+/** "Perto de mim agora": até onde a faixa de urgentes procura primeiro. */
 const NEARBY_KM = 2;
 
-/** Rounds the phone's point to about 100 m, so the nearby query is not redone on every GPS tick. */
+/** Arredonda o ponto do celular para uns 100 m, para a busca de perto não refazer a cada leitura do GPS. */
 function nearbyKey(here: DeviceFix | null): string | null {
   if (!here) return null;
   return `${here.latitude.toFixed(3)},${here.longitude.toFixed(3)}`;
@@ -103,7 +103,7 @@ const Stories = memo(function Stories({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.stories}
       >
-        {/* First bubble is always "your rescue", like the "your story" of social apps. */}
+        {/* A primeira bolha é sempre "Publicar", como o "Seu story" dos apps sociais. */}
         <Touchable
           accessibilityRole="button"
           accessibilityLabel="Publicar um resgate"
@@ -162,14 +162,14 @@ const Stories = memo(function Stories({
   );
 });
 
-/** Subtitle of a poster: neighborhood and age band, like the year and genre of a title. */
+/** Subtítulo do pôster: bairro e faixa de idade, como o ano e o gênero de um título. */
 function posterSubtitle(post: Post): string {
   const band = ageBandOf(post.animal.ageEstimate);
   const age = band ? ageBands.find((item) => item.value === band)?.label : null;
   return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
 }
 
-/** Row of adoption posters that scrolls sideways, in the style of streaming catalogs. */
+/** Fileira de pôsteres de adoção que rola para o lado, no estilo dos catálogos de streaming. */
 const PosterRail = memo(function PosterRail({
   title,
   subtitle,
@@ -276,7 +276,7 @@ export default function HomeScreen() {
   });
 
   const keep = useCallback((post: Post) => matchesLens(post, lens, seek), [lens, seek]);
-  // Close ones first when there are any; otherwise every urgent rescue in Belém.
+  // Os de perto primeiro, quando houver; senão, todo resgate urgente de Belém.
   const closePosts = (nearbyStories.data?.posts ?? emptyPosts)
     .filter((post) => !post.helpRequest && keep(post))
     .sort((a, b) =>
@@ -300,7 +300,7 @@ export default function HomeScreen() {
     title: animalHeadline(post.animal),
     subtitle: posterSubtitle(post),
   }));
-  // The dogs rail picks up after the banner, so the same faces do not repeat right below it.
+  // A fileira de cães começa depois do banner, para as mesmas carinhas não se repetirem logo abaixo.
   const dogPosts = adoptionPosts.filter((post) => post.animal.species === 'dog');
   const dogRail = dogPosts.length > HERO_SLIDES ? dogPosts.slice(HERO_SLIDES) : dogPosts;
   const catRail = (adoptionCats.data?.posts ?? emptyPosts).filter((post) => keep(post));
@@ -416,7 +416,7 @@ export default function HomeScreen() {
   const header = (
     <View>
       <View style={[styles.mast, { paddingTop: insets.top + spacing.xs }]}>
-        {/* Top bar like a social app: the name of the app on the left, quick actions on the right. */}
+        {/* Barra do topo como num app social: o nome do app à esquerda, ações rápidas à direita. */}
         <View style={styles.mastRow}>
           <Mascot pose="wave" size={size.avatar.md} />
           <View style={styles.heroText}>
@@ -470,7 +470,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Shortcuts to their own screens, like the categories of a catalog. */}
+      {/* Atalhos para as telas próprias, como as categorias de um catálogo. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -492,13 +492,13 @@ export default function HomeScreen() {
             <HeroCarousel slides={heroSlides} actionLabel="Quero conhecer" onOpen={openPost} />
           </View>
           <PosterRail
-            title="Cães esperando um lar"
+            title="Cães para adotar"
             posts={dogRail}
             loading={adoption.isLoading}
             onSeeAll={() => router.push('/adocao')}
           />
           <PosterRail
-            title="Gatos esperando um lar"
+            title="Gatos para adotar"
             posts={catRail}
             loading={adoptionCats.isLoading}
             onSeeAll={() => router.push('/adocao')}
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   mastRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroText: { flex: 1 },
   unread: { position: 'absolute', top: spacing.xs, right: spacing.xs },
-  // Vertical padding keeps the chips' 4 px hit slop inside the scroll view.
+  // O respiro vertical mantém a área de toque extra de 4 px dos chips dentro da rolagem.
   chips: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
@@ -623,5 +623,5 @@ const styles = StyleSheet.create({
   storyLine: { textAlign: 'center' },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
