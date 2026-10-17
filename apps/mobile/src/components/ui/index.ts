@@ -18,6 +18,7 @@ export { FloatingField, type FloatingFieldProps } from './FloatingField';
 export { FavoriteButton, type FavoriteButtonProps } from './FavoriteButton';
 export { FloatingTabBar } from './FloatingTabBar';
 export { Header, type HeaderProps } from './Header';
+export { HeroCarousel, type HeroCarouselProps, type HeroSlide } from './HeroCarousel';
 export { HeroSurface, type HeroSurfaceProps } from './HeroSurface';
 export { Icon, type IconName, type IconSize } from './Icon';
 export { IconButton } from './IconButton';
