@@ -32,7 +32,7 @@ export function StatusPill(props: StatusPillProps) {
   return (
     <View style={[styles.pill, { backgroundColor: background }]}>
       <View style={[styles.dot, { backgroundColor: foreground }]} />
-      <AppText variant="caption" style={{ color: foreground }}>
+      <AppText variant="caption" numberOfLines={1} style={{ color: foreground }}>
         {label}
       </AppText>
     </View>
@@ -48,6 +48,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
+    // In a crowded row the pill keeps its label whole and the neighbors shrink instead.
+    flexShrink: 0,
   },
   dot: { width: 6, height: 6, borderRadius: radius.pill },
 });

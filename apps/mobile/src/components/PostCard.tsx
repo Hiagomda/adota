@@ -258,14 +258,15 @@ const styles = StyleSheet.create({
   shadow: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, borderRadius: radius.xl },
   card: { borderRadius: radius.xl, overflow: 'hidden', paddingBottom: spacing.lg },
   photoFrame: { width: '100%', aspectRatio: 4 / 5 },
+  // The author's name gives way first; the status pill always shows in full.
   authorChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    maxWidth: '70%',
     minHeight: 44,
   },
-  overlayMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  overlayMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 },
   photo: { width: '100%', height: '100%' },
   photoEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   overlay: {
