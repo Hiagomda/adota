@@ -1,8 +1,8 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 28,
+  "androidVersionCode": 29,
   "notes": [
-    "Quando algo dá errado no app, a equipe fica sabendo na hora e corrige mais rápido.",
-    "Nada pessoal vai junto: nem telefone, nem e-mail."
+    "O mapa não volta mais sozinho para a sua localização: fica onde você deixou.",
+    "As patas não piscam nem somem quando você arrasta o mapa."
   ]
 }

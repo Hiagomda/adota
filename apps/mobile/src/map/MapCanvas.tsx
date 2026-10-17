@@ -60,20 +60,25 @@ const cameraBounds = {
   sw: [serviceCamera.west, serviceCamera.south] as [number, number],
 };
 
+// Constante de módulo: um objeto novo a cada render faria a <Camera> renderizar de novo.
+const defaultCamera = { centerCoordinate: belem, zoomLevel: 12 };
+
 const PUCK_DISTANCE_M = 25;
+/** Menos que isso (em graus, ~1 m) é a mesma vista; não vale gravar de novo. */
+const SAME_SPOT_DEG = 0.00001;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
 
-// Tile cancels are normal while the camera moves. Logging each one freezes the JS thread.
+// Cancelar tiles é normal enquanto a câmera anda. Registrar cada um trava a thread do JS.
 Logger.setLogCallback((log) => {
   const canceled = log.tag === 'Mbgl-HttpRequest' && log.message.includes('Canceled');
   return canceled || log.level === 'info' || log.level === 'debug' || log.level === 'verbose';
 });
 
 /**
- * The blue dot. Kept apart from the camera: location ticks update this marker only.
- * `animated` stays off because AnimatedPoint crashes React Native 0.86, and the view
- * is never unmounted while the screen is alive (hiding it is what `visible` does).
+ * O ponto azul. Fica separado da câmera: cada nova posição só atualiza este marcador.
+ * `animated` fica desligado porque o AnimatedPoint derruba o React Native 0.86, e a view
+ * nunca sai da árvore enquanto a tela vive (esconder é papel do `visible`).
  */
 const UserPuck = memo(function UserPuck({ visible }: { visible: boolean }) {
   return <UserLocation visible={visible} animated={false} minDisplacement={PUCK_DISTANCE_M} />;
@@ -92,14 +97,14 @@ export function MapCanvas({
   posts: Post[];
   selectedId: string | null;
   tracking: boolean;
-  /** Space left for the tab bar, or for the selected-animal card when it is open. */
+  /** Espaço da barra de abas, ou do card do animal selecionado quando ele está aberto. */
   controlsBottom: number;
   onSelect: (post: Post) => void;
-  /** Tap on the map, away from a paw, closes the selected card. */
+  /** Toque no mapa, fora de uma pata, fecha o card selecionado. */
   onDismiss?: () => void;
-  /** Called when the camera settles on an area, so the paws for that view can load. */
+  /** Chamado quando a câmera para numa área, para carregar as patas dessa vista. */
   onCommitBounds?: (bounds: MapBounds, origin: BoundsOrigin) => void;
-  /** Opens the camera on this pin, ahead of the GPS center. */
+  /** Abre a câmera neste pino, antes do centro pelo GPS. */
   focus?: LngLat | null;
 }) {
   const { colors, shadows } = useTheme();
@@ -114,20 +119,26 @@ export function MapCanvas({
   const [attempt, setAttempt] = useState(0);
   const [styleReady, setStyleReady] = useState(false);
   const [sprite, setSprite] = useState(0);
-  // Pins mount a beat after each sprite so MapLibre has the paw images before it draws them.
+  // As patas montam um instante depois de cada sprite, para o MapLibre ter as imagens antes de desenhar.
   const [pinsSprite, setPinsSprite] = useState<number | null>(null);
   const pinsReady = styleReady && pinsSprite === sprite;
   const focusRef = useRef(focus);
   const trackingRef = useRef(tracking);
   const landed = useRef(false);
   const lastKick = useRef(0);
-  /** Our own camera moves are reported as user gestures on Android. Ignore those. */
+  /** No Android, os movimentos do próprio app chegam como gesto da pessoa. Estes são ignorados. */
   const programmaticUntil = useRef(Number.POSITIVE_INFINITY);
   const opened = useRef(false);
   const committed = useRef<MapBounds | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** A gesture anywhere in the debounce window makes the settled area the person's choice. */
+  /** Um gesto dentro da janela de espera faz da área onde o mapa parou uma escolha da pessoa. */
   const userMoved = useRef(false);
+  /**
+   * Último destino gravado na câmera nativa. O setCamera do MapLibre vira prop nativa (`stop`) e,
+   * na New Architecture, o Android pode reaplicá-la depois sem ninguém pedir: era isso que puxava
+   * o mapa de volta para a pessoa. Por isso o destino gravado acompanha onde a pessoa deixou o mapa.
+   */
+  const lastStop = useRef<{ center: LngLat; zoom: number } | null>(null);
 
   useEffect(() => {
     commitRef.current = onCommitBounds;
@@ -162,6 +173,7 @@ export function MapCanvas({
     policy.current = step.state;
     if (step.move) {
       programmaticUntil.current = Date.now() + 1000;
+      lastStop.current = { center: step.move.center, zoom: step.move.zoom };
       camera.current?.setCamera({
         centerCoordinate: step.move.center,
         zoomLevel: step.move.zoom,
@@ -202,8 +214,8 @@ export function MapCanvas({
           got = true;
           setGps('ready');
           const point: LngLat = [fix.longitude, fix.latitude];
-          // A pin asked for by "Ver no mapa" wins over the first center, but only until it is on
-          // screen: later fixes must not pull the camera back to it.
+          // Um pino pedido por "Ver no mapa" vence o primeiro centro, mas só até aparecer na tela:
+          // posições seguintes não podem puxar a câmera de volta para ele.
           const pending = focusRef.current;
           if (pending && !landed.current) apply({ type: 'pin', point: pending });
           apply({
@@ -234,8 +246,8 @@ export function MapCanvas({
     };
   }, [apply, attempt]);
 
-  // setCamera before the style exists, or while this tab is frozen, is ignored.
-  // The default center is Belém, so keep trying once the map is actually on screen.
+  // setCamera antes do estilo existir, ou com a aba congelada, é ignorado.
+  // O centro padrão é Belém, então insiste quando o mapa estiver de fato na tela.
   useEffect(() => {
     landed.current = false;
   }, [focus]);
@@ -268,8 +280,8 @@ export function MapCanvas({
     apply({ type: 'pin', point: [post.location.longitude, post.location.latitude] });
   }, [apply, posts, selectedId]);
 
-  // Same paw data must keep the same GeoJSON object. A fresh array on every
-  // parent render blanks the icons on Android until the style draws them again.
+  // Os mesmos dados de patas precisam manter o mesmo objeto GeoJSON. Um array novo a cada
+  // render do pai apaga os ícones no Android até o estilo desenhá-los de novo.
   const pinKey = posts
     .map(
       (post) =>
@@ -290,7 +302,7 @@ export function MapCanvas({
         },
       })),
     }),
-    // pinKey already lists every field drawn on the map.
+    // O pinKey já lista todos os campos desenhados no mapa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pinKey],
   );
@@ -315,11 +327,30 @@ export function MapCanvas({
       opened.current = true;
       if (fromUser) userMoved.current = true;
       apply({ type: 'region', bounds, fromUser });
+      // A câmera parou longe do último destino gravado (a pessoa arrastou ou deu zoom): grava a
+      // vista atual, sem animação, para que uma reaplicação do nativo caia aqui mesmo.
+      const center = event.geometry.coordinates as LngLat;
+      const zoom = event.properties.zoomLevel;
+      const stop = lastStop.current;
+      if (
+        stop &&
+        (Math.abs(stop.center[0] - center[0]) > SAME_SPOT_DEG ||
+          Math.abs(stop.center[1] - center[1]) > SAME_SPOT_DEG ||
+          Math.abs(stop.zoom - zoom) > 0.01)
+      ) {
+        lastStop.current = { center, zoom };
+        camera.current?.setCamera({
+          centerCoordinate: center,
+          zoomLevel: zoom,
+          animationDuration: 0,
+          animationMode: 'moveTo',
+        });
+      }
       const aim = focusRef.current;
       if (aim) {
         const framed = cameraFramesPoint(bounds, { longitude: aim[0], latitude: aim[1] });
         if (framed) landed.current = true;
-        else if (trackingRef.current && Date.now() > lastKick.current + 700) {
+        else if (!landed.current && trackingRef.current && Date.now() > lastKick.current + 700) {
           lastKick.current = Date.now();
           apply({ type: 'pin', point: aim });
         }
@@ -342,7 +373,7 @@ export function MapCanvas({
       if (typeof id !== 'string') return;
       const post = posts.find((item) => item.id === id);
       if (!post) return;
-      // The map press fires too. Mark this so that tap keeps the card open.
+      // O toque no mapa também dispara. A marca faz esse toque manter o card aberto.
       pressedPin.current = true;
       onSelect(post);
     },
@@ -403,8 +434,8 @@ export function MapCanvas({
         : 'Minha localização';
 
   return (
-    // Any touch on the map hands the camera to the person, even when Android does not flag the
-    // camera change as a user gesture.
+    // Qualquer toque no mapa entrega a câmera à pessoa, mesmo quando o Android não marca a
+    // mudança de câmera como gesto.
     <View style={styles.fill} onTouchStart={() => apply({ type: 'gesture' })}>
       <MapView
         style={styles.fill}
@@ -422,7 +453,7 @@ export function MapCanvas({
           ref={camera}
           minZoomLevel={8.5}
           maxBounds={cameraBounds}
-          defaultSettings={{ centerCoordinate: belem, zoomLevel: 12 }}
+          defaultSettings={defaultCamera}
         />
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer

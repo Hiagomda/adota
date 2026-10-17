@@ -17,11 +17,13 @@ import {
 import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { useMapAim } from '../../src/map/focusRequest';
+import { mergePaws } from '../../src/map/knownPaws';
 import { MapCanvas } from '../../src/map/MapCanvas';
 import { belemBounds, boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
+import type { Post } from '../../src/types';
 
 const speciesLabel: Record<string, string> = {
   dog: 'Cachorro',
@@ -29,14 +31,18 @@ const speciesLabel: Record<string, string> = {
   other: 'Outro',
 };
 
-// Distance between the selected card and the bottom of the map, so the tab bar never covers it.
+// Distância entre o card selecionado e a base do mapa, para a barra de abas nunca cobri-lo.
 const CARD_BOTTOM_OFFSET = spacing.giant + spacing.xxl;
 const PHOTO_WIDTH = 72;
 const PHOTO_HEIGHT = 90;
 const BANNER_MASCOT = 64;
 
-/** Animals still out in the city. Adopted and finished rescues leave the map. */
+/** Animais ainda na rua. Adotados e resgates encerrados saem do mapa. */
 const ON_MAP = new Set(['open', 'on_the_way', 'for_adoption']);
+
+function onMap(post: Post): boolean {
+  return post.type !== 'lost' && post.type !== 'help_request' && ON_MAP.has(post.status);
+}
 
 export default function ExploreScreen() {
   const { colors } = useTheme();
@@ -46,7 +52,7 @@ export default function ExploreScreen() {
   const token = useSession((state) => state.token);
   const here = useViewerLocation();
   const aim = useMapAim();
-  // Whatever the map shows once it settles, from the app or from the person's gesture, loads by itself.
+  // O que o mapa mostra quando para, por movimento do app ou gesto da pessoa, carrega sozinho.
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
@@ -76,13 +82,22 @@ export default function ExploreScreen() {
   }, [aim]);
   useEffect(() => {
     if (!focused || !aiming || !aim) return;
-    // If the camera never reports the pin, stop holding the feed on that box.
+    // Se a câmera nunca mostrar o pino, para de prender a busca naquela área.
     const timer = setTimeout(() => setFramedToken(aim.token), 5000);
     return () => clearTimeout(timer);
   }, [aim, aiming, focused]);
-  const posts = (feed.data?.posts ?? []).filter(
-    (post) => post.type !== 'lost' && post.type !== 'help_request' && ON_MAP.has(post.status),
-  );
+  const fetched = feed.data?.posts;
+  const inView = useMemo(() => (fetched ?? []).filter(onMap), [fetched]);
+  // O mapa acumula as patas já carregadas (ver mergePaws). Atualizado durante o render quando
+  // chega uma resposta nova, o padrão do React para estado derivado.
+  const [paws, setPaws] = useState(() => ({
+    from: fetched,
+    known: mergePaws(new Map<string, Post>(), fetched ?? [], onMap),
+  }));
+  if (paws.from !== fetched) {
+    setPaws({ from: fetched, known: mergePaws(paws.known, fetched ?? [], onMap) });
+  }
+  const posts = useMemo(() => [...paws.known.values()], [paws.known]);
   const selected = posts.find((post) => post.id === selection) ?? null;
   const openPost = useCallback(
     (id: string) => {
@@ -127,7 +142,7 @@ export default function ExploreScreen() {
         }}
         focus={focusPoint}
       />
-      {!selected && (feed.isError || posts.length === 0) ? (
+      {!selected && (feed.isError || inView.length === 0) ? (
         <Card
           padding="md"
           elevation="md"
@@ -244,5 +259,5 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
