@@ -1,55 +1,55 @@
 ---
-description: Local Android release APK on the Windows work PC. Do not use EAS. Read before touching Gradle, Expo prebuild, or the download page.
+description: Local Android release APK on the Windows work PC + how to publish it to the VPS. Do not use EAS. Read before Gradle, Expo prebuild, GitHub APK release, or Coolify deploy.
 alwaysApply: true
 ---
 
-# Android local build (Windows work PC)
+# Android local build + publish (Windows)
 
-The user (Hiago) forbade EAS / Expo cloud compile. Build with Android Studio on this PC.
+Hiago forbade EAS / Expo cloud. Compile release with Gradle on this PC, then put the APK on the download page via GitHub release + Coolify. Full agent playbook: `CLAUDE.md` → **Como publicar (APK + VPS)**.
 
-## Status (2026-10-07)
+## Trees
 
-- GitHub `master` is the source. The compile copy is `C:\egua` (short path). `apps/mobile/android` is gitignored CNG — do not commit it.
-- Gradle configured and CMake/JS **release** bundle ran. **No APK yet.** Expected file: `C:\egua\apps\mobile\android\app\build\outputs\apk\release\app-release.apk`.
-- The release JS bundle already contains the test API `http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`.
-- The APK on the VPS download page is still the **debug** ~287 MB file (dev-client launcher: asks for an HTTP URL). That is not the test app.
-- Do not compile with Expo. Do not start another EAS build.
+| Role | Path |
+| --- | --- |
+| Edit / git | OneDrive `…\Égua, adota!` |
+| Compile | `C:\dev\egua-adota` (preferred: has `android/` + hoisted `node_modules`). Fallback short tree: `C:\egua`. |
 
-## Why `C:\egua`
-
-Windows `CMAKE_OBJECT_PATH_MAX` is 250. Building from `C:\Users\hmaraujo\Desktop\adota` makes ninja fail (`manifest 'build.ninja' still dirty`). `subst` does not help (Node realpath expands it). Use the physical short tree `C:\egua` with **hoisted** `C:\egua\node_modules` (not `apps\mobile\node_modules\.pnpm`).
-
-Do not recursively delete `C:\adota` (partial bad copy). Do not copy `apps\mobile\node_modules`.
+Windows `CMAKE_OBJECT_PATH_MAX` is 250. Building from a long Desktop/OneDrive path breaks ninja. `subst` does not help. Never `/MIR` robocopy. Never copy `node_modules`. Do not commit `apps/mobile/android` (CNG, gitignored).
 
 ## pnpm
 
-Root `package.json` must use `packageManager: pnpm@9.15.9`. pnpm 10.18.2 cannot install this lockfile (`ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY` for `next@16.3.8` even though the key exists). `.npmrc` has `node-linker=hoisted`.
+Root `packageManager: pnpm@9.15.9`. pnpm 10 cannot install this lockfile. `.npmrc` has `node-linker=hoisted`. Do not run a full `pnpm install` on every ship — only rebuild `@patinha/shared` if `dist` was wiped by robocopy.
 
-## Android Studio
+## Sync before Gradle
 
-- Open **`C:\egua\apps\mobile\android`**, not the monorepo root.
-- **Gradle JDK / Version = 17** (`C:\Program Files\Java\jdk-17`). The Studio JBR is Java 25. Prefab then prints `WARNING: A restricted method in java.lang.System has been called` and AGP treats it as failure in `:react-native-worklets:configureCMake*`.
-- `gradle/gradle-daemon-jvm.properties` in the generated android tree must be `toolchainVersion=17` (Studio wrote 25). After changing Version to 17, add the foojay resolver in `settings.gradle` or Gradle asks for toolchain download repositories.
-- `org.gradle.java.home=C:\\Program Files\\Java\\jdk-17` in `gradle.properties`.
-- First sync failed on missing `android/build/generated/autolinking/autolinking.json`. Generate it with node (`expo-modules-autolinking react-native-config --platform android --json`) or the `app/build.gradle` fallback that runs that command when the file is empty.
-- Node: `C:\nvm4w\nodejs`. From `C:\egua\apps\mobile`, `require.resolve('react-native/package.json')` must be `C:\egua\node_modules\react-native\package.json`.
-- SDK: `%LOCALAPPDATA%\Android\Sdk`. NDK `27.1.12297006` is installed. Main manifest must have `android:usesCleartextTraffic="true"` (HTTP test API). `app.config.ts` already sets this for the next prebuild.
-- Release signing in the Expo template uses the **debug** keystore. If install fails, uninstall the debug app first.
-- Build **release** (`assembleRelease`), not debug. Prefer `-PreactNativeArchitectures=arm64-v8a` (quote it in PowerShell). Debug shows the Expo dev-client URL screen.
+1. Robocopy edit tree → compile tree `/E`, exclude `android`, `node_modules`, `.expo`, `.git`, `.env`.
+2. `node apps/mobile/scripts/bump-build.mjs --sync` so `android/app/build.gradle` `versionCode` matches `version.json`.
+3. Keep `apps/mobile/.env` on the compile tree (do not commit):
 
-## Env for the JS bundle
-
-Set before Metro/export embed:
-
-- `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io` (HTTP on purpose; API HTTPS is 503)
+- `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
 - `EXPO_PUBLIC_DOWNLOAD_URL=https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
 
-There may be `C:\egua\apps\mobile\.env` with those values. Do not commit `.env`.
+## Gradle
 
-## After the APK exists
+- Open / build under `…\apps\mobile\android`, not the monorepo root.
+- JDK **17** only. On this PC `org.gradle.java.home` points at Adoptium under `C:\Users\hiago\.gradle\jdks\…` (gitignored). Studio JBR 25 breaks Prefab/worklets.
+- Node: `C:\nvm4w\nodejs`. From `apps\mobile`, `require.resolve('react-native/package.json')` must resolve to the **hoisted** root `node_modules`.
+- SDK: `%LOCALAPPDATA%\Android\Sdk`. NDK `27.1.12297006`. Manifest needs `usesCleartextTraffic=true` (HTTP test API).
+- Release signing = debug keystore (Expo template). Uninstall old debug app if install fails.
+- **assembleRelease**, not debug. Quote `-PreactNativeArchitectures=arm64-v8a` in PowerShell.
+- Set `NODE_ENV=production` for the Gradle process (`NODE_ENV=test` from vitest breaks the release JS bundle). Prefer `GRADLE_USER_HOME=C:\Users\hiago\.gradle` and `TEMP`/`TMP=C:\Temp`.
 
-Put it on the download page. `docker/download-entrypoint.sh` copies `/opt/egua-adota.apk` over `/apk` on every start, so a volume-only copy is wiped on restart. Durable path: GitHub release + `docker/download.Dockerfile` `APK_URL` + Coolify redeploy. Do not bind another Caddy to 80/443. Do not touch Coolify projects MetalRiff, chatbot, or teste-AtivaFacil.
+Expected APK: `apps\mobile\android\app\build\outputs\apk\release\app-release.apk` (~80–90 MB). A ~287 MB debug APK that asks for a Metro URL is wrong.
+
+## After the APK
+
+1. Commit + push `master` with bumped `version.json`, `download/version.json`, and `docker/download.Dockerfile` `APK_URL` pointing at the new tag.
+2. GitHub release tag `apk-<version>-<build>`, asset filename **`egua-adota.apk`**. `gh` is not installed — use `git credential fill` + a temp Node script under `C:\Temp`; never print the token; delete the script after.
+3. Coolify Deploy on app `fpmewu0com3qkbfihrsihc6y` (header Deploy button, not the sidebar expander). Panel host: `painel.86.48.25.233.sslip.io:8000`. Do not touch MetalRiff, chatbot, teste-AtivaFacil; do not Cancel / Danger Zone / Coolify upgrade.
+4. Confirm live `https://download-…/version.json` has the new `androidVersionCode` before telling Hiago to reopen the app.
+
+Volume-only APK copies are wiped by `docker/download-entrypoint.sh` on every start. Durable path = GitHub release + Dockerfile `APK_URL` + Coolify rebuild.
 
 ## PowerShell
 
-No `&&`. Quote Gradle `-P` args. Use `curl.exe`, not the curl alias. Shell needs full permissions on this PC.
+No `&&`. Quote Gradle `-P` args. Use `curl.exe`. Shell needs full permissions on this PC.

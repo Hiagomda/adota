@@ -30,18 +30,84 @@ pnpm test                         # vitest (api, shared) + node:test (mobile)
 
 ## Build do APK e versão
 
-- Proibido EAS e build na nuvem da Expo. O APK de release é compilado no Android Studio a partir de `C:\egua` (caminho curto por causa do limite de 250 caracteres do CMake no Windows). O passo a passo está em `.cursor/rules/android-windows-build.mdc`.
-- A versão mora em `apps/mobile/version.json`. `pnpm --filter @patinha/mobile version:bump` sobe o build, e `version:publish` escreve `download/version.json`, que é o que o app compara para oferecer atualização.
+- Proibido EAS e build na nuvem da Expo. Detalhes de Gradle/JDK em `.cursor/rules/android-windows-build.mdc`.
+- A versão mora em `apps/mobile/version.json`. `pnpm --filter @patinha/mobile version:bump` sobe o build; `--sync` alinha o `android/app/build.gradle`; `version:publish` (ou `bump-build.mjs --publish`) escreve `download/version.json`, que é o que o app compara para oferecer atualização.
 - A atualização vem só da VPS: ao abrir, `startStartupUpdateCheck()` (primeira ação em `app/_layout.tsx`) lê `<download>/version.json` com timeout de 3 s e nunca bloqueia a abertura. Não existe OTA (`expo-updates` foi removido).
 - A versão e o build aparecem em Configurações, no perfil, em Suporte e na tela de erro (`src/diagnostics/VersionMark.tsx`).
 
-## Deploy (VPS com Coolify)
+## Como publicar (APK + VPS) — playbook do agente
 
-- O Coolify sobe `docker-compose.coolify.yml` a partir do GitHub (`master`). A API roda `db:migrate`, `db:seed` (com `SEED_IF_EMPTY=true` só remove conteúdo de demonstração) e `start` a cada boot.
-- Domínios fixos, todos em HTTP no sslip enquanto não há domínio próprio: `api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`, `imgproxy-…`, `minio-…` e `download-…` (este responde em HTTPS). O APK tem a URL da API embutida, então mudar esses hosts quebra os APKs instalados.
-- `docker-compose.prod.yml` + `deploy.yml` são o caminho antigo (Caddy em `/opt/patinha`) e não estão em uso.
-- `publish-download.yml` publica o APK do release `apk-<version>-<build>` lendo `download/version.json`.
-- Não mexa nos projetos MetalRiff, chatbot e teste-AtivaFacil do Coolify.
+Quando o Hiago disser **"suba tudo"** / **"ssuba"** / publicar APK+VPS, faça **nesta ordem**. Não pule o Coolify: sem redeploy o `version.json` fica no build antigo e o celular não vê atualização. Commit/push/release/deploy só com pedido explícito (ou essa frase).
+
+### Árvores neste PC
+
+| Papel              | Caminho                                                                                                                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Edição / git       | `C:\Users\hiago\OneDrive\Área de Trabalho\Égua, adota!`                                                                |
+| Compilação Android | `C:\dev\egua-adota` (tem `apps/mobile/android` + `node_modules` hoistado). Se faltar, use `C:\egua` com a mesma regra. |
+
+Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não rode EAS. PowerShell: sem `&&`; quote `-P…`; `curl.exe`; shell com permissão total (`all`).
+
+### 1. Código pronto na árvore de edição
+
+1. Lint/typecheck/testes relevantes (API: unidade; integração só com Docker e aviso de TRUNCATE).
+2. Em `apps/mobile/version.json`: suba `build` e escreva 2–4 `notes` em pt-BR (o que o aviso de update mostra).
+3. `pnpm --filter @patinha/mobile version:bump` **ou** edite o JSON e rode `node apps/mobile/scripts/bump-build.mjs --sync` depois na árvore de compile.
+4. Rode também o que grava a página: `node apps/mobile/scripts/bump-build.mjs --publish` (atualiza `download/version.json` com o mesmo `version` / `androidVersionCode` / `notes`).
+5. Em `docker/download.Dockerfile`, `ARG APK_URL=` → `https://github.com/Hiagomda/adota/releases/download/apk-<version>-<build>/egua-adota.apk` (ex.: `apk-0.1.0-22`).
+6. Commit Conventional Commits em inglês + push em **`master`** (`origin` = `Hiagomda/adota`). Auto-review pode bloquear push: peça aprovação nativa e repita o mesmo `git push`.
+
+### 2. Sincronizar e compilar o APK
+
+1. Robocopy OneDrive → `C:\dev\egua-adota` com `/E`, **excluindo** `android`, `node_modules`, `.expo`, `.git`, `.env`. **Nunca** `/MIR`.
+2. Não rode `pnpm install` completo. Se `@patinha/shared` quebrar o tsc, `pnpm --filter @patinha/shared build` na árvore de compile.
+3. `node apps/mobile/scripts/bump-build.mjs --sync` em `C:\dev\egua-adota` para o `versionCode` do Gradle bater com `version.json`.
+4. Confirme `C:\dev\egua-adota\apps\mobile\.env` com (não commitar, não imprimir valores além do host):
+   - `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io` (HTTP de propósito)
+   - `EXPO_PUBLIC_DOWNLOAD_URL=https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
+5. Gradle **release** (não debug), JDK 17 já em `android/gradle.properties` (Adoptium sob `~/.gradle/jdks/…` neste PC):
+
+```powershell
+cd C:\dev\egua-adota\apps\mobile\android
+$env:NODE_ENV = "production"
+$env:GRADLE_USER_HOME = "C:\Users\hiago\.gradle"
+$env:TEMP = "C:\Temp"; $env:TMP = "C:\Temp"
+.\gradlew.bat assembleRelease "-PreactNativeArchitectures=arm64-v8a"
+```
+
+6. APK: `C:\dev\egua-adota\apps\mobile\android\app\build\outputs\apk\release\app-release.apk`. Confira tamanho (~80–90 MB release; debug ~287 MB com tela de URL do dev-client está errado). `NODE_ENV=test` no shell quebra o bundle (babel); use `production`.
+
+### 3. Release no GitHub
+
+- Tag: `apk-<version>-<build>` (ex. `apk-0.1.0-22`). Asset obrigatório: **`egua-adota.apk`** (renomeie o `app-release.apk`).
+- `gh` **não** está instalado. Use `git credential fill` (host=github.com) num script Node temporário em `C:\Temp` (API releases + upload do asset). **Nunca** imprima o token. **Delete** o script depois (não se auto-apague no meio do run).
+- HEAD do asset deve ser 302 para release-assets; não cole a URL assinada no chat.
+
+### 4. Deploy Coolify (obrigatório para o celular ver a att)
+
+- Painel: `http://painel.86.48.25.233.sslip.io:8000` (não o IP cru — Kaspersky bloqueia). App: `adota:master-…` / id `fpmewu0com3qkbfihrsihc6y`.
+- Compose: `docker-compose.coolify.yml`. Ao subir: API faz `db:migrate` + `db:seed` (`SEED_IF_EMPTY`) + `start`; o serviço `download` rebuilda com o `APK_URL` e copia `version.json` + APK.
+- Clique no **Deploy do cabeçalho** (`wire:click=deploy` / botão roxo), **não** no "Deploy" da sidebar (só expande seção). Não clique Log out, Cancel, Danger Zone, nem upgrade do Coolify. Não toque MetalRiff, chatbot, teste-AtivaFacil.
+- Websocket "Cannot connect to real-time service" é normal; o deploy ainda roda — acompanhe Deployment Logs / histórico.
+- Auto-review pode bloquear o clique: peça aprovação e repita o **mesmo** clique.
+
+### 5. Verificar
+
+```powershell
+curl.exe -sS "https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/version.json"
+curl.exe -sS -I "https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/egua-adota.apk"
+curl.exe -sS "http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/health"
+```
+
+Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, APK com `Content-Length` do release. Só então diga ao Hiago para fechar e reabrir o app.
+
+### Deploy (VPS) — referência rápida
+
+- Coolify sobe `docker-compose.coolify.yml` a partir do GitHub **`master`**.
+- Domínios de teste (sslip): API/MinIO/imgproxy em HTTP; download em HTTPS. Mudar host quebra APKs já instalados.
+- `docker/download-entrypoint.sh` copia `/opt/egua-adota.apk` e `/opt/version.json` sobre o volume a cada start — cópia só no volume some no restart. Caminho durável = release GitHub + `APK_URL` no Dockerfile + redeploy.
+- `docker-compose.prod.yml` + `deploy.yml` (Caddy em `/opt/patinha`) **não** estão em uso.
+- `publish-download.yml` espelha o APK do release `apk-<version>-<build>` lendo `download/version.json`.
 
 ## Estrutura
 
@@ -65,9 +131,7 @@ download/                     página de download servida pelo container `downlo
 - Não existe carona solidária ou transporte. Ainda há resíduos no app (selo "Piloto do Bem", estado `transport`) e no backend (coluna `is_transport_available`, `action_type 'transport'`, `helpKind 'transport'`, selo `good_pilot`). O app remove os visuais; os dados do backend ficam até o dono limpar.
 - Sem Cloudflare, CDN, proxy ou R2. As fotos ficam no MinIO da VPS e são servidas pelo imgproxy. Variáveis `R2_*` que sobraram são ignoradas.
 - Identidade "calor de casa paraense": turquesa `#1F7A7A`, coral `#F26B4E`, caramelo `#D98A3D`, fundo creme `#FFF8EE`, Baloo 2 nos títulos e Nunito no corpo. Mascote: vira-lata caramelo com coleira turquesa e plaquinha de patinha coral. Detalhes de Belém (marajoara sutil, fitinha do Círio, mangueira). Use sempre os tokens de `src/theme`, nunca hex solto. Branco sobre coral não passa contraste, então superfície coral usa texto escuro.
-- Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho. Existem "Minha localização" e "Buscar nesta área": movimentos do app (abertura, GPS, "Ver no mapa") carregam sozinhos; gesto da pessoa só mostra o botão (`onCommitBounds` recebe `fromUser`).
-- Contato só pelo WhatsApp, fora do app: o dono não quer responder por conversa dentro da plataforma. O app não tem chat (a rota `/chat/[postId]` só explica a mudança). O número sai um por vez em `POST /posts/:id/contact` e `POST /posts/:id/foster-homes/:userId/contact` (`contact.ts`, 10/min por conta), só de quem ligou "Mostrar meu WhatsApp". As rotas de `adoptionChat.ts` ficam só para APKs antigos.
-- Casa Amiga não pede endereço: a oferta é o interruptor de "Sua rede" (`volunteer_profiles`), listada em `GET /posts/:id/foster-homes` sem distância. Encontro e endereço são combinados no WhatsApp. A tabela `fosters` e `GET /posts/:id/fosters` ficam para APKs antigos.
+- Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho. Existe "Minha localização". Não existe botão "Buscar nesta área": quando o mapa para (movimento do app ou gesto da pessoa), a área visível carrega sozinha. O Hiago removeu o botão; não traga de volta.
 - Admin do dono: o e-mail em `OWNER_EMAILS` vira admin só com `email_verified` do Firebase.
 
 ## Regras
