@@ -490,7 +490,8 @@ export default function PostScreen() {
               <AppText variant="display">{animalHeadline(item.animal)}</AppText>
               <View style={styles.pills}>
                 {journeyOf(item.type, item.status) ? null : <StatusPill status={item.status} />}
-                <StatusPill urgency={item.urgency} />
+                {/* Urgency only matters while nobody has the animal yet. */}
+                {item.status === 'open' ? <StatusPill urgency={item.urgency} /> : null}
               </View>
             </View>
 
@@ -614,12 +615,14 @@ export default function PostScreen() {
                       verified={item.author.verified}
                     />
                     <View style={styles.authorText}>
-                      <AppText variant="h3" numberOfLines={1}>
+                      <AppText variant="h3" numberOfLines={2}>
                         {item.author.name}
                       </AppText>
-                      <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
+                      <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
                         @{item.author.handle}
-                        {item.author.verified ? ' · perfil verificado' : ''} · publicou{' '}
+                      </AppText>
+                      <AppText variant="caption" color="textSecondary" numberOfLines={1}>
+                        {item.author.verified ? 'Perfil verificado · publicou ' : 'Publicou '}
                         {formatWhen(item.createdAt)}
                       </AppText>
                     </View>
