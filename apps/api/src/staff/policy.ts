@@ -95,7 +95,7 @@ export function decideRoleChange(input: {
   nextRole: string;
   expectedRole: string;
   activeSuperadmins: number;
-  recentTotp: boolean;
+  recentAuth: boolean;
   justification: string;
 }): { changed: boolean } {
   assertPermission(input.actorRole, 'team.manage');
@@ -110,8 +110,8 @@ export function decideRoleChange(input: {
   if (justification.length < 10) {
     throw new HttpError(400, 'Escreva o motivo, com pelo menos 10 caracteres.');
   }
-  if (!input.recentTotp) {
-    throw new HttpError(401, 'Confirme com o código do autenticador.');
+  if (!input.recentAuth) {
+    throw new HttpError(403, 'Confirme com a sua senha.');
   }
   const removesLastSuperadmin =
     input.currentRole === 'superadmin' &&

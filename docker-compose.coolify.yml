@@ -95,8 +95,6 @@ services:
       WEB_ORIGIN: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       # Endereço do painel da equipe (repositório AdotaSite).
       ADMIN_ORIGIN: https://admin-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
-      # Chave do painel (32 bytes em base64). Fica só nas variáveis do Coolify.
-      ADMIN_TOTP_KEY: ${ADMIN_TOTP_KEY}
       SEED_IF_EMPTY: 'true'
     command:
       - sh

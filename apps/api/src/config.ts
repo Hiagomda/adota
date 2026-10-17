@@ -34,8 +34,6 @@ const envSchema = z.object({
   IMGPROXY_SALT: z.string().default(''),
   WEB_ORIGIN: z.string().min(1).default('http://localhost:3000'),
   ADMIN_ORIGIN: z.string().min(1).default('http://localhost:3020'),
-  /** 32 bytes, base64. Encrypts TOTP secrets. Absent means staff login stays closed. */
-  ADMIN_TOTP_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   /** Comma-separated IPs. Empty means the staff API does not filter by address. */
   ADMIN_IP_ALLOWLIST: z.preprocess(blankAsUnset, z.string().min(1).optional()),
   /** Comma-separated e-mails promoted to admin once Firebase has verified them. */

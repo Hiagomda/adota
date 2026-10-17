@@ -8,6 +8,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "create-superadmin": "tsx scripts/create-superadmin.ts",
+    "staff:login": "tsx scripts/staff-login.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

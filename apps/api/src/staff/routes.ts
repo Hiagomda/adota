@@ -2,13 +2,12 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
-import { findUserByFirebaseUid, grantOwnerRole, isOwnerToken } from '../accounts.js';
 import type { Env } from '../config.js';
-import { ensureFirebaseApp, firebaseChecksRevocation } from '../firebaseAdmin.js';
 import { HttpError } from '../http.js';
 import type { createQueue } from '../notify.js';
 import { rowsOf } from '../session.js';
 import { registerModerationRoutes } from './moderation.js';
+import { decoyHash, verifyPassword } from './password.js';
 import {
   assignableRoles,
   assertPermission,
@@ -18,50 +17,30 @@ import {
   requirePresentedCredential,
   type Permission,
 } from './policy.js';
-import {
-  base32Encode,
-  decryptSecret,
-  encryptSecret,
-  otpauthUrl,
-  readStaffTicket,
-  signStaffTicket,
-  totpKeyFrom,
-  totpMatches,
-} from './totp.js';
-
 type RescueQueue = ReturnType<typeof createQueue>;
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const IDLE_MS = 30 * 60 * 1000;
-const TICKET_MS = 5 * 60 * 1000;
-const RECENT_TOTP_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 5;
-
-const sessionStartSchema = z
-  .object({
-    firebaseToken: z.string().min(8).max(8192).optional(),
-    devToken: z.string().min(4).max(200).optional(),
-  })
-  .strict();
-
-const codeSchema = z
-  .object({
-    ticket: z.string().min(10).max(2000),
-    code: z.string().trim().min(6).max(32),
-  })
-  .strict();
 
 const roleChangeSchema = z
   .object({
     role: z.enum(assignableRoles),
     expectedRole: z.enum(assignableRoles),
     justification: z.string().trim().min(10).max(500),
-    totpCode: z.string().trim().min(6).max(12),
+    password: z.string().min(1).max(200),
   })
   .strict();
 
-const revokeSchema = z.object({ totpCode: z.string().trim().min(6).max(32) }).strict();
+const revokeSchema = z.object({ password: z.string().min(1).max(200) }).strict();
+
+const loginSchema = z
+  .object({
+    username: z.string().trim().toLowerCase().min(3).max(32),
+    password: z.string().min(1).max(200),
+  })
+  .strict();
 
 interface StaffRow {
   id: string;
@@ -281,67 +260,20 @@ export async function loadSession(
   return { ...row, via: credential.via, token: credential.token };
 }
 
-async function identityFromBody(env: Env, pool: Pool, body: z.infer<typeof sessionStartSchema>) {
-  if (body.devToken) {
-    if (!env.authDevMode || !body.devToken.startsWith('dev:')) {
-      throw new HttpError(401, 'Não reconheci essa conta.');
-    }
-    return findUserByFirebaseUid(pool, body.devToken);
-  }
-  if (!body.firebaseToken) throw new HttpError(401, 'Não reconheci essa conta.');
-  if (!env.FIREBASE_PROJECT_ID) throw new HttpError(401, 'Não reconheci essa conta.');
-  await ensureFirebaseApp(env);
-  const admin = await import('firebase-admin');
-  const decoded = await admin
-    .auth()
-    .verifyIdToken(body.firebaseToken, firebaseChecksRevocation(env));
-  if (isOwnerToken(env, decoded)) await grantOwnerRole(pool, decoded.uid);
-  return findUserByFirebaseUid(pool, decoded.uid);
-}
-
-function recoveryCode(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = randomBytes(10);
-  return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
-}
-
-async function secretFor(
-  pool: Pool,
-  key: Buffer,
-  userId: string,
-  enabledOnly: boolean,
-): Promise<Buffer> {
-  const result = await pool.query<{ secret_enc: string; enabled_at: Date | null }>(
-    `SELECT secret_enc, enabled_at FROM staff_totp WHERE user_id = $1`,
-    [userId],
-  );
-  const row = result.rows[0];
-  if (!row || (enabledOnly && !row.enabled_at)) {
-    throw new HttpError(401, 'Ative a verificação em duas etapas antes de entrar.');
-  }
-  return decryptSecret(key, row.secret_enc);
-}
-
-async function consumeRecoveryCode(pool: Pool, userId: string, code: string): Promise<boolean> {
-  const normalized = code.replace(/\s/g, '').toUpperCase();
-  if (!/^[A-Z2-9]{10}$/.test(normalized)) return false;
-  const result = await pool.query<{ id: string; code_hash: string }>(
-    `SELECT id, code_hash FROM staff_recovery_codes WHERE user_id = $1 AND used_at IS NULL`,
-    [userId],
-  );
-  const match = result.rows.find((row) => sameHex(row.code_hash, sha256(normalized)));
-  if (!match) return false;
-  const updated = await pool.query(
-    `UPDATE staff_recovery_codes SET used_at = now() WHERE id = $1 AND used_at IS NULL`,
-    [match.id],
-  );
-  return (updated.rowCount ?? 0) === 1;
-}
-
 function parseBody<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.output<Schema> {
   const result = schema.safeParse(value);
   if (!result.success) throw new HttpError(400, 'Confira os dados e tente de novo.');
   return result.data;
+}
+
+/** Confere a senha de quem já está no painel, para ações sensíveis. */
+async function passwordMatches(pool: Pool, userId: string, password: string): Promise<boolean> {
+  const result = await pool.query<{ password_hash: string }>(
+    `SELECT password_hash FROM staff_passwords WHERE user_id = $1`,
+    [userId],
+  );
+  const stored = result.rows[0]?.password_hash;
+  return verifyPassword(password, stored ?? (await decoyHash()));
 }
 
 const loginLimit = { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } };
@@ -352,120 +284,29 @@ export async function registerStaffRoutes(
 ): Promise<void> {
   const { env, pool, queue } = deps;
 
-  app.post('/admin/v1/session', loginLimit, async (request) => {
+  app.post('/admin/v1/login', loginLimit, async (request, reply) => {
     const ip = clientIp(request);
     allowlisted(env, ip);
+    const body = parseBody(loginSchema, request.body);
     await assertUnlocked(pool, `ip:${ip}`);
-    const body = parseBody(sessionStartSchema, request.body);
-    let user: Awaited<ReturnType<typeof identityFromBody>>;
-    try {
-      user = await identityFromBody(env, pool, body);
-    } catch (error) {
+    await assertUnlocked(pool, `login:${body.username}`);
+    const found = await pool.query<{ user_id: string; password_hash: string; role: string }>(
+      `SELECT p.user_id, p.password_hash, u.role
+       FROM staff_passwords p JOIN users u ON u.id = p.user_id
+       WHERE p.username = $1 AND u.deleted_at IS NULL AND u.suspended = false`,
+      [body.username],
+    );
+    const row = found.rows[0];
+    // Sem conta, compara com um hash qualquer: a resposta demora o mesmo tanto.
+    const ok = await verifyPassword(body.password, row?.password_hash ?? (await decoyHash()));
+    if (!row || !ok || !isStaffRole(row.role)) {
       await recordFailure(pool, `ip:${ip}`);
-      if (error instanceof HttpError) throw error;
-      throw new HttpError(401, 'Não reconheci essa conta.');
-    }
-    if (!user || !isStaffRole(user.role)) {
-      await recordFailure(pool, `ip:${ip}`);
-      throw new HttpError(
-        user ? 403 : 401,
-        user ? 'Essa conta não faz parte da equipe.' : 'Não reconheci essa conta.',
-      );
+      await recordFailure(pool, `login:${body.username}`);
+      throw new HttpError(401, 'Usuário ou senha incorretos.');
     }
     await clearFailures(pool, `ip:${ip}`);
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const totp = await pool.query<{ enabled_at: Date | null }>(
-      `SELECT enabled_at FROM staff_totp WHERE user_id = $1`,
-      [user.id],
-    );
-    const purpose = totp.rows[0]?.enabled_at ? 'totp' : 'enroll';
-    const ticket = signStaffTicket(key, { sub: user.id, purpose, exp: Date.now() + TICKET_MS });
-    return { step: purpose, ticket };
-  });
-
-  app.post('/admin/v1/totp/enroll', loginLimit, async (request) => {
-    const body = parseBody(
-      z.object({ ticket: z.string().min(10).max(2000) }).strict(),
-      request.body,
-    );
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const ticket = readStaffTicket(key, body.ticket, 'enroll');
-    const account = await pool.query<{ handle: string; role: string }>(
-      `SELECT handle, role FROM users WHERE id = $1 AND deleted_at IS NULL AND suspended = false`,
-      [ticket.sub],
-    );
-    const row = account.rows[0];
-    if (!row || !isStaffRole(row.role))
-      throw new HttpError(403, 'Essa conta não faz parte da equipe.');
-    const enabled = await pool.query<{ enabled_at: Date | null }>(
-      `SELECT enabled_at FROM staff_totp WHERE user_id = $1`,
-      [ticket.sub],
-    );
-    if (enabled.rows[0]?.enabled_at)
-      throw new HttpError(409, 'A verificação em duas etapas já está ativa.');
-    const secret = randomBytes(20);
-    await pool.query(
-      `INSERT INTO staff_totp (user_id, secret_enc, enabled_at)
-       VALUES ($1, $2, NULL)
-       ON CONFLICT (user_id) DO UPDATE SET secret_enc = EXCLUDED.secret_enc, enabled_at = NULL, created_at = now()`,
-      [ticket.sub, encryptSecret(key, secret)],
-    );
-    return { otpauthUrl: otpauthUrl(row.handle, secret), secret: base32Encode(secret) };
-  });
-
-  app.post('/admin/v1/totp/confirm', loginLimit, async (request, reply) => {
-    const body = parseBody(codeSchema, request.body);
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const ticket = readStaffTicket(key, body.ticket, 'enroll');
-    await assertUnlocked(pool, `user:${ticket.sub}`);
-    const secret = await secretFor(pool, key, ticket.sub, false);
-    if (!totpMatches(secret, body.code)) {
-      await recordFailure(pool, `user:${ticket.sub}`);
-      throw new HttpError(401, 'Código inválido.');
-    }
-    const codes = Array.from({ length: 8 }, () => recoveryCode());
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const enabled = await client.query(
-        `UPDATE staff_totp SET enabled_at = now() WHERE user_id = $1 AND enabled_at IS NULL`,
-        [ticket.sub],
-      );
-      if ((enabled.rowCount ?? 0) !== 1)
-        throw new HttpError(409, 'A verificação em duas etapas já está ativa.');
-      await client.query(`DELETE FROM staff_recovery_codes WHERE user_id = $1`, [ticket.sub]);
-      for (const code of codes) {
-        await client.query(
-          `INSERT INTO staff_recovery_codes (user_id, code_hash) VALUES ($1, $2)`,
-          [ticket.sub, sha256(code)],
-        );
-      }
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-    await clearFailures(pool, `user:${ticket.sub}`);
-    const session = await openSession(pool, env, reply, ticket.sub, request);
-    return { token: session.token, csrf: session.csrf, recoveryCodes: codes };
-  });
-
-  app.post('/admin/v1/session/totp', loginLimit, async (request, reply) => {
-    const body = parseBody(codeSchema, request.body);
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const ticket = readStaffTicket(key, body.ticket, 'totp');
-    await assertUnlocked(pool, `user:${ticket.sub}`);
-    const secret = await secretFor(pool, key, ticket.sub, true);
-    const codeOk =
-      totpMatches(secret, body.code) || (await consumeRecoveryCode(pool, ticket.sub, body.code));
-    if (!codeOk) {
-      await recordFailure(pool, `user:${ticket.sub}`);
-      throw new HttpError(401, 'Código inválido.');
-    }
-    await clearFailures(pool, `user:${ticket.sub}`);
-    const session = await openSession(pool, env, reply, ticket.sub, request);
+    await clearFailures(pool, `login:${body.username}`);
+    const session = await openSession(pool, env, reply, row.user_id, request);
     return { token: session.token, csrf: session.csrf };
   });
 
@@ -489,10 +330,9 @@ export async function registerStaffRoutes(
     const session = await loadSession(pool, request);
     assertPermission(session.role, 'session.revoke_own');
     const body = parseBody(revokeSchema, request.body);
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const secret = await secretFor(pool, key, session.user_id, true);
-    if (!totpMatches(secret, body.totpCode))
-      throw new HttpError(401, 'Confirme com o código do autenticador.');
+    if (!(await passwordMatches(pool, session.user_id, body.password))) {
+      throw new HttpError(403, 'Senha incorreta.');
+    }
     await pool.query(
       `UPDATE admin_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
       [session.user_id],
@@ -536,9 +376,7 @@ export async function registerStaffRoutes(
     const session = await loadSession(pool, request);
     const targetId = parseBody(z.object({ id: z.string().uuid() }), request.params).id;
     const body = parseBody(roleChangeSchema, request.body);
-    const key = totpKeyFrom(env.ADMIN_TOTP_KEY);
-    const recent = session.last_totp_at.getTime() + RECENT_TOTP_MS > Date.now();
-    const codeOk = totpMatches(await secretFor(pool, key, session.user_id, true), body.totpCode);
+    const passwordOk = await passwordMatches(pool, session.user_id, body.password);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -560,7 +398,7 @@ export async function registerStaffRoutes(
         nextRole: body.role,
         expectedRole: body.expectedRole,
         activeSuperadmins: count.rows[0]?.total ?? 0,
-        recentTotp: recent || codeOk,
+        recentAuth: passwordOk,
         justification: body.justification,
       });
       if (decision.changed) {
@@ -595,11 +433,6 @@ export async function registerStaffRoutes(
       throw error;
     } finally {
       client.release();
-    }
-    if (codeOk) {
-      await pool.query(`UPDATE admin_sessions SET last_totp_at = now() WHERE id = $1`, [
-        session.id,
-      ]);
     }
     return { role: body.role };
   });
