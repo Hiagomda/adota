@@ -39,16 +39,15 @@ const BANNER_MASCOT = 64;
 const ON_MAP = new Set(['open', 'on_the_way', 'for_adoption']);
 
 export default function ExploreScreen() {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const focused = useIsFocused();
   const token = useSession((state) => state.token);
   const here = useViewerLocation();
   const aim = useMapAim();
+  // Whatever the map shows once it settles, from the app or from the person's gesture, loads by itself.
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
-  // An area the person panned or zoomed to. It loads only when they ask ("Buscar nesta área").
-  const [pendingBounds, setPendingBounds] = useState<MapBounds | null>(null);
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
   const closedAim = useRef<number | null>(null);
@@ -121,35 +120,14 @@ export default function ExploreScreen() {
         controlsBottom={controlsBottom}
         onSelect={selectPost}
         onDismiss={closeCard}
-        onCommitBounds={(next, origin) => {
+        onCommitBounds={(next) => {
           if (aiming && aim && !cameraFramesPoint(next, aim)) return;
           if (aim) setFramedToken(aim.token);
-          if (origin.fromUser && !aiming) {
-            setPendingBounds(next);
-            return;
-          }
-          setPendingBounds(null);
           setBounds(next);
         }}
         focus={focusPoint}
       />
-      {pendingBounds && !selected ? (
-        <View
-          style={[styles.searchArea, { top: insets.top + spacing.lg }]}
-          pointerEvents="box-none"
-        >
-          <Button
-            title="Buscar nesta área"
-            icon="search"
-            onPress={() => {
-              setBounds(pendingBounds);
-              setPendingBounds(null);
-            }}
-            style={shadows.md}
-          />
-        </View>
-      ) : null}
-      {!selected && !pendingBounds && (feed.isError || posts.length === 0) ? (
+      {!selected && (feed.isError || posts.length === 0) ? (
         <Card
           padding="md"
           elevation="md"
@@ -247,7 +225,6 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   banner: { position: 'absolute', left: spacing.lg, right: spacing.lg },
-  searchArea: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   bannerAction: { marginTop: spacing.md },
   bannerText: { flex: 1 },
