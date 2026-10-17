@@ -12,7 +12,7 @@ import {
 import { AppText } from './AppText';
 import { Avatar } from './Avatar';
 import { Badge } from './Badge';
-import { MarajoaraPattern } from './MarajoaraPattern';
+import { PetPattern } from './PetPattern';
 import { Touchable } from './Touchable';
 
 export interface OrgCardProps {
@@ -30,7 +30,7 @@ const MAX_STAGGER = 6;
 // The avatar climbs half of its own height over the band.
 const AVATAR_LIFT = size.avatar.lg / 2;
 
-/** NGO or rescuer: a tile with a marajoara band, the avatar on top of it and the name below. */
+/** NGO or rescuer: a tile with a bone-and-fish band, the avatar on top of it and the name below. */
 export function OrgCard({
   name,
   subtitle,
@@ -56,7 +56,7 @@ export function OrgCard({
         style={[styles.card, { backgroundColor: colors.surfaceRaised }]}
       >
         <View style={[styles.band, { backgroundColor: colors.primarySoft }]}>
-          <MarajoaraPattern color={colors.primary} opacity={0.18} />
+          <PetPattern color={colors.primary} opacity={0.18} />
         </View>
         <View style={styles.body}>
           <View style={[styles.avatar, { borderColor: colors.surfaceRaised }]}>

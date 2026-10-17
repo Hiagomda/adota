@@ -34,7 +34,7 @@ import {
   InfoChip,
   Input,
   ListItem,
-  MarajoaraPattern,
+  PetPattern,
   Notice,
   PawBurst,
   PhotoScrim,
@@ -456,7 +456,7 @@ export default function PostScreen() {
             </ScrollView>
           ) : (
             <View style={styles.photoEmpty}>
-              <MarajoaraPattern color={colors.primary} opacity={0.12} />
+              <PetPattern color={colors.primary} opacity={0.12} />
               <Mascot pose="search" size={MASCOT_ON_PHOTO} />
               <AppText color="textSecondary">Ainda sem foto deste bichinho</AppText>
             </View>

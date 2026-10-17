@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Mascot, type MascotPose } from '../../mascot';
 import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../../theme';
 import { AppText } from './AppText';
-import { MarajoaraPattern } from './MarajoaraPattern';
+import { PetPattern } from './PetPattern';
 
 export interface StateLayoutProps {
   pose: MascotPose;
@@ -38,7 +38,7 @@ export function StateLayout({
     >
       <View style={[shadows.sm, styles.shadow, { backgroundColor: colors.surfaceRaised }]}>
         <View style={styles.panel}>
-          <MarajoaraPattern color={colors.primary} opacity={PATTERN_OPACITY} />
+          <PetPattern color={colors.primary} opacity={PATTERN_OPACITY} />
           <View style={compact ? styles.compactBody : styles.body}>
             <Mascot pose={pose} size={compact ? COMPACT_MASCOT : size.mascot} />
             <View style={compact ? styles.compactText : styles.text}>

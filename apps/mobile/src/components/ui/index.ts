@@ -24,7 +24,7 @@ export { IconButton } from './IconButton';
 export { InfoChip, type InfoChipProps } from './InfoChip';
 export { Input } from './Input';
 export { ListItem, type ListItemProps } from './ListItem';
-export { MarajoaraPattern } from './MarajoaraPattern';
+export { PetPattern } from './PetPattern';
 export { Notice, type NoticeProps } from './Notice';
 export { OrgCard, type OrgCardProps } from './OrgCard';
 export { PawBurst, type PawBurstProps } from './PawBurst';

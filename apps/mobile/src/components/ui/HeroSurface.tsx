@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { size, useTheme } from '../../theme';
-import { MARAJOARA_PATTERN_ID, MarajoaraPatternDef } from './MarajoaraPattern';
+import { PET_PATTERN_ID, PetPatternDef } from './PetPattern';
 
 const GRADIENT_ID = 'hero-gradient';
 const PATTERN_OPACITY = 0.12;
@@ -21,7 +21,7 @@ export interface HeroSurfaceProps {
 }
 
 /**
- * Turquoise gradient with the marajoara texture, used behind headers. The shape is drawn with SVG
+ * Turquoise gradient with the bone-and-fish texture, used behind headers. The shape is drawn with SVG
  * from the measured size, so the wave has the same depth on every screen.
  */
 export function HeroSurface({ children, curved = true, style }: HeroSurfaceProps) {
@@ -57,10 +57,10 @@ export function HeroSurface({ children, curved = true, style }: HeroSurfaceProps
             <Stop offset="0" stopColor={colors.heroStart} />
             <Stop offset="1" stopColor={colors.heroEnd} />
           </LinearGradient>
-          <MarajoaraPatternDef color={colors.onHero} />
+          <PetPatternDef color={colors.onHero} />
         </Defs>
         <Path d={shape} fill={`url(#${GRADIENT_ID})`} />
-        <Path d={shape} fill={`url(#${MARAJOARA_PATTERN_ID})`} opacity={PATTERN_OPACITY} />
+        <Path d={shape} fill={`url(#${PET_PATTERN_ID})`} opacity={PATTERN_OPACITY} />
       </Svg>
       {children}
     </View>
