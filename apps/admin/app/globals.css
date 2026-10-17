@@ -132,3 +132,63 @@ td {
   border-radius: 8px;
   background: var(--line);
 }
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.stat {
+  display: grid;
+  gap: 4px;
+}
+.stat strong {
+  font-family: var(--font-display), 'Segoe UI', sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+}
+.stat.attention {
+  border-color: var(--coral);
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tabs button[aria-pressed='false'] {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.badge.warn {
+  border-color: var(--coral);
+}
+.thumb {
+  width: 96px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--line);
+}
+.item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.item > .stack {
+  flex: 1;
+  min-width: 0;
+}
+.nav {
+  flex-wrap: wrap;
+}
+button.danger {
+  background: var(--danger);
+  color: var(--surface);
+}

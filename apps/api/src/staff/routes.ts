@@ -6,7 +6,9 @@ import { findUserByFirebaseUid, grantOwnerRole, isOwnerToken } from '../accounts
 import type { Env } from '../config.js';
 import { ensureFirebaseApp, firebaseChecksRevocation } from '../firebaseAdmin.js';
 import { HttpError } from '../http.js';
+import type { createQueue } from '../notify.js';
 import { rowsOf } from '../session.js';
+import { registerModerationRoutes } from './moderation.js';
 import {
   assignableRoles,
   assertPermission,
@@ -26,6 +28,8 @@ import {
   totpKeyFrom,
   totpMatches,
 } from './totp.js';
+
+type RescueQueue = ReturnType<typeof createQueue>;
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const IDLE_MS = 30 * 60 * 1000;
@@ -90,11 +94,11 @@ function sameHex(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function clientIp(request: FastifyRequest): string {
+export function clientIp(request: FastifyRequest): string {
   return request.ip || 'unknown';
 }
 
-function userAgent(request: FastifyRequest): string {
+export function userAgent(request: FastifyRequest): string {
   const raw = request.headers['user-agent'];
   return typeof raw === 'string' ? raw.slice(0, 200) : '';
 }
@@ -138,7 +142,7 @@ async function clearFailures(pool: Pool, subject: string): Promise<void> {
   await pool.query(`DELETE FROM staff_login_attempts WHERE subject = $1`, [subject]);
 }
 
-async function writeAudit(
+export async function writeAudit(
   db: Pool | PoolClient,
   event: {
     actorId: string | null;
@@ -237,7 +241,7 @@ async function openSession(
   return { token, csrf };
 }
 
-async function loadSession(
+export async function loadSession(
   pool: Pool,
   request: FastifyRequest,
 ): Promise<SessionRow & { via: 'bearer' | 'cookie'; token: string }> {
@@ -344,9 +348,9 @@ const loginLimit = { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } }
 
 export async function registerStaffRoutes(
   app: FastifyInstance,
-  deps: { env: Env; pool: Pool },
+  deps: { env: Env; pool: Pool; queue: RescueQueue },
 ): Promise<void> {
-  const { env, pool } = deps;
+  const { env, pool, queue } = deps;
 
   app.post('/admin/v1/session', loginLimit, async (request) => {
     const ip = clientIp(request);
@@ -640,6 +644,8 @@ export async function registerStaffRoutes(
       nextCursor: events.length === 50 ? (events[events.length - 1]?.id ?? null) : null,
     };
   });
+
+  registerModerationRoutes(app, { env, pool, queue });
 }
 
 export type StaffPermissionName = Permission;

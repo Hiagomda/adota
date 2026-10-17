@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { Frame, Loading, useStaff } from './painel';
+import Link from 'next/link';
+import { Frame, Loading, useModeration, useStaff, type StaffMe } from './painel';
 
 type Step = 'login' | 'enroll' | 'totp' | 'codes';
 
@@ -21,13 +22,7 @@ export default function HomePage() {
   if (me) {
     return (
       <Frame me={me}>
-        <section className="card stack">
-          <h1>Painel da equipe</h1>
-          <p className="muted">
-            Verificação de ONG, chaves Pix e denúncias entram nas próximas entregas. Aqui ficam a
-            equipe e a auditoria.
-          </p>
-        </section>
+        <Overview me={me} />
       </Frame>
     );
   }
@@ -180,5 +175,95 @@ export default function HomePage() {
         {message ? <p className="error">{message}</p> : null}
       </section>
     </main>
+  );
+}
+
+interface OverviewData {
+  usersTotal: number;
+  usersThisWeek: number;
+  usersSuspended: number;
+  postsThisWeek: number;
+  alertsOpen: number;
+  adopted: number;
+  pendingReview: number;
+  openReports: number;
+  pendingVerifications: number;
+  meanSecondsToResponse: number | null;
+}
+
+function minutes(seconds: number | null): string {
+  if (seconds === null) return '—';
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  return `${(seconds / 3600).toFixed(1).replace('.', ',')} h`;
+}
+
+function Overview({ me }: { me: StaffMe }) {
+  const allowed = me.permissions.includes('overview.read');
+  const { data, message } = useModeration<OverviewData>(allowed ? 'overview' : null);
+  if (!allowed) {
+    return (
+      <section className="card stack">
+        <h1>Painel da equipe</h1>
+        <p className="muted">Sua conta abre só a equipe e a auditoria.</p>
+      </section>
+    );
+  }
+  if (message) return <p className="error">{message}</p>;
+  if (!data) return <Loading />;
+  const queue = [
+    {
+      label: 'Denúncias abertas',
+      value: data.openReports,
+      href: '/denuncias',
+      permission: 'reports.manage',
+    },
+    {
+      label: 'Posts esperando revisão',
+      value: data.pendingReview,
+      href: '/posts',
+      permission: 'posts.moderate',
+    },
+    {
+      label: 'Pedidos de verificação',
+      value: data.pendingVerifications,
+      href: '/verificacoes',
+      permission: 'verifications.manage',
+    },
+  ];
+  const numbers = [
+    { label: 'Pessoas cadastradas', value: String(data.usersTotal) },
+    { label: 'Novas nos últimos 7 dias', value: String(data.usersThisWeek) },
+    { label: 'Contas suspensas', value: String(data.usersSuspended) },
+    { label: 'Posts nos últimos 7 dias', value: String(data.postsThisWeek) },
+    { label: 'Resgates em aberto', value: String(data.alertsOpen) },
+    { label: 'Adoções concluídas', value: String(data.adopted) },
+    {
+      label: 'Tempo médio até "vou ajudar" (30 dias)',
+      value: minutes(data.meanSecondsToResponse),
+    },
+  ];
+  return (
+    <div className="stack">
+      <h1>Painel da equipe</h1>
+      <h2>Fila de trabalho</h2>
+      <div className="grid">
+        {queue.map((item) => (
+          <div key={item.label} className={`card stat${item.value > 0 ? ' attention' : ''}`}>
+            <strong>{item.value}</strong>
+            <span>{item.label}</span>
+            {me.permissions.includes(item.permission) ? <Link href={item.href}>Abrir</Link> : null}
+          </div>
+        ))}
+      </div>
+      <h2>Números do app</h2>
+      <div className="grid">
+        {numbers.map((item) => (
+          <div key={item.label} className="card stat">
+            <strong>{item.value}</strong>
+            <span className="muted">{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

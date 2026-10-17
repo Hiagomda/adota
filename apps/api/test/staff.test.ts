@@ -25,6 +25,30 @@ describe('staff permissions', () => {
     expect(() => assertPermission('support', 'audit.read')).toThrow(HttpError);
   });
 
+  it('divide a moderação por função', () => {
+    expect(permissionsFor('moderator')).toContain('reports.manage');
+    expect(permissionsFor('moderator')).toContain('users.suspend');
+    expect(permissionsFor('moderator')).not.toContain('verifications.manage');
+    expect(permissionsFor('ong_reviewer')).toContain('verifications.manage');
+    expect(permissionsFor('ong_reviewer')).not.toContain('reports.manage');
+    expect(permissionsFor('support')).toContain('users.read');
+    expect(permissionsFor('support')).not.toContain('users.suspend');
+    expect(permissionsFor('finance_reviewer')).toEqual(['session.revoke_own', 'overview.read']);
+    for (const role of ['admin', 'superadmin']) {
+      expect(permissionsFor(role)).toEqual(
+        expect.arrayContaining([
+          'overview.read',
+          'reports.manage',
+          'verifications.manage',
+          'posts.moderate',
+          'users.read',
+          'users.suspend',
+        ]),
+      );
+    }
+    expect(permissionsFor('ngo')).toEqual([]);
+  });
+
   it('refuses the last superadmin demotion and a stale role', () => {
     expect(() =>
       decideRoleChange({

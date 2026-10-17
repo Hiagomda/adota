@@ -853,7 +853,7 @@ export async function registerRoutes(
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, { env, pool, writeLimit });
   registerNeighborhoodRoutes(app, { pool });
-  await registerStaffRoutes(app, { env, pool });
+  await registerStaffRoutes(app, { env, pool, queue });
 }
 
 async function toggle(
