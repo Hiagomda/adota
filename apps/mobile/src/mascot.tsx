@@ -7,6 +7,10 @@ const poses = {
   drive: require('../assets/mascot/drive.png'),
   search: require('../assets/mascot/search.png'),
   home: require('../assets/mascot/home.png'),
+  offline: require('../assets/mascot/offline.png'),
+  chat: require('../assets/mascot/chat.png'),
+  quiet: require('../assets/mascot/quiet.png'),
+  party: require('../assets/mascot/party.png'),
 } as const;
 
 export type MascotPose = keyof typeof poses;

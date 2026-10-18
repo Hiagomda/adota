@@ -17,7 +17,7 @@ export default function ChatMovedScreen() {
       <View style={styles.column}>
         <Header title="Conversa" onBack={() => router.back()} />
         <EmptyState
-          pose="wave"
+          pose="chat"
           title="A conversa agora é no WhatsApp"
           body="O app não guarda mais conversas. Abra o animal e toque em falar no WhatsApp."
         />

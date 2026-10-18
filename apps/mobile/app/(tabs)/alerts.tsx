@@ -96,7 +96,7 @@ export default function AlertsScreen() {
                 />
               ) : (
                 <EmptyState
-                  pose="sit"
+                  pose="quiet"
                   title="Tudo quieto"
                   body="Quando um resgate perto de você precisar de gente, o aviso aparece aqui."
                 />
