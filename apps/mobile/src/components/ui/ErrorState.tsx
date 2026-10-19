@@ -1,3 +1,4 @@
+import type { MascotPose } from '../../mascot';
 import { Button } from './Button';
 import { StateLayout } from './StateLayout';
 
@@ -6,6 +7,7 @@ export interface ErrorStateProps {
   body?: string;
   onRetry?: () => void;
   retryLabel?: string;
+  pose?: MascotPose;
   /** Row version for a block inside a screen. */
   compact?: boolean;
 }
@@ -16,11 +18,12 @@ export function ErrorState({
   body = 'Não consegui carregar agora. Confira sua conexão e tente de novo.',
   onRetry,
   retryLabel = 'Tentar de novo',
+  pose = 'offline',
   compact = false,
 }: ErrorStateProps) {
   return (
     <StateLayout
-      pose="sad"
+      pose={pose}
       title={title}
       body={body}
       compact={compact}

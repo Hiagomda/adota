@@ -201,7 +201,7 @@ export default function ProfileScreen() {
           </View>
           {!token ? (
             <EmptyState
-              pose="wave"
+              pose="login"
               title="Entre para ver seu perfil"
               body="Seus resgates, os que você salvou e as adoções concluídas ficam ligados à sua conta."
               actionLabel="Entrar"
@@ -222,7 +222,7 @@ export default function ProfileScreen() {
             />
           ) : (posts.data?.posts.length ?? 0) === 0 ? (
             <EmptyState
-              pose={tab === 'adopted' ? 'home' : 'sad'}
+              pose={tab === 'adopted' ? 'home' : tab === 'saved' ? 'saved' : 'camera'}
               title={
                 tab === 'posts'
                   ? 'Você ainda não publicou'
