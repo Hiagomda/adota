@@ -15,10 +15,12 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  HeroCarousel,
   SearchBar,
   SectionHeader,
   Segmented,
   Skeleton,
+  type HeroSlide,
 } from '../src/components/ui';
 import {
   activeFilterCount,
@@ -36,6 +38,7 @@ import type { Post } from '../src/types';
 
 const PLACE_DEBOUNCE_MS = 400;
 const SKELETON_CARDS = 4;
+const HERO_SLIDES = 5;
 
 const speciesOptions = [
   { value: 'dog', label: 'Cães' },
@@ -53,7 +56,7 @@ const shelves = [
   { value: 'adopted', label: 'Adotados' },
 ] as const;
 
-/** The two care facts people filter by most, kept on the quick row. */
+/** Os dois cuidados mais filtrados, que ficam na fileira rápida. */
 const quickCare: CareKey[] = ['neutered', 'goodWithKids'];
 
 function toggleCare(filters: AdoptionFilters, key: CareKey): AdoptionFilters {
@@ -83,14 +86,14 @@ export default function AdoptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
-  // "Adotados" on Home opens this screen on the second tab.
+  // "Adotados" na Início abre esta tela já na segunda aba.
   const { aba } = useLocalSearchParams<{ aba?: string }>();
   const [shelf, setShelf] = useState<AdoptionShelf>(aba === 'adotados' ? 'adopted' : 'available');
   const [filters, setFilters] = useState<AdoptionFilters>(noAdoptionFilters);
   const [placeText, setPlaceText] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Typing a neighborhood waits a moment, so each letter is not a new search.
+  // Digitar um bairro espera um instante, para cada letra não virar uma busca nova.
   useEffect(() => {
     const timer = setTimeout(
       () => setFilters((current) => ({ ...current, place: placeText })),
@@ -108,6 +111,15 @@ export default function AdoptionScreen() {
     getNextPageParam: (last) => last.nextCursor,
   });
   const posts = feed.data?.pages.flatMap((page) => page.posts) ?? [];
+  // Sem filtros, os primeiros animais ganham o banner de destaque, como num catálogo de streaming.
+  const showHero = shelf === 'available' && activeFilterCount(filters) === 0 && posts.length > 0;
+  const heroSlides: HeroSlide[] = posts.slice(0, HERO_SLIDES).map((post) => ({
+    id: post.id,
+    photoUri: post.media[0]?.url || post.media[0]?.thumbUrl,
+    tag: 'Para adoção',
+    title: animalHeadline(post.animal),
+    subtitle: cardSubtitle(post, shelf),
+  }));
   const extra = activeFilterCount({ ...filters, species: undefined, place: '' });
   // A fileira só aparece na vitrine sem filtros além da espécie, para não esconder resultado.
   const showWaiting = shelf === 'available' && extra === 0 && filters.place.trim() === '';
@@ -248,7 +260,22 @@ export default function AdoptionScreen() {
               if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
             }}
             onEndReachedThreshold={0.6}
-            ListHeaderComponent={waitingRow}
+            ListHeaderComponent={
+              showHero || waitingRow ? (
+                <>
+                  {showHero ? (
+                    <View style={styles.hero}>
+                      <HeroCarousel
+                        slides={heroSlides}
+                        actionLabel="Quero conhecer"
+                        onOpen={(id) => router.push(`/post/${id}`)}
+                      />
+                    </View>
+                  ) : null}
+                  {waitingRow}
+                </>
+              ) : null
+            }
             ListEmptyComponent={
               <EmptyState
                 pose={shelf === 'adopted' ? 'home' : 'search'}
@@ -359,7 +386,7 @@ const styles = StyleSheet.create({
   column: { flex: 1, ...screenColumn },
   shelf: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  // A horizontal scroll in a column grows to fill it unless told not to.
+  // Uma rolagem horizontal numa coluna cresce até ocupar tudo, a menos que se diga o contrário.
   chipRow: { flexGrow: 0 },
   chips: {
     paddingHorizontal: spacing.lg,
@@ -374,6 +401,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: spacing.md,
   },
+  // O banner vai de ponta a ponta: desfaz o recuo lateral da grade.
+  hero: { marginHorizontal: -spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
   cell: { alignItems: 'center', paddingVertical: spacing.sm },
   // A grade já tem a margem lateral; a fileira e o título vão até a borda dela.
   waiting: { marginHorizontal: -spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
@@ -383,5 +412,5 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../src/crash/RouteErrorBoundary';

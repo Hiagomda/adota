@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, messageFrom } from '../../src/api';
+import { neighborhoodOf } from '../../src/animalLabels';
+import { PostGrid } from '../../src/components/profile/PostGrid';
+import { ProfileHeader } from '../../src/components/profile/ProfileHeader';
 import {
-  ActionCard,
   AppText,
   Avatar,
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -22,7 +22,7 @@ import {
 } from '../../src/components/ui';
 import { VersionMark } from '../../src/diagnostics/VersionMark';
 import { useSession } from '../../src/session';
-import { motion, screenColumn, spacing, useTheme } from '../../src/theme';
+import { screenColumn, spacing, useTheme } from '../../src/theme';
 import type { VolunteerStatus } from '../../src/volunteer/types';
 
 type ProfileTab = 'posts' | 'saved' | 'adopted';
@@ -34,8 +34,12 @@ const tabOptions = [
 ] as const;
 
 const MAX_HIGHLIGHTS = 6;
-// Hairline gap between the 3 columns of the grid.
-const CELL_GAP = spacing.xs / 4;
+const HIGHLIGHT_WIDTH = 76;
+
+/** Só os números do perfil público que o cabeçalho usa. */
+interface PublicProfile {
+  counts: { posts: number; helped: number; rescued?: number; followers: number };
+}
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -69,6 +73,12 @@ export default function ProfileScreen() {
     queryFn: () => loadFeed(token, search),
     enabled: Boolean(token && (tab !== 'posts' || me.data)),
   });
+  // Os números do cabeçalho vêm do perfil público, o mesmo que os outros veem.
+  const publicProfile = useQuery({
+    queryKey: ['user', me.data?.handle],
+    queryFn: () => api<PublicProfile>(`/users/${me.data?.handle ?? ''}`, { token }),
+    enabled: Boolean(me.data?.handle),
+  });
   const highlights = (posts.data?.posts ?? [])
     .filter((post) => post.urgency === 'high')
     .slice(0, MAX_HIGHLIGHTS);
@@ -86,6 +96,7 @@ export default function ProfileScreen() {
               void me.refetch();
               void posts.refetch();
               void volunteer.refetch();
+              void publicProfile.refetch();
             }}
             tintColor={colors.primary}
             colors={[colors.primary]}
@@ -93,30 +104,49 @@ export default function ProfileScreen() {
         }
       >
         <View style={styles.column}>
-          <View style={styles.head}>
-            <Avatar
-              name={me.data?.name ?? 'Sua conta'}
-              uri={me.data?.avatarUrl}
-              size="xl"
-              verified={me.data?.verified}
-            />
-            <View style={styles.headText}>
-              <AppText variant="h1" numberOfLines={2}>
-                {me.data?.name ?? 'Sua conta'}
-              </AppText>
-              {me.data ? (
-                <AppText color="textSecondary" numberOfLines={1}>
-                  @{me.data.handle}
-                </AppText>
-              ) : null}
-              {me.data?.verified ? <Badge kind="label" label="Verificado" tone="primary" /> : null}
-            </View>
+          {/* Barra do topo como no Instagram: o @ da conta e os ajustes. */}
+          <View style={styles.topBar}>
+            <AppText variant="h3" numberOfLines={1} style={styles.topTitle}>
+              {me.data ? `@${me.data.handle}` : 'Perfil'}
+            </AppText>
             <IconButton
               icon="settings"
               accessibilityLabel="Ajustes"
               onPress={() => router.push('/settings')}
             />
           </View>
+          <ProfileHeader
+            name={me.data?.name ?? 'Sua conta'}
+            avatarUrl={me.data?.avatarUrl}
+            verified={me.data?.verified}
+            subtitle={[level?.name, me.data?.city].filter(Boolean).join(' · ') || null}
+            stats={[
+              { value: publicProfile.data?.counts.posts ?? 0, label: 'publicações' },
+              { value: publicProfile.data?.counts.followers ?? 0, label: 'seguidores' },
+              {
+                value: publicProfile.data?.counts.rescued ?? publicProfile.data?.counts.helped ?? 0,
+                label: 'saíram da rua',
+              },
+            ]}
+          >
+            {token ? (
+              <>
+                <Button
+                  title="Editar perfil"
+                  variant="outline"
+                  onPress={() => router.push('/settings')}
+                  style={styles.grow}
+                />
+                <Button
+                  title="Minha rede"
+                  icon="users"
+                  variant="outline"
+                  onPress={() => router.push('/voluntario')}
+                  style={styles.grow}
+                />
+              </>
+            ) : null}
+          </ProfileHeader>
           {token && level ? (
             <View style={styles.network}>
               <Card elevation="md">
@@ -132,26 +162,13 @@ export default function ProfileScreen() {
               </Card>
             </View>
           ) : null}
-          <View style={styles.network}>
-            <ActionCard
-              title="Minha rede"
-              description="Lar temporário e selos"
-              icon="users"
-              tone="primary"
-              onPress={() => router.push('/voluntario')}
-            />
-          </View>
-          {highlights.length > 0 ? (
-            <AppText variant="bodySmallStrong" style={styles.railTitle}>
-              Seus resgates urgentes
-            </AppText>
-          ) : null}
           {highlights.length > 0 ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.highlights}
             >
+              {/* Destaques como os do Instagram: bolha com anel e o bairro embaixo. */}
               {highlights.map((post) => (
                 <Touchable
                   key={post.id}
@@ -159,8 +176,17 @@ export default function ProfileScreen() {
                   accessibilityLabel={`Ver resgate urgente em ${post.approxLabel}`}
                   pressedScale={0.94}
                   onPress={() => router.push(`/story/${post.id}`)}
+                  style={styles.highlight}
                 >
-                  <Avatar name={post.approxLabel} uri={post.media[0]?.thumbUrl} size="lg" />
+                  <Avatar
+                    name={post.approxLabel}
+                    uri={post.media[0]?.thumbUrl}
+                    size="lg"
+                    ring="story"
+                  />
+                  <AppText variant="caption" numberOfLines={1} style={styles.highlightLabel}>
+                    {neighborhoodOf(post.approxLabel)}
+                  </AppText>
                 </Touchable>
               ))}
             </ScrollView>
@@ -174,31 +200,7 @@ export default function ProfileScreen() {
               onChange={setTab}
             />
           </View>
-          <View style={styles.grid}>
-            {(posts.data?.posts ?? []).map((post) => (
-              <Touchable
-                key={post.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Abrir resgate em ${post.approxLabel}`}
-                pressedScale={0.97}
-                style={styles.cell}
-                onPress={() => router.push(`/post/${post.id}`)}
-              >
-                <View style={[styles.cellFill, { backgroundColor: colors.surfaceMuted }]}>
-                  {post.media[0] ? (
-                    <Image
-                      source={{ uri: post.media[0].thumbUrl }}
-                      style={styles.cellImage}
-                      contentFit="cover"
-                      transition={motion.base}
-                      cachePolicy="memory-disk"
-                      recyclingKey={post.id}
-                    />
-                  ) : null}
-                </View>
-              </Touchable>
-            ))}
-          </View>
+          <PostGrid posts={posts.data?.posts ?? []} />
           {!token ? (
             <EmptyState
               pose="login"
@@ -265,23 +267,21 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxl },
   column: screenColumn,
-  head: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
-    padding: spacing.lg,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
   },
-  headText: { flex: 1, gap: spacing.xs, alignItems: 'flex-start' },
-  network: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  highlights: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md },
-  tabs: { paddingHorizontal: spacing.lg },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '33.33%', aspectRatio: 1, padding: CELL_GAP },
-  cellFill: { flex: 1 },
-  cellImage: { width: '100%', height: '100%' },
+  topTitle: { flex: 1 },
+  grow: { flex: 1 },
+  network: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  highlights: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
+  highlight: { width: HIGHLIGHT_WIDTH, alignItems: 'center', gap: spacing.xs },
+  highlightLabel: { textAlign: 'center', alignSelf: 'stretch' },
+  tabs: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   logout: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
-  railTitle: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
 });
 
-// One broken screen must not take the whole app down.
+// Uma tela quebrada não pode derrubar o app inteiro.
 export { RouteErrorBoundary as ErrorBoundary } from '../../src/crash/RouteErrorBoundary';
