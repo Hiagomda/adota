@@ -121,6 +121,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 apps/api/src/register.ts      rotas principais (auth no hook onRequest → request.user)
 apps/api/src/feed.ts          posts, status, localização aproximada
 apps/api/src/adoptionChat.ts  conversa de adoção
+apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/staff/           rotas da equipe (TOTP, auditoria)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)

@@ -75,7 +75,7 @@ export function LevelUpBanner({ levelName, onClose }: LevelUpBannerProps) {
         </View>
         <View style={styles.body}>
           <View>
-            <Mascot pose="wave" size={MASCOT_SIZE} />
+            <Mascot pose="party" size={MASCOT_SIZE} />
             <PawBurst trigger={burst} size={24} />
           </View>
           <View style={styles.text}>

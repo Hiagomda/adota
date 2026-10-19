@@ -1,8 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 30,
+  "androidVersionCode": 32,
   "notes": [
-    "Marcador novo no mapa: gota na cor da urgência com a patinha dentro.",
-    "A ponta do marcador mostra o lugar exato do animal."
+    "\"Quero adotar\" agora tem uma ficha rápida antes do WhatsApp, e quem cuida vê as respostas.",
+    "Em Adoção, uma fila mostra os animais que esperam há mais tempo por uma família.",
+    "Feiras de adoção: veja a próxima no Início e como chegar. ONGs verificadas podem divulgar a delas.",
+    "ONG ou protetor pode pedir o selo de verificado numa tela própria, em Configurações."
   ]
 }

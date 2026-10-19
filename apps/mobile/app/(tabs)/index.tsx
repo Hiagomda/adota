@@ -24,9 +24,12 @@ import {
   SkeletonCard,
   SkeletonRail,
   Touchable,
+  useToast,
   type HeroSlide,
 } from '../../src/components/ui';
 import { openCreateCamera } from '../../src/createCamera';
+import { FairCard } from '../../src/events/FairCard';
+import { useFairs } from '../../src/events/useFairs';
 import { adoptionQuery, noAdoptionFilters } from '../../src/post/adoptionQuery';
 import { ageBandOf, ageBands } from '../../src/post/care';
 import { onFeedRefresh } from '../../src/feedRefresh';
@@ -235,6 +238,10 @@ export default function HomeScreen() {
   const [lens, setLens] = useState<HomeLens>('all');
   const [searchOpen, setSearchOpen] = useState(false);
   const here = useViewerLocation();
+  const toast = useToast();
+  const fairs = useFairs(token);
+  const nextFair = fairs.data?.events[0] ?? null;
+  const fairCount = fairs.data?.events.length ?? 0;
 
   const feed = useQuery({
     queryKey: ['posts', token],
@@ -378,12 +385,24 @@ export default function HomeScreen() {
     void stories.refetch();
     void adoption.refetch();
     void adoptionCats.refetch();
+    void fairs.refetch();
     if (nearPoint) void nearbyStories.refetch();
     if (token) {
       void me.refetch();
       void notifications.refetch();
     }
-  }, [adoption, adoptionCats, feed, me, nearPoint, nearbyStories, notifications, stories, token]);
+  }, [
+    adoption,
+    adoptionCats,
+    fairs,
+    feed,
+    me,
+    nearPoint,
+    nearbyStories,
+    notifications,
+    stories,
+    token,
+  ]);
 
   useEffect(() => {
     return onFeedRefresh(() => {
@@ -482,6 +501,7 @@ export default function HomeScreen() {
           icon="smile"
           onPress={() => router.push({ pathname: '/adocao', params: { aba: 'adotados' } })}
         />
+        <Chip label="Feiras" icon="calendar" onPress={() => router.push('/feiras')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
         <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
       </ScrollView>
@@ -503,6 +523,23 @@ export default function HomeScreen() {
             loading={adoptionCats.isLoading}
             onSeeAll={() => router.push('/adocao')}
           />
+          {nextFair ? (
+            <View style={styles.fair}>
+              <SectionHeader
+                title="Feira de adoção"
+                subtitle="Conheça os animais pessoalmente"
+                actionLabel={fairCount > 1 ? `Ver as ${fairCount}` : 'Ver feiras'}
+                onAction={() => router.push('/feiras')}
+              />
+              <View style={styles.fairCard}>
+                <FairCard
+                  fair={nextFair}
+                  onOrganizer={(handle) => router.push(`/user/${handle}`)}
+                  onError={(message) => toast.show(message, 'error')}
+                />
+              </View>
+            </View>
+          ) : null}
         </>
       )}
 
@@ -559,7 +596,7 @@ export default function HomeScreen() {
               />
             ) : (
               <EmptyState
-                pose="sad"
+                pose="map"
                 title="Nenhum resgate por aqui"
                 body="Belém está quieta neste momento. Se você viu um animal na rua, publique para a rede ajudar."
                 actionLabel="Criar resgate"
@@ -619,6 +656,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   story: { width: STORY_WIDTH, alignItems: 'center', gap: spacing.xs },
+  fair: { ...screenColumn, paddingBottom: spacing.md },
+  fairCard: { paddingHorizontal: spacing.lg },
   storyText: { alignSelf: 'stretch', alignItems: 'center' },
   storyLine: { textAlign: 'center' },
 });
