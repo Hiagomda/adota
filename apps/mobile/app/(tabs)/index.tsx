@@ -423,7 +423,7 @@ export default function HomeScreen() {
               />
             ) : (
               <EmptyState
-                pose="sad"
+                pose="map"
                 title="Nenhum resgate por aqui"
                 body="Belém está quieta neste momento. Se você viu um animal na rua, publique para a rede ajudar."
                 actionLabel="Criar resgate"
