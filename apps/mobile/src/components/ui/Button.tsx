@@ -134,6 +134,10 @@ export function Button({
               variant="button"
               style={[styles.label, { color: foreground }]}
               numberOfLines={2}
+              // O padrão do Android (highQuality) mede a linha mais estreita do que desenha: com o
+              // rótulo na medida exata, a última palavra quebrava para uma linha que não cabia e
+              // sumia ("Vou procurar" virava só "Vou").
+              textBreakStrategy="simple"
             >
               {title}
             </AppText>
@@ -161,7 +165,11 @@ const styles = StyleSheet.create({
   full: { alignSelf: 'stretch' },
   // Two lines before an ellipsis: with a large system font a long title wraps instead of hiding.
   label: { flexShrink: 1, textAlign: 'center' },
+  // Sem limite de largura, o Yoga mede o rótulo contra o botão inteiro, esquecendo o ícone e o
+  // espaço entre eles: a linha passava da borda em vez de quebrar.
   content: {
+    flexShrink: 1,
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

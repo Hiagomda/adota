@@ -8,13 +8,12 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
-  Share,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, loadFeed, loadPost, messageFrom, siteUrl } from '../../src/api';
+import { api, loadFeed, loadPost, messageFrom } from '../../src/api';
 import { requestMapFocus } from '../../src/map/focusRequest';
 import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
@@ -55,7 +54,15 @@ import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
+import { postLinkFor, sharePost } from '../../src/post/sharePost';
 import { PostEditor } from '../../src/post/PostEditor';
+import { AdoptionInterestSheet } from '../../src/post/AdoptionInterestSheet';
+import {
+  answerLines,
+  interestMessage,
+  type AdoptionAnswers,
+} from '../../src/post/adoptionInterest';
+import { waitingLabel } from '../../src/post/waiting';
 import { isTeamRole, useSession } from '../../src/session';
 import {
   contentMaxWidth,
@@ -70,6 +77,14 @@ import { useLightStatusBar } from '../../src/useLightStatusBar';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { reportError } from '../../src/crash/reporter';
 import { reportReasons, reportSentNote } from '../../src/reportReasons';
+
+/** Ficha que alguém mandou antes de chamar no WhatsApp. Só quem cuida recebe a lista. */
+interface AdoptionInterest {
+  person: { id: string; name: string; handle: string; avatarUrl: string | null; verified: boolean };
+  answers: AdoptionAnswers;
+  note: string | null;
+  updatedAt: string;
+}
 
 interface Comment {
   id: string;
@@ -101,6 +116,7 @@ export default function PostScreen() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [interestOpen, setInterestOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editSession, setEditSession] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -145,6 +161,16 @@ export default function PostScreen() {
     queryKey: ['sightings', id, token],
     queryFn: () => api<{ sightings: Sighting[] }>(`/posts/${id}/sightings`, { token }),
     enabled: Boolean(id),
+  });
+  const ownAdoption =
+    Boolean(token) &&
+    post.data?.author.id === userId &&
+    (post.data?.status === 'for_adoption' || post.data?.status === 'adopted');
+  const interests = useQuery({
+    queryKey: ['adoption-interests', id, token],
+    queryFn: () =>
+      api<{ interests: AdoptionInterest[] }>(`/posts/${id}/adoption-interests`, { token }),
+    enabled: Boolean(id) && ownAdoption,
   });
   const species = post.data?.animal.species;
   const similar = useQuery({
@@ -260,6 +286,8 @@ export default function PostScreen() {
   const othersGoing = Math.max(helpers - (item.viewerWillHelp ? 1 : 0), 0);
   const missedVisits = notFoundVisits(item);
   const careList = careChips(item.animal.care);
+  const waiting = forAdoption ? waitingLabel(item.adoptionSince) : null;
+  const interestList = interests.data?.interests ?? [];
   const sightingList = sightings.data?.sightings ?? [];
   const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
   const fosterList = fosters.data?.homes ?? [];
@@ -345,7 +373,7 @@ export default function PostScreen() {
             icon: 'message-circle',
             variant: 'secondary',
             loading: contactBusy,
-            onPress: () => talkToAuthor(),
+            onPress: () => (forAdoption ? startAdoption() : talkToAuthor()),
           }
         : helpingNow
           ? {
@@ -384,7 +412,7 @@ export default function PostScreen() {
       ? `${helpers} ${helpers === 1 ? 'pessoa' : 'pessoas'} a caminho`
       : null;
 
-  const postLink = `${siteUrl}/p/${item.id}`;
+  const postLink = postLinkFor(item.id);
   // "a Mel" reads wrong without knowing the sex, so the name goes alone or "um gato".
   const animalRef = item.animal.name?.trim() || `um ${speciesName.toLowerCase()}`;
   const authorFirstName = item.author.name.split(' ')[0] ?? item.author.name;
@@ -395,6 +423,30 @@ export default function PostScreen() {
       ? `Oi, ${authorFirstName}! Vi o post de adoção de ${animalRef} no Égua, adota! e quero adotar. ${postLink}`
       : `Oi, ${authorFirstName}! Vou ajudar no resgate de ${animalRef} em ${placeOf(item.approxLabel)}, pelo Égua, adota!. ${postLink}`;
     void whatsapp.open(`/posts/${item.id}/contact`, text);
+  }
+
+  function startAdoption() {
+    if (!token) {
+      setNote('Entre na sua conta para falar com quem cuida.');
+      return;
+    }
+    setInterestOpen(true);
+  }
+
+  function sendInterest(answers: AdoptionAnswers, extra: string) {
+    if (!item) return;
+    setInterestOpen(false);
+    void whatsapp.open(
+      `/posts/${item.id}/contact`,
+      interestMessage({
+        authorFirstName,
+        animalRef,
+        answers,
+        species: item.animal.species,
+        note: extra,
+        link: postLink,
+      }),
+    );
   }
 
   function talkToFosterHome(home: FosterHome) {
@@ -408,10 +460,7 @@ export default function PostScreen() {
 
   function share() {
     if (!item) return;
-    Share.share({
-      message: `${animalHeadline(item.animal)} em ${item.approxLabel} no Égua, adota! ${siteUrl}/p/${item.id}`,
-      url: `${siteUrl}/p/${item.id}`,
-    }).catch((error: unknown) => {
+    sharePost(item).catch((error: unknown) => {
       reportError(error, { source: 'handled', where: 'post:share' });
       setNote('Não consegui abrir o compartilhamento. Tente de novo.');
     });
@@ -561,6 +610,7 @@ export default function PostScreen() {
               {item.animal.ageEstimate ? (
                 <InfoChip label={item.animal.ageEstimate} icon="clock" tone="info" />
               ) : null}
+              {waiting ? <InfoChip label={waiting} icon="calendar" tone="caramel" /> : null}
             </View>
 
             {careList.length > 0 ? (
@@ -650,6 +700,55 @@ export default function PostScreen() {
                 </Card>
               ) : null}
             </View>
+
+            {ownAdoption ? (
+              <View style={styles.section}>
+                <AppText variant="h2">Quem quer adotar</AppText>
+                {interestList.length === 0 ? (
+                  <AppText color="textSecondary">
+                    {interests.isError
+                      ? messageFrom(interests.error)
+                      : 'Quando alguém tocar em "Quero adotar", a ficha dessa pessoa aparece aqui e a conversa abre no seu WhatsApp.'}
+                  </AppText>
+                ) : (
+                  <Card padding="none" elevation="md">
+                    {interestList.map((interest, index) => (
+                      <View key={interest.person.id}>
+                        {index > 0 ? <Divider inset /> : null}
+                        <Touchable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Ficha de ${interest.person.name}. Ver perfil`}
+                          pressedScale={0.98}
+                          onPress={() => router.push(`/user/${interest.person.handle}`)}
+                          style={styles.interest}
+                        >
+                          <Avatar
+                            name={interest.person.name}
+                            uri={interest.person.avatarUrl}
+                            size="md"
+                            verified={interest.person.verified}
+                          />
+                          <View style={styles.interestText}>
+                            <AppText variant="bodyStrong" numberOfLines={1}>
+                              {interest.person.name}
+                            </AppText>
+                            <AppText variant="bodySmall" color="textSecondary">
+                              {answerLines(interest.answers, item.animal.species).join(' · ')}
+                            </AppText>
+                            {interest.note ? (
+                              <AppText variant="bodySmall">{interest.note}</AppText>
+                            ) : null}
+                            <AppText variant="caption" color="textSecondary">
+                              Mandou a ficha {formatWhen(interest.updatedAt)}
+                            </AppText>
+                          </View>
+                        </Touchable>
+                      </View>
+                    ))}
+                  </Card>
+                )}
+              </View>
+            ) : null}
 
             {item.helpRequest ? (
               <Card elevation="none" style={{ backgroundColor: colors.infoSoft }}>
@@ -1025,6 +1124,14 @@ export default function PostScreen() {
         ) : null}
       </View>
 
+      <AdoptionInterestSheet
+        visible={interestOpen}
+        postId={item.id}
+        species={item.animal.species}
+        token={token}
+        onClose={() => setInterestOpen(false)}
+        onSent={sendInterest}
+      />
       <PostEditor
         key={editSession}
         visible={editOpen}
@@ -1353,6 +1460,8 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   author: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   authorLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  interest: { flexDirection: 'row', gap: spacing.md, padding: spacing.md },
+  interestText: { flex: 1, gap: spacing.xs },
   authorText: { flex: 1 },
   pix: { flexDirection: 'row', gap: spacing.md },
   pixText: { flex: 1, gap: spacing.xs },

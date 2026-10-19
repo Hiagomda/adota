@@ -379,7 +379,7 @@ async function seed(pool: Pool): Promise<void> {
 
   await pool.query(`
     TRUNCATE TABLE
-      adoption_terms, verification_requests, notifications, reports, help_requests,
+      adoption_terms, adoption_interests, adoption_events, verification_requests, notifications, reports, help_requests,
       fosters, story_views, blocks, post_follows, follows, saves, likes, comments,
       responses, post_media, posts, animals, users
     RESTART IDENTITY CASCADE
@@ -516,6 +516,36 @@ async function seed(pool: Pool): Promise<void> {
         );
       }
     }
+  }
+
+  // Alguns animais para adoção há semanas, para a fileira "Esperando há mais tempo".
+  await pool.query(
+    `WITH oldest AS (
+       SELECT id, row_number() OVER (ORDER BY id) AS place
+       FROM posts WHERE status = 'for_adoption' AND parent_post_id IS NULL
+       LIMIT 3
+     )
+     UPDATE posts p SET created_at = now() - (oldest.place * interval '18 days')
+     FROM oldest WHERE p.id = oldest.id`,
+  );
+
+  // Uma feira da ONG no sábado da semana que vem, das 9h às 13h no horário de Belém.
+  const ngo = ids.get('patasbelem');
+  if (ngo) {
+    await pool.query(
+      `INSERT INTO adoption_events (user_id, title, description, place_label, location, starts_at, ends_at)
+       VALUES (
+         $1, 'Feira de adoção na Batista Campos',
+         'Cães e gatos castrados e vacinados. Traga documento com foto e venha conhecer.',
+         'Praça Batista Campos, Batista Campos',
+         ST_SetSRID(ST_MakePoint(-48.4878, -1.4588), 4326)::geography,
+         (date_trunc('week', now() AT TIME ZONE 'America/Belem') + interval '12 days 9 hours')
+           AT TIME ZONE 'America/Belem',
+         (date_trunc('week', now() AT TIME ZONE 'America/Belem') + interval '12 days 13 hours')
+           AT TIME ZONE 'America/Belem'
+       )`,
+      [ngo],
+    );
   }
 }
 

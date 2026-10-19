@@ -43,7 +43,6 @@ export default function SettingsScreen() {
   });
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
-  const [organization, setOrganization] = useState('');
   const [phone, setPhone] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
   const toast = useToast();
@@ -320,33 +319,18 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
               <AppText variant="h3">ONG ou proteção</AppText>
-              <Card>
-                <View style={styles.form}>
-                  <Input
-                    label="Nome da ONG ou proteção"
-                    value={organization}
-                    onChangeText={setOrganization}
-                    placeholder="Nome da ONG ou proteção"
-                    helper="Perfis verificados podem divulgar o Pix. O app nunca recebe dinheiro."
-                  />
-                  <Button
-                    title="Pedir verificação"
-                    icon="shield"
-                    variant="outline"
-                    fullWidth
-                    onPress={() =>
-                      void run(
-                        () =>
-                          api('/me/verification', {
-                            method: 'POST',
-                            token,
-                            body: { organizationName: organization, note: 'Atuo em Belém.' },
-                          }),
-                        'Pedido enviado. A equipe analisa antes de liberar o Pix no perfil.',
-                      )
-                    }
-                  />
-                </View>
+              <Card padding="none" elevation="none">
+                <ListItem
+                  title={me.data?.verified ? 'Perfil verificado' : 'Cadastrar ONG ou protetor'}
+                  subtitle={
+                    me.data?.verified
+                      ? 'Divulgue Pix nos pedidos de ajuda e marque feiras de adoção.'
+                      : 'Peça o selo para divulgar Pix e feiras de adoção.'
+                  }
+                  icon="shield"
+                  showChevron
+                  onPress={() => router.push('/ong')}
+                />
               </Card>
             </View>
 

@@ -4,7 +4,12 @@ import { z } from 'zod';
 import type { Env } from '../config.js';
 import { HttpError } from '../http.js';
 import { publicMediaUrl } from '../media.js';
-import { enqueueRescueAlert, notifyReportResolved, type createQueue } from '../notify.js';
+import {
+  enqueueRescueAlert,
+  notifyReportResolved,
+  notifyVerificationDecision,
+  type createQueue,
+} from '../notify.js';
 import { rowsOf } from '../session.js';
 import { assertPermission, isStaffRole } from './policy.js';
 import { clientIp, loadSession, userAgent, writeAudit } from './routes.js';
@@ -22,7 +27,8 @@ const reportActionSchema = z.object({ action: z.enum(['hide', 'dismiss']) }).str
 const verificationActionSchema = z
   .object({
     action: z.enum(['approve', 'reject']),
-    role: z.enum(['ngo', 'protector']).default('ngo'),
+    // Sem papel, vale o que a pessoa pediu no cadastro.
+    role: z.enum(['ngo', 'protector']).optional(),
   })
   .strict();
 
@@ -262,14 +268,18 @@ export function registerModerationRoutes(
       organization_name: string;
       note: string | null;
       created_at: Date;
+      kind: string;
+      instagram: string | null;
+      cnpj: string | null;
+      neighborhood: string | null;
       user_id: string;
       handle: string;
       name: string;
       role: string;
       verified: boolean;
     }>(
-      `SELECT v.id, v.organization_name, v.note, v.created_at,
-              u.id AS user_id, u.handle, u.name, u.role, u.verified
+      `SELECT v.id, v.organization_name, v.note, v.created_at, v.kind, v.instagram, v.cnpj,
+              v.neighborhood, u.id AS user_id, u.handle, u.name, u.role, u.verified
        FROM verification_requests v JOIN users u ON u.id = v.user_id
        WHERE v.status = 'pending' AND u.deleted_at IS NULL
        ORDER BY v.created_at ASC
@@ -281,6 +291,10 @@ export function registerModerationRoutes(
         organizationName: row.organization_name,
         note: row.note,
         createdAt: row.created_at.toISOString(),
+        kind: row.kind,
+        instagram: row.instagram,
+        cnpj: row.cnpj,
+        neighborhood: row.neighborhood,
         userId: row.user_id,
         handle: row.handle,
         name: row.name,
@@ -296,11 +310,17 @@ export function registerModerationRoutes(
     const id = parse(idSchema, request.params).id;
     const body = parse(verificationActionSchema, request.body);
     const status = body.action === 'approve' ? 'approved' : 'rejected';
+    let decided: string | null = null;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const row = await client.query<{ user_id: string; status: string; role: string }>(
-        `SELECT v.user_id, v.status, u.role
+      const row = await client.query<{
+        user_id: string;
+        status: string;
+        role: string;
+        kind: 'ngo' | 'protector';
+      }>(
+        `SELECT v.user_id, v.status, u.role, v.kind
          FROM verification_requests v JOIN users u ON u.id = v.user_id
          WHERE v.id = $1 FOR UPDATE OF v`,
         [id],
@@ -310,6 +330,8 @@ export function registerModerationRoutes(
       if (found.status !== 'pending') {
         throw new HttpError(409, 'Outra pessoa já analisou esse pedido. Atualize a lista.');
       }
+      const role = body.role ?? found.kind;
+      decided = found.user_id;
       if (body.action === 'approve') {
         // Conta da equipe continua com o papel dela: só ganha o selo de verificada.
         if (isStaffRole(found.role)) {
@@ -317,21 +339,21 @@ export function registerModerationRoutes(
         } else {
           await client.query(`UPDATE users SET verified = true, role = $2 WHERE id = $1`, [
             found.user_id,
-            body.role,
+            role,
           ]);
         }
       }
-      await client.query(`UPDATE verification_requests SET status = $2 WHERE id = $1`, [
-        id,
-        status,
-      ]);
+      await client.query(
+        `UPDATE verification_requests SET status = $2, decided_at = now() WHERE id = $1`,
+        [id, status],
+      );
       await writeAudit(client, {
         actorId: session.user_id,
         action: `verification.${body.action}`,
         targetType: 'user',
         targetId: found.user_id,
         before: { request: id, role: found.role },
-        after: { request: id, status, role: body.action === 'approve' ? body.role : found.role },
+        after: { request: id, status, role: body.action === 'approve' ? role : found.role },
         ...trail(request),
       });
       await client.query('COMMIT');
@@ -340,6 +362,11 @@ export function registerModerationRoutes(
       throw error;
     } finally {
       client.release();
+    }
+    if (decided) {
+      await notifyVerificationDecision(pool, decided, body.action).catch((error: unknown) => {
+        request.log.error({ err: error, where: 'notify:verification' }, 'best-effort step failed');
+      });
     }
     return { status };
   });

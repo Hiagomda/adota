@@ -43,17 +43,32 @@ services:
     volumes:
       - minio:/bitnami/minio/data
     restart: unless-stopped
-    mem_limit: 256m
+    # Estava em 240 de 256 MB. Com folga, o envio de fotos não trava.
+    mem_limit: 512m
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
       interval: 10s
       timeout: 5s
       retries: 10
 
+  # O nome `imgproxy` e a porta 8080 continuam com o domínio público no Coolify, mas agora é o
+  # cache (nginx). Ele guarda as fotos já redimensionadas e só chama o imgproxy-origin na primeira vez.
   imgproxy:
-    image: darthsim/imgproxy:v3.30.1
+    build:
+      context: .
+      dockerfile: docker/imgcache.Dockerfile
     environment:
       SERVICE_URL_IMGPROXY_8080: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+    volumes:
+      - imgcache:/var/cache/imgproxy
+    depends_on:
+      - imgproxy-origin
+    restart: unless-stopped
+    mem_limit: 128m
+
+  imgproxy-origin:
+    image: darthsim/imgproxy:v3.30.1
+    environment:
       IMGPROXY_USE_S3: 'true'
       IMGPROXY_S3_ENDPOINT: http://minio:9000
       IMGPROXY_S3_REGION: us-east-1
@@ -137,3 +152,4 @@ volumes:
   postgres:
   minio:
   apk:
+  imgcache:

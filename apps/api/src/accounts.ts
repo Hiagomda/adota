@@ -284,6 +284,8 @@ const personalTables = [
   'story_views',
   'notifications',
   'adoption_terms',
+  'adoption_interests',
+  'adoption_events',
   'verification_requests',
   'staff_totp',
   'staff_recovery_codes',

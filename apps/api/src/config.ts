@@ -11,10 +11,15 @@ function blankAsUnset(value: unknown): unknown {
   return typeof value === 'string' && value.trim() === '' ? undefined : value;
 }
 
+const defaults = {
+  DATABASE_URL: 'postgres://patinha:patinha@localhost:5435/patinha',
+  MINIO_SECRET_KEY: 'patinha-secret',
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3010),
-  DATABASE_URL: z.string().min(1).default('postgres://patinha:patinha@localhost:5435/patinha'),
+  DATABASE_URL: z.string().min(1).default(defaults.DATABASE_URL),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
   AUTH_DEV_MODE: z.enum(['true', 'false']).optional(),
   FIREBASE_PROJECT_ID: z.preprocess(blankAsUnset, z.string().min(1).optional()),
@@ -27,7 +32,7 @@ const envSchema = z.object({
     z.string().min(1).optional(),
   ),
   MINIO_ACCESS_KEY: z.string().min(1).default('patinha'),
-  MINIO_SECRET_KEY: z.string().min(1).default('patinha-secret'),
+  MINIO_SECRET_KEY: z.string().min(1).default(defaults.MINIO_SECRET_KEY),
   MINIO_BUCKET: z.string().min(1).default('patinha-media'),
   IMGPROXY_URL: z.string().min(1).default('http://localhost:8080'),
   IMGPROXY_KEY: z.string().default(''),
@@ -49,5 +54,26 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const authDevMode =
     parsed.AUTH_DEV_MODE === 'true' ||
     (parsed.AUTH_DEV_MODE === undefined && parsed.NODE_ENV !== 'production');
-  return { ...parsed, authDevMode };
+  const env = { ...parsed, authDevMode };
+  const unsafe = productionProblems(env);
+  if (unsafe.length > 0) {
+    throw new Error(`Configuração insegura para produção: ${unsafe.join('; ')}`);
+  }
+  return env;
+}
+
+/**
+ * Em produção a API não sobe com os valores de desenvolvimento. Melhor o deploy falhar no
+ * Coolify do que ficar no ar aceitando `dev:<email>` ou com a senha padrão do MinIO.
+ */
+export function productionProblems(env: Env): string[] {
+  if (env.NODE_ENV !== 'production') return [];
+  const problems: string[] = [];
+  if (env.authDevMode) problems.push('AUTH_DEV_MODE precisa ser false');
+  if (!env.FIREBASE_PROJECT_ID) problems.push('FIREBASE_PROJECT_ID está vazio');
+  if (env.DATABASE_URL === defaults.DATABASE_URL) problems.push('DATABASE_URL é o padrão local');
+  if (env.MINIO_SECRET_KEY === defaults.MINIO_SECRET_KEY)
+    problems.push('MINIO_SECRET_KEY é o padrão local');
+  if (!env.IMGPROXY_KEY || !env.IMGPROXY_SALT) problems.push('IMGPROXY_KEY e IMGPROXY_SALT vazios');
+  return problems;
 }

@@ -438,7 +438,7 @@ export default function CreateScreen() {
             />
           ) : null}
           <View style={styles.intro}>
-            <Mascot pose={kind === 'lost' ? 'search' : 'sit'} size={INTRO_MASCOT} />
+            <Mascot pose={kind === 'lost' ? 'search' : 'camera'} size={INTRO_MASCOT} />
             <AppText variant="h1" style={styles.introTitle}>
               {photos.length === 0 ? 'Fotografar o animal' : 'Sobre o animal'}
             </AppText>

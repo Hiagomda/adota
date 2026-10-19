@@ -56,6 +56,16 @@
         font-weight: 700;
         text-decoration: none;
       }
+      a[hidden] {
+        display: none;
+      }
+      a.abrir {
+        background: var(--acai);
+        color: var(--areia);
+      }
+      a.abrir + a {
+        margin-top: 12px;
+      }
       a[aria-disabled='true'] {
         background: #e4d4b8;
         pointer-events: none;
@@ -71,13 +81,28 @@
     <main>
       <img src="/paw.png" alt="" />
       <h1>Égua, adota!</h1>
-      <p>Teste do app de resgate de animais em Belém. O arquivo é só para Android.</p>
+      <p id="texto">Teste do app de resgate de animais em Belém. O arquivo é só para Android.</p>
+      <a id="abrir" class="abrir" href="#" hidden>Abrir no app</a>
       <a id="baixar" href="/egua-adota.apk" aria-disabled="true">Preparando o arquivo...</a>
       <small id="aviso">Se o botão não liberar, atualize a página daqui a pouco.</small>
     </main>
     <script>
       const botao = document.getElementById('baixar');
       const aviso = document.getElementById('aviso');
+      // Post compartilhado pelo app (?post=<id>): oferece abrir no app. No Android o intent://
+      // volta para esta página quando o app não está instalado.
+      const post = new URLSearchParams(location.search).get('post');
+      if (post && /^[A-Za-z0-9-]{1,64}$/.test(post)) {
+        const abrir = document.getElementById('abrir');
+        const pagina = `${location.origin}${location.pathname}`;
+        abrir.href = /Android/i.test(navigator.userAgent)
+          ? `intent://post/${post}#Intent;scheme=egua;package=app.egua.adota;` +
+            `S.browser_fallback_url=${encodeURIComponent(pagina)};end`
+          : `egua://post/${post}`;
+        abrir.hidden = false;
+        document.getElementById('texto').textContent =
+          'Te mandaram um bichinho do Égua, adota! Já tem o app? Abre o post. Ainda não tem? Baixa e depois toca no link de novo.';
+      }
       fetch('/egua-adota.apk', { method: 'HEAD' }).then((resposta) => {
         if (!resposta.ok) return;
         botao.textContent = 'Baixar o app';
