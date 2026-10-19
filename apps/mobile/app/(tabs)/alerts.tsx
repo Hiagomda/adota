@@ -67,7 +67,7 @@ export default function AlertsScreen() {
         <Header title="Notificações" large />
         {!token ? (
           <EmptyState
-            pose="wave"
+            pose="login"
             title="Entre para ver os avisos"
             body="As notificações de resgates perto de você aparecem depois que você entra na conta."
           />

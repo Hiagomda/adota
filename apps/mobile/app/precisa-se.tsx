@@ -58,7 +58,7 @@ export default function NeedsScreen() {
             />
           ) : open.length === 0 ? (
             <EmptyState
-              pose="sit"
+              pose="bowl"
               title="Nenhum pedido aberto agora"
               body="Quando uma ONG ou protetor verificado pedir ração, remédio ou castração, aparece aqui."
             />

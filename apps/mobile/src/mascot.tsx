@@ -11,6 +11,11 @@ const poses = {
   chat: require('../assets/mascot/chat.png'),
   quiet: require('../assets/mascot/quiet.png'),
   party: require('../assets/mascot/party.png'),
+  login: require('../assets/mascot/login.png'),
+  map: require('../assets/mascot/map.png'),
+  bowl: require('../assets/mascot/bowl.png'),
+  camera: require('../assets/mascot/camera.png'),
+  saved: require('../assets/mascot/saved.png'),
 } as const;
 
 export type MascotPose = keyof typeof poses;
