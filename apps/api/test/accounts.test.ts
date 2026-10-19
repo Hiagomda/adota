@@ -18,9 +18,18 @@ function poolFailing(errors: unknown[]) {
 const taken = Object.assign(new Error('duplicate key'), { code: '23505' });
 
 describe('first sign-in', () => {
-  it('derives a lowercase @ from the e-mail and the uid', () => {
-    expect(firstHandle('Maria.Silva@gmail.com', 'AbC9xyz')).toBe('mariasilvaabc9');
-    expect(firstHandle(undefined, 'Zz12')).toBe('pessoazz12');
+  it('derives a readable @ from the name, then the e-mail', () => {
+    expect(firstHandle('Maria da Silva Araújo', 'x@gmail.com')).toBe('maria.araujo');
+    expect(firstHandle('Hiago', undefined)).toBe('hiago');
+    expect(firstHandle(undefined, 'Joao_Pedro99@gmail.com')).toBe('joao.pedro99');
+    expect(firstHandle('Jo', 'jo@x.com')).toBe('amigo');
+    expect(firstHandle(undefined, undefined)).toBe('amigo');
+  });
+
+  it('keeps the @ within the profile limit', () => {
+    const handle = firstHandle('Maximiliano Bartolomeu Constantinopla', undefined);
+    expect(handle).toBe('maximiliano');
+    expect(firstHandle('A'.repeat(40), undefined).length).toBeLessThanOrEqual(19);
   });
 
   it('tries another @ when the first one is taken instead of failing the login', async () => {
@@ -32,8 +41,8 @@ describe('first sign-in', () => {
       role: 'user',
     });
     expect(handles).toHaveLength(2);
-    expect(handles[0]).toBe('anaabcd');
-    expect(handles[1]).toMatch(/^anaabcd\d{4}$/);
+    expect(handles[0]).toBe('ana');
+    expect(handles[1]).toMatch(/^ana\d{2}$/);
   });
 
   it('lets a database failure reach the caller', async () => {

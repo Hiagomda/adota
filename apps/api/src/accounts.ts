@@ -71,30 +71,52 @@ export async function createDevUser(pool: Pool, email: string): Promise<SessionU
   return mapUser(row);
 }
 
-/** First @ for a new Firebase account: the e-mail name plus four characters of the uid. */
-export function firstHandle(email: string | undefined, uid: string): string {
-  const base =
-    (email ?? '')
-      .split('@')[0]
-      ?.toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
-      .slice(0, 16) || 'pessoa';
-  return `${base}${uid
-    .slice(0, 4)
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '0')}`;
+/**
+ * First @ for a new Firebase account, made to look like a name people would pick: "Maria da
+ * Silva" becomes "maria.silva". Without a usable name it falls back to the e-mail, then "amigo".
+ */
+export function firstHandle(name: string | undefined, email: string | undefined): string {
+  return handleFrom(name, (word) => word.length > 2) || handleFrom(email?.split('@')[0]) || 'amigo';
 }
+
+function handleFrom(
+  text: string | undefined,
+  keep: (word: string) => boolean = () => true,
+): string {
+  const words = (text ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  // "Maria da Silva" keeps first and last name; connectors like "da" and "de" drop out.
+  const named = words.filter(keep);
+  const picked =
+    named.length >= 2 ? [named[0], named[named.length - 1]] : named.length ? named : words;
+  let handle = picked.join('.');
+  if (handle.length > HANDLE_BASE_MAX) handle = (picked[0] ?? '').slice(0, HANDLE_BASE_MAX);
+  return handle.length >= 3 ? handle : '';
+}
+
+/** Room for a 4-digit suffix inside the 24 characters the profile screen accepts. */
+const HANDLE_BASE_MAX = 19;
 
 /**
  * First sign-in. Another account may already own the derived @ (handles are unique), which used
- * to fail every later request of this person. On that collision, try a random suffix.
+ * to fail every later request of this person. On that collision, try a short number after it.
  */
 export async function createFirebaseUser(
   pool: Pool,
   input: { uid: string; name: string | undefined; email: string | undefined; role: string },
 ): Promise<void> {
-  const first = firstHandle(input.email, input.uid);
-  const candidates = [first, ...Array.from({ length: 4 }, () => `${first}${randomDigits()}`)];
+  const first = firstHandle(input.name, input.email);
+  const candidates = [
+    first,
+    `${first}${randomDigits(2)}`,
+    `${first}${randomDigits(2)}`,
+    `${first}${randomDigits(4)}`,
+    `${first}${randomDigits(4)}`,
+  ];
   for (const handle of candidates) {
     try {
       await pool.query(
@@ -110,8 +132,9 @@ export async function createFirebaseUser(
   throw new Error(`No free handle for the new account after ${candidates.length} tries`);
 }
 
-function randomDigits(): string {
-  return String(Math.floor(Math.random() * 9000 + 1000));
+function randomDigits(count: 2 | 4): string {
+  const low = count === 2 ? 10 : 1000;
+  return String(Math.floor(Math.random() * low * 9 + low));
 }
 
 export async function profileByHandle(
