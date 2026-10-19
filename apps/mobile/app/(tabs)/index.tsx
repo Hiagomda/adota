@@ -3,7 +3,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
 import { animalHeadline, neighborhoodOf, placeOf } from '../../src/animalLabels';
@@ -37,6 +37,7 @@ import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
+import { canChooseScheme, toggleColorScheme } from '../../src/theme/schemeChoice';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { Mascot } from '../../src/mascot';
@@ -229,6 +230,7 @@ function matchesLens(post: Post, lens: HomeLens, seek: string): boolean {
 
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const dark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const token = useSession((state) => state.token);
@@ -454,6 +456,13 @@ export default function HomeScreen() {
               setSearchOpen(!searchOpen);
             }}
           />
+          {canChooseScheme ? (
+            <IconButton
+              icon={dark ? 'sun' : 'moon'}
+              accessibilityLabel={dark ? 'Usar tema claro' : 'Usar tema escuro'}
+              onPress={() => toggleColorScheme(dark ? 'dark' : 'light')}
+            />
+          ) : null}
           <View>
             <IconButton
               icon="bell"

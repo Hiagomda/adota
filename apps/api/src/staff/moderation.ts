@@ -552,7 +552,7 @@ export function registerModerationRoutes(
     );
     const target = current.rows[0];
     if (!target) throw new HttpError(404, 'Essa conta não existe.');
-    // Conta da equipe sai pela tela Equipe, que pede o autenticador e encerra as sessões.
+    // Conta da equipe sai pela tela Equipe, que pede a senha e encerra as sessões.
     if (isStaffRole(target.role)) {
       throw new HttpError(403, 'Conta da equipe: mude o papel na tela Equipe antes.');
     }

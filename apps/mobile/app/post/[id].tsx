@@ -648,7 +648,7 @@ export default function PostScreen() {
             </View>
 
             <View style={styles.section}>
-              <AppText variant="h2">Quem está cuidando</AppText>
+              <AppText variant="h2">Quem publicou</AppText>
               <Card elevation="md" padding="md">
                 <View style={styles.author}>
                   <Touchable
@@ -841,8 +841,8 @@ export default function PostScreen() {
                 <AppText variant="h2">Visto por aí</AppText>
                 {sightingList.length === 0 ? (
                   <AppText color="textSecondary">
-                    Viu este animal em outro lugar? Marque onde, mesmo sem poder ir. Quem está
-                    cuidando recebe o aviso.
+                    Viu este animal em outro lugar? Marque onde, mesmo sem poder ir. Quem publicou
+                    recebe o aviso.
                   </AppText>
                 ) : (
                   <Card padding="none" elevation="md">

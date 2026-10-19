@@ -53,7 +53,7 @@ export default function SightingScreen() {
         },
       });
       await client.invalidateQueries({ queryKey: ['sightings', id] });
-      toast.show('Obrigado! Avisamos quem está cuidando deste resgate.', 'success');
+      toast.show('Obrigado! Avisamos quem publicou este resgate.', 'success');
       router.back();
     } catch (error) {
       setMessage(messageFrom(error));
@@ -69,7 +69,7 @@ export default function SightingScreen() {
           <Header title="Vi esse animal" onBack={() => router.back()} />
           <View style={styles.body}>
             <AppText color="textSecondary">
-              Marque onde você viu. Você não precisa ir até lá: quem está cuidando recebe o aviso.
+              Marque onde você viu. Você não precisa ir até lá: quem publicou recebe o aviso.
             </AppText>
             <AppText variant="bodySmall" color="textSecondary">
               {manual ? 'Ponto escolhido no mapa.' : gps.message}

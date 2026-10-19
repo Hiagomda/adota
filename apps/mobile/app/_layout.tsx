@@ -21,6 +21,7 @@ import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
 import { syncNearbyPresence } from '../src/nearby/presence';
 import { primeCreateDraft } from '../src/place/createDraftStore';
+import { primeColorScheme } from '../src/theme/schemeChoice';
 import { flushOutbox } from '../src/place/outbox';
 import { queryClient } from '../src/queryClient';
 import { useSession } from '../src/session';
@@ -39,6 +40,9 @@ void startStartupUpdateCheck();
 
 // A half-filled rescue from the last time the app closed, read before anyone opens Criar.
 void primeCreateDraft();
+
+// Light or dark as the person picked on Início; without a choice, the phone decides.
+void primeColorScheme().catch(logBestEffort('theme:read'));
 
 // The splash stays up until fonts and the saved session are ready, so nothing jumps or flashes.
 void SplashScreen.preventAutoHideAsync().catch(logBestEffort('splash'));
