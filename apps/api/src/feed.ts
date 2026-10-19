@@ -62,6 +62,7 @@ interface PostRow {
   saved: boolean;
   viewer_will_help: boolean;
   parent_post_id: string | null;
+  adoption_since: Date | null;
 }
 
 export async function listPosts(
@@ -173,6 +174,40 @@ export async function listPosts(
       ? encodeCursor(last.urgency_rank, last.boosted, last.created_at.toISOString(), last.id)
       : null;
   return { posts, nextCursor };
+}
+
+/** Animais para adoção há pelo menos `minDays`, do que espera há mais tempo para o mais novo. */
+export async function listWaitingForAdoption(
+  pool: Pool,
+  env: Env,
+  viewer: SessionUser | null,
+  options: { minDays: number; limit: number; species?: string },
+) {
+  const result = await pool.query(
+    `SELECT * FROM (
+       SELECT ${postColumns('$1')}
+       FROM posts p
+       JOIN users u ON u.id = p.author_id
+       JOIN animals a ON a.id = p.animal_id
+       WHERE p.hidden = false
+         AND p.review_status = 'published'
+         AND p.parent_post_id IS NULL
+         AND p.status = 'for_adoption'
+         AND u.deleted_at IS NULL
+         AND u.suspended = false
+         AND ($4::text IS NULL OR a.species = $4)
+         AND ($1::uuid IS NULL OR NOT EXISTS (
+           SELECT 1 FROM blocks b
+           WHERE (b.blocker_id = $1 AND b.blocked_id = p.author_id)
+              OR (b.blocker_id = p.author_id AND b.blocked_id = $1)
+         ))
+     ) waiting
+     WHERE adoption_since <= now() - make_interval(days => $2::int)
+     ORDER BY adoption_since ASC, id ASC
+     LIMIT $3`,
+    [viewer?.id ?? null, options.minDays, options.limit, options.species ?? null],
+  );
+  return { posts: await hydrate(pool, env, rowsOf<PostRow>(result), viewer) };
 }
 
 export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionUser | null) {
@@ -581,6 +616,15 @@ export async function addResponse(
   }
 }
 
+/**
+ * Desde quando o animal espera um lar. Para adoção só vira adotado, então a primeira linha do
+ * diário em "para adoção" é a mudança de status; um post que já nasceu para adoção conta da criação.
+ */
+const adoptionSinceColumn = `CASE WHEN p.status = 'for_adoption' THEN COALESCE(
+      (SELECT min(c.created_at) FROM posts c WHERE c.parent_post_id = p.id AND c.status = 'for_adoption'),
+      p.created_at
+    ) END`;
+
 function postColumns(viewerParam: string): string {
   return `
     p.id, p.type, p.urgency, p.description, p.approx_label, p.status, p.created_at, p.boosted, p.parent_post_id,
@@ -598,7 +642,8 @@ function postColumns(viewerParam: string): string {
     (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id AND c.hidden = false) AS comment_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${viewerParam}) AS liked,
     EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = ${viewerParam}) AS saved,
-    EXISTS (SELECT 1 FROM responses r WHERE r.post_id = p.id AND r.user_id = ${viewerParam} AND r.kind = 'will_help') AS viewer_will_help
+    EXISTS (SELECT 1 FROM responses r WHERE r.post_id = p.id AND r.user_id = ${viewerParam} AND r.kind = 'will_help') AS viewer_will_help,
+    ${adoptionSinceColumn} AS adoption_since
   `;
 }
 
@@ -681,6 +726,8 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
       liked: row.liked,
       saved: row.saved,
       viewerWillHelp: row.viewer_will_help,
+      // Só para adoção. APKs antigos ignoram.
+      adoptionSince: row.adoption_since?.toISOString() ?? null,
       helpRequest: helpRow
         ? {
             kind: helpRow.kind,

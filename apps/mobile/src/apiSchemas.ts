@@ -77,6 +77,7 @@ export const postSchema: Schema<Post> = z.object({
   liked: z.boolean(),
   saved: z.boolean(),
   viewerWillHelp: z.boolean(),
+  adoptionSince: nullableString.optional(),
   helpersCount: z.number().int().nonnegative().optional(),
   helpRequest: z
     .object({
@@ -136,6 +137,9 @@ export const feedPageSchema = z.object({
   posts: z.array(z.unknown()),
   nextCursor: z.string().nullable(),
 });
+
+/** Lista curta, sem paginação: a fileira de quem espera há mais tempo. */
+export const postListSchema = z.object({ posts: z.array(z.unknown()) });
 
 export const notificationsPageSchema = z.object({ notifications: z.array(z.unknown()) });
 

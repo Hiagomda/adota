@@ -16,6 +16,7 @@ import type { Pool } from 'pg';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
+import { registerAdoptionRoutes } from './adoption.js';
 import { registerContactRoutes } from './contact.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
 import { registerSightingRoutes } from './sightings.js';
@@ -58,6 +59,7 @@ import {
   notifyDiaryNote,
   notifyReportResolved,
   notifyStatusChange,
+  notifyVerificationDecision,
   type createQueue,
 } from './notify.js';
 import { fosterDistanceKm } from './privacy.js';
@@ -87,10 +89,6 @@ const fosterSchema = z.object({
   radiusKm: z.number().positive().max(50),
 });
 const adoptionSchema = z.object({ body: z.string().trim().min(20).max(4000) });
-const verificationSchema = z.object({
-  organizationName: z.string().trim().min(2).max(120),
-  note: z.string().trim().max(500).optional(),
-});
 
 /**
  * Write limits count per account, after the session is resolved: many phones in Belém share one
@@ -204,16 +202,6 @@ export async function registerRoutes(
         .catch(bestEffort(request, 'delete-account:firebase'));
     }
     return reply.code(204).send();
-  });
-
-  app.post('/me/verification', strictLimit, async (request, reply) => {
-    const user = requireUser(request.user);
-    const body = parse(verificationSchema, request.body);
-    await pool.query(
-      `INSERT INTO verification_requests (user_id, organization_name, note) VALUES ($1, $2, $3)`,
-      [user.id, body.organizationName, body.note ?? null],
-    );
-    return reply.code(201).send({ status: 'pending' });
   });
 
   app.get('/users/:handle', async (request) => {
@@ -764,7 +752,8 @@ export async function registerRoutes(
   app.get('/admin/verifications', async (request) => {
     requireAdmin(request.user);
     const result = await pool.query(
-      `SELECT v.id, v.organization_name, v.note, v.status, v.created_at, u.handle, u.name
+      `SELECT v.id, v.organization_name, v.note, v.status, v.created_at, v.kind, v.instagram,
+              v.cnpj, v.neighborhood, u.handle, u.name
        FROM verification_requests v JOIN users u ON u.id = v.user_id
        WHERE v.status = 'pending' ORDER BY v.created_at ASC`,
     );
@@ -793,10 +782,13 @@ export async function registerRoutes(
         body.role,
       ]);
     }
-    await pool.query(`UPDATE verification_requests SET status = $2 WHERE id = $1`, [
-      id,
-      body.action === 'approve' ? 'approved' : 'rejected',
-    ]);
+    await pool.query(
+      `UPDATE verification_requests SET status = $2, decided_at = now() WHERE id = $1`,
+      [id, body.action === 'approve' ? 'approved' : 'rejected'],
+    );
+    await notifyVerificationDecision(pool, userId, body.action).catch((error: unknown) => {
+      request.log.error({ err: error, where: 'notify:verification' }, 'best-effort step failed');
+    });
     return { status: body.action === 'approve' ? 'approved' : 'rejected' };
   });
 
@@ -850,6 +842,7 @@ export async function registerRoutes(
   });
 
   registerAdoptionChat(app, { env, pool });
+  registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, { env, pool, writeLimit });
   registerNeighborhoodRoutes(app, { pool });
