@@ -54,3 +54,12 @@ export {
 } from './volunteer.js';
 export { insideServiceArea } from './serviceArea.js';
 export { normalizeWhatsApp } from './phone.js';
+export {
+  adoptionEventSchema,
+  adoptionInterestSchema,
+  daysWaiting,
+  verificationRequestSchema,
+  type AdoptionEventInput,
+  type AdoptionInterestInput,
+  type VerificationRequestInput,
+} from './adoption.js';
