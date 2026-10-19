@@ -56,6 +56,8 @@ export interface Post {
   liked: boolean;
   saved: boolean;
   viewerWillHelp: boolean;
+  /** Desde quando espera um lar; só para adoção. Versões antigas da API não mandam. */
+  adoptionSince?: string | null;
   /** People on the way right now. Only the single-post endpoint sends it. */
   helpersCount?: number;
   helpRequest: {

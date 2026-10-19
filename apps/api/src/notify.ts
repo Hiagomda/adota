@@ -297,6 +297,48 @@ export async function notifyReportResolved(
   );
 }
 
+/** Primeira ficha de alguém para um animal: quem cuida recebe aviso e push. */
+export async function notifyAdoptionInterest(
+  pool: Pool,
+  env: Env,
+  postId: string,
+  authorId: string,
+  adopterName: string,
+): Promise<void> {
+  const author = await pool.query<{ fcm_tokens: string[] }>(
+    `SELECT fcm_tokens FROM users WHERE id = $1 AND deleted_at IS NULL`,
+    [authorId],
+  );
+  const target = author.rows[0];
+  if (!target) return;
+  const first = adopterName.trim().split(/\s+/)[0] || 'Alguém';
+  const title = 'Alguém quer adotar';
+  const body = `${first} respondeu a ficha de adoção. Veja as respostas no post do animal.`;
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'adoption_interest', $2::jsonb)`,
+    [authorId, JSON.stringify({ postId, title, body })],
+  );
+  await sendPush(env, target.fcm_tokens, title, body, postId);
+}
+
+/** A equipe decidiu o pedido de selo de ONG ou protetor. Fica só na tela Alertas. */
+export async function notifyVerificationDecision(
+  pool: Pool,
+  userId: string,
+  action: 'approve' | 'reject',
+): Promise<void> {
+  const title =
+    action === 'approve' ? 'Seu perfil foi verificado' : 'Seu pedido de selo foi analisado';
+  const body =
+    action === 'approve'
+      ? 'Agora você pode divulgar o Pix nos pedidos de ajuda e publicar feiras de adoção.'
+      : 'A equipe não conseguiu confirmar os dados desta vez. Confira e mande de novo em Ajustes.';
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'verification', $2::jsonb)`,
+    [userId, JSON.stringify({ title, body })],
+  );
+}
+
 export async function notifyComment(
   pool: Pool,
   env: Env,

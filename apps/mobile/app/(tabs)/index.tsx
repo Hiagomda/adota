@@ -20,7 +20,10 @@ import {
   SectionHeader,
   SkeletonCard,
   Touchable,
+  useToast,
 } from '../../src/components/ui';
+import { FairCard } from '../../src/events/FairCard';
+import { useFairs } from '../../src/events/useFairs';
 import { onFeedRefresh } from '../../src/feedRefresh';
 import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
@@ -145,6 +148,10 @@ export default function HomeScreen() {
   const [seek, setSeek] = useState('');
   const [lens, setLens] = useState<HomeLens>('all');
   const here = useViewerLocation();
+  const toast = useToast();
+  const fairs = useFairs(token);
+  const nextFair = fairs.data?.events[0] ?? null;
+  const fairCount = fairs.data?.events.length ?? 0;
 
   const feed = useQuery({
     queryKey: ['posts', token],
@@ -265,12 +272,13 @@ export default function HomeScreen() {
     failedCursor.current = null;
     void feed.refetch();
     void stories.refetch();
+    void fairs.refetch();
     if (nearPoint) void nearbyStories.refetch();
     if (token) {
       void me.refetch();
       void notifications.refetch();
     }
-  }, [feed, me, nearPoint, nearbyStories, notifications, stories, token]);
+  }, [fairs, feed, me, nearPoint, nearbyStories, notifications, stories, token]);
 
   useEffect(() => {
     return onFeedRefresh(() => {
@@ -349,10 +357,28 @@ export default function HomeScreen() {
           icon="smile"
           onPress={() => router.push({ pathname: '/adocao', params: { aba: 'adotados' } })}
         />
+        <Chip label="Feiras" icon="calendar" onPress={() => router.push('/feiras')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
         <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
       </ScrollView>
       <Stories posts={storyPosts} here={here} nearby={nearbyFirst} />
+      {nextFair ? (
+        <View style={styles.fair}>
+          <SectionHeader
+            title="Feira de adoção"
+            subtitle="Conheça os animais pessoalmente"
+            actionLabel={fairCount > 1 ? `Ver as ${fairCount}` : 'Ver feiras'}
+            onAction={() => router.push('/feiras')}
+          />
+          <View style={styles.fairCard}>
+            <FairCard
+              fair={nextFair}
+              onOrganizer={(handle) => router.push(`/user/${handle}`)}
+              onError={(message) => toast.show(message, 'error')}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -429,6 +455,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   story: { width: STORY_WIDTH, alignItems: 'center', gap: spacing.xs },
+  fair: { ...screenColumn, paddingBottom: spacing.md },
+  fairCard: { paddingHorizontal: spacing.lg },
   storyText: { alignSelf: 'stretch', alignItems: 'center' },
   storyLine: { textAlign: 'center' },
 });

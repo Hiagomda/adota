@@ -1,10 +1,11 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { loadFeed, messageFrom } from '../src/api';
+import { api, loadFeed, messageFrom } from '../src/api';
+import { parseList, postListSchema, postSchema } from '../src/apiSchemas';
 import {
   AnimalCard,
   AppText,
@@ -15,6 +16,7 @@ import {
   ErrorState,
   Header,
   SearchBar,
+  SectionHeader,
   Segmented,
   Skeleton,
 } from '../src/components/ui';
@@ -27,6 +29,7 @@ import {
 } from '../src/post/adoptionQuery';
 import { ageBandOf, ageBands, careKeys, careQuestion, type CareKey } from '../src/post/care';
 import { animalHeadline, placeOf } from '../src/animalLabels';
+import { waitingShort } from '../src/post/waiting';
 import { useSession } from '../src/session';
 import { screenColumn, size, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
@@ -68,6 +71,13 @@ function cardSubtitle(post: Post, shelf: AdoptionShelf): string {
   return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
 }
 
+/** Quem está para adoção há semanas. Adultos e pretos costumam ficar para trás. */
+async function loadWaiting(token: string | null, species: string | undefined): Promise<Post[]> {
+  const path = species ? `/adoption/waiting?species=${species}` : '/adoption/waiting';
+  const page = await api(path, { token, schema: postListSchema });
+  return parseList(postSchema, page.posts, path);
+}
+
 export default function AdoptionScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -99,6 +109,44 @@ export default function AdoptionScreen() {
   });
   const posts = feed.data?.pages.flatMap((page) => page.posts) ?? [];
   const extra = activeFilterCount({ ...filters, species: undefined, place: '' });
+  // A fileira só aparece na vitrine sem filtros além da espécie, para não esconder resultado.
+  const showWaiting = shelf === 'available' && extra === 0 && filters.place.trim() === '';
+  const waiting = useQuery({
+    queryKey: ['adoption', 'waiting', filters.species ?? 'all', token],
+    queryFn: () => loadWaiting(token, filters.species),
+    enabled: showWaiting,
+  });
+  const waitingPosts = showWaiting ? (waiting.data ?? []) : [];
+
+  const waitingRow =
+    waitingPosts.length > 0 ? (
+      <View style={styles.waiting}>
+        <SectionHeader
+          title="Esperando há mais tempo"
+          subtitle="Estão para adoção há semanas. Dê uma chance a eles."
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
+          {waitingPosts.map((post, index) => (
+            <AnimalCard
+              key={post.id}
+              variant="compact"
+              index={index}
+              photoUri={post.media[0]?.thumbUrl || post.media[0]?.url}
+              title={animalHeadline(post.animal)}
+              subtitle={waitingShort(post.adoptionSince) ?? placeOf(post.approxLabel)}
+              onPress={() => router.push(`/post/${post.id}`)}
+            />
+          ))}
+        </ScrollView>
+        <AppText variant="h3" style={styles.allTitle}>
+          Todos para adoção
+        </AppText>
+      </View>
+    ) : null;
 
   const filterRow = (
     <ScrollView
@@ -188,7 +236,10 @@ export default function AdoptionScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-                onRefresh={() => void feed.refetch()}
+                onRefresh={() => {
+                  void feed.refetch();
+                  if (showWaiting) void waiting.refetch();
+                }}
                 tintColor={colors.primary}
                 colors={[colors.primary]}
               />
@@ -197,6 +248,7 @@ export default function AdoptionScreen() {
               if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
             }}
             onEndReachedThreshold={0.6}
+            ListHeaderComponent={waitingRow}
             ListEmptyComponent={
               <EmptyState
                 pose={shelf === 'adopted' ? 'home' : 'search'}
@@ -323,6 +375,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   cell: { alignItems: 'center', paddingVertical: spacing.sm },
+  // A grade já tem a margem lateral; a fileira e o título vão até a borda dela.
+  waiting: { marginHorizontal: -spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
+  rail: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  allTitle: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   sheet: { gap: spacing.md, paddingBottom: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
