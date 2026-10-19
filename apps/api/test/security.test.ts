@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isOwnerToken } from '../src/accounts.js';
 import { buildApp } from '../src/app.js';
 import { requireRole, requireUser } from '../src/authz.js';
-import type { Env } from '../src/config.js';
+import { loadEnv, productionProblems, type Env } from '../src/config.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
 import { firebaseChecksRevocation, isTokenRejection } from '../src/firebaseAdmin.js';
@@ -190,5 +190,30 @@ describe('http hardening', () => {
         FIREBASE_PRIVATE_KEY: 'key',
       }),
     ).toBe(true);
+  });
+
+  it('refuses to start in production with development settings', () => {
+    expect(productionProblems(env)).toEqual([]);
+    expect(productionProblems({ ...env, NODE_ENV: 'production', authDevMode: true })).toEqual(
+      expect.arrayContaining([
+        'AUTH_DEV_MODE precisa ser false',
+        'FIREBASE_PROJECT_ID está vazio',
+        'DATABASE_URL é o padrão local',
+        'MINIO_SECRET_KEY é o padrão local',
+        'IMGPROXY_KEY e IMGPROXY_SALT vazios',
+      ]),
+    );
+    expect(() => loadEnv({ NODE_ENV: 'production' })).toThrow(/insegura/);
+    expect(
+      productionProblems({
+        ...env,
+        NODE_ENV: 'production',
+        FIREBASE_PROJECT_ID: 'egua-adota',
+        DATABASE_URL: 'postgres://patinha:forte@postgres:5432/patinha',
+        MINIO_SECRET_KEY: 'segredo-forte',
+        IMGPROXY_KEY: 'aa',
+        IMGPROXY_SALT: 'bb',
+      }),
+    ).toEqual([]);
   });
 });
