@@ -176,11 +176,25 @@ export async function registerRoutes(
   app.post('/me/fcm-token', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const { token } = parse(z.object({ token: z.string().min(8).max(512) }), request.body);
+    // O token é do aparelho, não da pessoa. Num celular compartilhado, quem entrou por último
+    // recebe os avisos; a conta anterior deixa de receber alertas e conversas neste aparelho.
+    await pool.query(
+      `UPDATE users SET fcm_tokens = array_remove(fcm_tokens, $2)
+       WHERE id <> $1 AND $2 = ANY(fcm_tokens)`,
+      [user.id, token],
+    );
+    // O mais recente fica no fim; só os últimos MAX_PUSH_TOKENS aparelhos continuam.
     await pool.query(
       `UPDATE users SET fcm_tokens = (
-         SELECT ARRAY(SELECT DISTINCT unnest(fcm_tokens || ARRAY[$2]::text[]))
+         SELECT COALESCE(array_agg(t ORDER BY i), '{}')
+         FROM (
+           SELECT t, i FROM unnest(array_remove(fcm_tokens, $2) || ARRAY[$2]::text[])
+             WITH ORDINALITY AS u(t, i)
+           ORDER BY i DESC
+           LIMIT $3
+         ) recent
        ) WHERE id = $1`,
-      [user.id, token],
+      [user.id, token, MAX_PUSH_TOKENS],
     );
     return { ok: true };
   });
@@ -545,6 +559,7 @@ export async function registerRoutes(
   app.post('/posts/:id/follow', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
+    await assertVisiblePost(pool, id);
     await pool.query(
       `INSERT INTO post_follows (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [user.id, id],
@@ -562,6 +577,7 @@ export async function registerRoutes(
   app.post('/posts/:id/story-view', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const id = resourceId(request.params);
+    await assertVisiblePost(pool, id);
     await pool.query(
       `INSERT INTO story_views (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [user.id, id],
@@ -700,8 +716,14 @@ export async function registerRoutes(
     async (request, reply) => {
       const user = requireUser(request.user);
       const body = parse(reportSchema, request.body);
+      // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
       await pool.query(
-        `INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO reports (reporter_id, target_type, target_id, reason)
+         SELECT $1, $2, $3, $4
+         WHERE NOT EXISTS (
+           SELECT 1 FROM reports
+           WHERE reporter_id = $1 AND target_type = $2 AND target_id = $3 AND status = 'open'
+         )`,
         [user.id, body.targetType, body.targetId, body.reason],
       );
       return reply.code(201).send({ status: 'open' });
@@ -856,17 +878,28 @@ async function toggle(
 ) {
   const user = requireUser(request.user);
   const id = resourceId(request.params);
-  const existing = await pool.query(`SELECT 1 FROM ${table} WHERE user_id = $1 AND post_id = $2`, [
-    user.id,
-    id,
-  ]);
-  if ((existing.rowCount ?? 0) > 0) {
-    await pool.query(`DELETE FROM ${table} WHERE user_id = $1 AND post_id = $2`, [user.id, id]);
-    return { active: false };
-  }
-  await pool.query(`INSERT INTO ${table} (user_id, post_id) VALUES ($1, $2)`, [user.id, id]);
-  return { active: true };
+  await assertVisiblePost(pool, id);
+  // Dois toques juntos não podem cair os dois no INSERT: sem linha nova, o toque desfaz.
+  const added = await pool.query(
+    `INSERT INTO ${table} (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [user.id, id],
+  );
+  if ((added.rowCount ?? 0) > 0) return { active: true };
+  await pool.query(`DELETE FROM ${table} WHERE user_id = $1 AND post_id = $2`, [user.id, id]);
+  return { active: false };
 }
+
+/** Curtir, salvar ou seguir um alerta que não existe responde 404, não erro do servidor. */
+async function assertVisiblePost(pool: Pool, id: string): Promise<void> {
+  const found = await pool.query(
+    `SELECT 1 FROM posts WHERE id = $1 AND hidden = false AND review_status = 'published'`,
+    [id],
+  );
+  if ((found.rowCount ?? 0) === 0) throw new HttpError(404, 'Esse alerta não existe.');
+}
+
+/** Aparelhos por conta que recebem push. Celular trocado não fica para sempre na lista. */
+const MAX_PUSH_TOKENS = 10;
 
 /**
  * Notifications and queue jobs never undo the action the person already completed, but a
