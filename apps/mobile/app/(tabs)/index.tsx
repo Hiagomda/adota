@@ -19,6 +19,7 @@ import {
   HeroCarousel,
   Icon,
   IconButton,
+  Notice,
   SearchBar,
   SectionHeader,
   SkeletonCard,
@@ -341,11 +342,14 @@ export default function HomeScreen() {
       );
       try {
         await api(`/posts/${post.id}/like`, { method: 'POST', token });
-      } catch {
+      } catch (error) {
+        // A curtida otimista já apareceu: avisa e recarrega para o coração voltar ao real.
+        logBestEffort('home:like')(error);
+        toast.show('Não consegui registrar a curtida. Tente de novo.', 'error');
         void refetchFeed();
       }
     },
-    [client, refetchFeed, token],
+    [client, refetchFeed, toast, token],
   );
 
   const openPost = useCallback(
@@ -355,34 +359,41 @@ export default function HomeScreen() {
     [router],
   );
 
-  const failedCursor = useRef<string | null>(null);
-  const loadMore = useCallback(async () => {
-    const cursor = feed.data?.nextCursor;
-    if (!cursor || cursor === failedCursor.current || feed.isFetching) return;
-    const ticket = pageGeneration.current;
-    try {
-      const page = await loadFeed(token, `?limit=20&cursor=${encodeURIComponent(cursor)}`);
-      if (ticket !== pageGeneration.current) return;
-      failedCursor.current = null;
-      client.setQueryData(
-        ['posts', token],
-        (current: { posts: Post[]; nextCursor: string | null } | undefined) => {
-          if (!current) return current;
-          const seen = new Set(current.posts.map((item) => item.id));
-          return {
-            posts: [...current.posts, ...page.posts.filter((item) => !seen.has(item.id))],
-            nextCursor: page.nextCursor,
-          };
-        },
-      );
-    } catch {
-      failedCursor.current = cursor;
-    }
-  }, [client, feed.data?.nextCursor, feed.isFetching, token]);
+  // A página que falhou fica parada até a pessoa pedir de novo, para o fim da lista não
+  // repetir a chamada a cada rolagem sem internet.
+  const [failedCursor, setFailedCursor] = useState<string | null>(null);
+  const loadMore = useCallback(
+    async (retry = false) => {
+      const cursor = feed.data?.nextCursor;
+      if (!cursor || (!retry && cursor === failedCursor) || feed.isFetching) return;
+      const ticket = pageGeneration.current;
+      try {
+        const page = await loadFeed(token, `?limit=20&cursor=${encodeURIComponent(cursor)}`);
+        if (ticket !== pageGeneration.current) return;
+        setFailedCursor(null);
+        client.setQueryData(
+          ['posts', token],
+          (current: { posts: Post[]; nextCursor: string | null } | undefined) => {
+            if (!current) return current;
+            const seen = new Set(current.posts.map((item) => item.id));
+            return {
+              posts: [...current.posts, ...page.posts.filter((item) => !seen.has(item.id))],
+              nextCursor: page.nextCursor,
+            };
+          },
+        );
+      } catch (error) {
+        if (ticket !== pageGeneration.current) return;
+        logBestEffort('home:next-page')(error);
+        setFailedCursor(cursor);
+      }
+    },
+    [client, failedCursor, feed.data?.nextCursor, feed.isFetching, token],
+  );
 
   const refreshAll = useCallback(() => {
     pageGeneration.current += 1;
-    failedCursor.current = null;
+    setFailedCursor(null);
     void feed.refetch();
     void stories.refetch();
     void adoption.refetch();
@@ -593,6 +604,17 @@ export default function HomeScreen() {
         ListHeaderComponent={header}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          failedCursor && failedCursor === feed.data?.nextCursor ? (
+            <View style={styles.column}>
+              <Notice
+                tone="error"
+                message="Não consegui carregar mais resgates. Confira a internet."
+                action={{ label: 'Tentar de novo', onPress: () => void loadMore(true) }}
+              />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.column}>
             {feed.isLoading ? (
