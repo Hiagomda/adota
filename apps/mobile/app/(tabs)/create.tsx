@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,7 +6,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ApiError, api, loadPost } from '../../src/api';
+import { ApiError, api, loadFeed, loadPost } from '../../src/api';
+import { speciesLabel } from '../../src/animalLabels';
+import { formatWhen } from '../../src/format';
+import { duplicateSearch, likelyDuplicates } from '../../src/post/nearbyDuplicates';
 import { reportError } from '../../src/crash/reporter';
 import {
   AppText,
@@ -15,6 +18,7 @@ import {
   Icon,
   IconButton,
   Input,
+  ListItem,
   Notice,
   SectionHeader,
   Segmented,
@@ -36,7 +40,7 @@ import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src
 import { PlacePicker } from '../../src/place/PlacePicker';
 import { isOfflineError, preparePhoto, newDraftId, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
-import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
+import { radius, screenColumn, spacing, statusLabel, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { ageBands, careKeys, careQuestion, type AgeBand, type CareKey } from '../../src/post/care';
@@ -185,6 +189,16 @@ export default function CreateScreen() {
   const located = gps.fix && insideServiceArea(gps.fix) ? gps.fix : null;
   const point = moved ? manual : located;
   const { address, looking } = useAddress(point);
+  // Resgates abertos ali perto: talvez alguém já tenha avisado do mesmo animal.
+  const nearbySearch = point && kind === 'rescue_alert' ? duplicateSearch(point) : null;
+  const nearby = useQuery({
+    queryKey: ['nearby-open', nearbySearch],
+    queryFn: () => loadFeed(token, nearbySearch ?? ''),
+    enabled: nearbySearch !== null,
+    staleTime: 60_000,
+  });
+  const duplicates =
+    nearbySearch && nearby.data ? likelyDuplicates(nearby.data.posts, species) : [];
 
   // Keeps the form on the phone while the person fills it, a moment after each change.
   useEffect(() => {
@@ -656,6 +670,24 @@ export default function CreateScreen() {
                   onChangeText={setReference}
                   placeholder="Se quiser. Ex.: em frente à padaria"
                 />
+                {duplicates.length > 0 ? (
+                  <View style={styles.group}>
+                    <Notice
+                      tone="warning"
+                      message="Já avisaram de um animal aqui perto. Se for o mesmo, abra e diga que viu ou que vai ajudar. Se for outro, pode publicar."
+                    />
+                    {duplicates.map((post) => (
+                      <ListItem
+                        key={post.id}
+                        icon="alert-triangle"
+                        title={post.animal.name ?? speciesLabel[post.animal.species] ?? 'Animal'}
+                        subtitle={`${statusLabel[post.status] ?? post.status} · ${formatWhen(post.createdAt)}`}
+                        showChevron
+                        onPress={() => router.push(`/post/${post.id}`)}
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <View style={styles.section}>
                 <SectionHeader title="Sobre o animal" flush />
