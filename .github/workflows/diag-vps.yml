@@ -6,17 +6,20 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping
-        run: ping -c 4 -W 3 86.48.25.233 || true
-      - name: Portas
+      - name: Serviços
         run: |
-          for p in 22 80 443 8000; do
-            timeout 6 bash -c "</dev/tcp/86.48.25.233/$p" 2>/dev/null && echo "porta $p ABERTA" || echo "porta $p FECHADA/sem resposta"
+          S=fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+          for u in \
+            http://86.48.25.233:8000/ \
+            http://api-$S/health \
+            http://download-$S/ \
+            https://download-$S/version.json \
+            http://minio-$S/minio/health/live \
+            http://imgproxy-$S/health \
+            https://admin-$S/ \
+            https://api.eguaadota.app/health \
+            https://app.eguaadota.app/ \
+            https://img.eguaadota.app/ ; do
+            curl -sS -k -m 20 -o body.txt -w "%{http_code} %{time_total}s  $u\n" "$u" || echo "ERRO  $u"
+            head -c 200 body.txt | tr '\n' ' '; echo; echo
           done
-      - name: HTTP
-        run: |
-          curl -sS -m 15 -o /dev/null -w "http://IP -> %{http_code}\n" http://86.48.25.233/ || true
-          curl -sSk -m 15 -o /dev/null -w "https://IP -> %{http_code}\n" https://86.48.25.233/ || true
-          curl -sS -m 15 -o /dev/null -w "sslip -> %{http_code}\n" http://86.48.25.233.sslip.io/ || true
-      - name: Traceroute
-        run: (sudo apt-get install -y -qq traceroute >/dev/null && traceroute -n -w 2 -m 20 86.48.25.233) || true
