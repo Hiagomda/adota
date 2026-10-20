@@ -80,7 +80,7 @@ export default function LostScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.column}>
-        <Header title="Animais perdidos" onBack={() => router.back()} />
+        <Header title="Animais perdidos" large onBack={() => router.back()} />
         <AppText color="textSecondary" style={styles.intro}>
           Se o seu sumiu, a gente te ajuda a procurar.
         </AppText>

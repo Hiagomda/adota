@@ -8,10 +8,8 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { size, useTheme } from '../../theme';
-import { PET_PATTERN_ID, PetPatternDef } from './PetPattern';
 
 const GRADIENT_ID = 'hero-gradient';
-const PATTERN_OPACITY = 0.12;
 
 export interface HeroSurfaceProps {
   children: ReactNode;
@@ -57,10 +55,8 @@ export function HeroSurface({ children, curved = true, style }: HeroSurfaceProps
             <Stop offset="0" stopColor={colors.heroStart} />
             <Stop offset="1" stopColor={colors.heroEnd} />
           </LinearGradient>
-          <PetPatternDef color={colors.onHero} />
         </Defs>
         <Path d={shape} fill={`url(#${GRADIENT_ID})`} />
-        <Path d={shape} fill={`url(#${PET_PATTERN_ID})`} opacity={PATTERN_OPACITY} />
       </Svg>
       {children}
     </View>

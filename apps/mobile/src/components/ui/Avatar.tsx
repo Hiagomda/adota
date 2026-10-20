@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { motion, radius, size as sizeTokens, useTheme } from '../../theme';
@@ -19,6 +20,9 @@ export interface AvatarProps {
 
 export function Avatar({ name, uri, size = 'md', ring, verified = false }: AvatarProps) {
   const { colors } = useTheme();
+  // Foto que não carrega volta para a inicial, em vez de deixar o círculo vazio.
+  const [failed, setFailed] = useState<string | null>(null);
+  const photo = uri && failed !== uri ? uri : null;
   const dimension = sizeTokens.avatar[size];
   const circle = { width: dimension, height: dimension, borderRadius: radius.pill };
   const badge = Math.max(16, Math.round(dimension * 0.34));
@@ -64,9 +68,10 @@ export function Avatar({ name, uri, size = 'md', ring, verified = false }: Avata
           />
         </Svg>
       ) : null}
-      {uri ? (
+      {photo ? (
         <Image
-          source={{ uri }}
+          source={{ uri: photo }}
+          onError={() => setFailed(photo)}
           style={[circle, styles.fill]}
           contentFit="cover"
           transition={motion.fast}

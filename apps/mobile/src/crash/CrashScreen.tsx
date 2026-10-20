@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText, Button, PetPattern } from '../components/ui';
+import { AppText, Button } from '../components/ui';
 import { VersionMark } from '../diagnostics/VersionMark';
 import { Mascot } from '../mascot';
 import { radius, screenColumn, size, spacing, useTheme } from '../theme';
@@ -20,7 +20,6 @@ export interface CrashScreenProps {
 }
 
 const COPIED_MS = 2500;
-const PATTERN_OPACITY = 0.1;
 
 /**
  * Shown when a part of the app threw. It never hides the error: the code and the version are
@@ -59,7 +58,6 @@ export function CrashScreen({
     <View style={[styles.column, inline ? styles.inlineColumn : null]}>
       <View style={[shadows.sm, styles.shadow, { backgroundColor: colors.surfaceRaised }]}>
         <View style={styles.panel}>
-          <PetPattern color={colors.primary} opacity={PATTERN_OPACITY} />
           <View style={styles.content} accessibilityRole="alert">
             <Mascot pose="sad" size={size.mascot} label="Cupu triste" />
             <AppText variant="h2" style={styles.center}>

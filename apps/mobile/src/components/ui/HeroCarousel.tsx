@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { Photo } from './Photo';
 import { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
@@ -101,8 +101,8 @@ export function HeroCarousel({ slides, actionLabel, onOpen }: HeroCarouselProps)
                 style={StyleSheet.absoluteFill}
               >
                 {slide.photoUri ? (
-                  <Image
-                    source={{ uri: slide.photoUri }}
+                  <Photo
+                    uri={slide.photoUri}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
                     transition={motion.base}

@@ -38,6 +38,8 @@ export interface CampaignCardProps {
   deadline: string | null;
   createdAt: string;
   index?: number;
+  /** Ocupa a largura da lista (tela Precisa-se) em vez da largura fixa do carrossel. */
+  fullWidth?: boolean;
   onPress: () => void;
 }
 
@@ -71,6 +73,7 @@ export function CampaignCard({
   deadline,
   createdAt,
   index = 0,
+  fullWidth = false,
   onPress,
 }: CampaignCardProps) {
   const { colors, shadows } = useTheme();
@@ -84,7 +87,12 @@ export function CampaignCard({
       entering={FadeInRight.delay(duration(Math.min(index, MAX_STAGGER) * STAGGER_MS)).duration(
         duration(motion.slow),
       )}
-      style={[shadows.md, styles.shadow, { backgroundColor: colors.surfaceRaised }]}
+      style={[
+        shadows.md,
+        styles.shadow,
+        fullWidth ? styles.full : null,
+        { backgroundColor: colors.surfaceRaised },
+      ]}
     >
       <Touchable
         accessibilityRole="button"
@@ -132,6 +140,7 @@ export function CampaignCard({
 
 const styles = StyleSheet.create({
   shadow: { width: size.orgCard.width + spacing.xxl, borderRadius: radius.xl },
+  full: { width: '100%' },
   card: { borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   headText: { flex: 1 },

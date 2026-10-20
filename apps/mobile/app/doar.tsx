@@ -196,7 +196,7 @@ export default function DonateScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.column}>
-        <Header title="Doar" onBack={() => router.back()} />
+        <Header title="Doar" large onBack={() => router.back()} />
       </View>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.giant }]}

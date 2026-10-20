@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Header, useToast } from '../src/components/ui';
 import { reportError } from '../src/crash/reporter';
 import { VersionMark } from '../src/diagnostics/VersionMark';
-import { Mascot } from '../src/mascot';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 
 const SUPPORT_EMAIL = 'contato@eguaadota.app';
@@ -32,7 +31,6 @@ export default function SupportScreen() {
       <View style={styles.column}>
         <Header title="Suporte" large onBack={() => router.back()} />
         <View style={styles.body}>
-          <Mascot pose="wave" />
           <AppText selectable style={styles.center}>
             Escreva para {SUPPORT_EMAIL}. A gente responde sobre conta, denúncia e verificação de
             ONG.

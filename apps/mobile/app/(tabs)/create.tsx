@@ -34,7 +34,6 @@ import {
   setCreatePhotoCount,
   watchCreateCamera,
 } from '../../src/createCamera';
-import { Mascot } from '../../src/mascot';
 import { enqueueAlert } from '../../src/place/outbox';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src/permissions';
 import { PlacePicker } from '../../src/place/PlacePicker';
@@ -98,7 +97,6 @@ const urgencyOptions = [
 
 const MAX_PHOTOS = 5;
 const MIN_COLUMN_WIDTH = 280;
-const INTRO_MASCOT = 72;
 const THUMB_RATIO = 1.25;
 const EMPTY_PHOTO_MIN = 180;
 const EMPTY_PHOTO_MAX = 240;
@@ -452,7 +450,6 @@ export default function CreateScreen() {
             />
           ) : null}
           <View style={styles.intro}>
-            <Mascot pose={kind === 'lost' ? 'search' : 'camera'} size={INTRO_MASCOT} />
             <AppText variant="h1" style={styles.introTitle}>
               {photos.length === 0 ? 'Fotografar o animal' : 'Sobre o animal'}
             </AppText>
