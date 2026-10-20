@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type RefObject,
 } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,9 +64,51 @@ const cameraBounds = {
 // Constante de módulo: um objeto novo a cada render faria a <Camera> renderizar de novo.
 const defaultCamera = { centerCoordinate: belem, zoomLevel: 12 };
 
+/** Duração dos movimentos do próprio app (primeiro centro, "Minha localização", pata escolhida). */
+const MOVE_MS = 600;
+
+/**
+ * Destino neutro: sem centro nem zoom, o MapLibre usa a câmera atual e não anda. Fica gravado
+ * depois que cada movimento do app termina, para que uma reaplicação da prop `stop` pelo nativo
+ * não leve o mapa a lugar nenhum.
+ */
+const NEUTRAL_STOP = { animationDuration: 0, animationMode: 'moveTo' } as const;
+
+// Estilos das camadas fora do render: um objeto novo a cada render manda o estilo de novo ao
+// nativo, que redesenha as patas no meio do arrasto.
+const outlineStyle: ComponentProps<typeof LineLayer>['style'] = {
+  lineColor: mapColors.areaOutline,
+  lineWidth: 3,
+  lineJoin: 'round',
+  lineCap: 'round',
+};
+// Área de toque sobre a cabeça da gota, que fica acima do ponto (scripts/paw-pins.mjs).
+const hitStyle: ComponentProps<typeof CircleLayer>['style'] = {
+  circleRadius: 32,
+  circleColor: mapColors.hitArea,
+  circleOpacity: 0.01,
+  circleTranslate: [0, -44],
+};
+const pinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
+  iconImage: [
+    'match',
+    ['get', 'urgency'],
+    'high',
+    'pawHigh',
+    'medium',
+    'pawMedium',
+    'low',
+    'pawLow',
+    'pawMedium',
+  ],
+  iconSize: 0.6,
+  // A ponta da gota é o ponto do animal.
+  iconAnchor: 'bottom',
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+};
+
 const PUCK_DISTANCE_M = 25;
-/** Menos que isso (em graus, ~1 m) é a mesma vista; não vale gravar de novo. */
-const SAME_SPOT_DEG = 0.00001;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
 
@@ -82,6 +125,26 @@ Logger.setLogCallback((log) => {
  */
 const UserPuck = memo(function UserPuck({ visible }: { visible: boolean }) {
   return <UserLocation visible={visible} animated={false} minDisplacement={PUCK_DISTANCE_M} />;
+});
+
+/**
+ * A câmera nunca renderiza de novo depois de montada. Cada render dela manda as props ao nativo,
+ * e o Android reaplicava junto o último `stop` gravado pelo setCamera: no meio de um arrasto, o
+ * mapa pulava de volta para onde estava antes (as "teleportadas"). Só o ref a move.
+ */
+const StableCamera = memo(function StableCamera({
+  cameraRef,
+}: {
+  cameraRef: RefObject<CameraRef | null>;
+}) {
+  return (
+    <Camera
+      ref={cameraRef}
+      minZoomLevel={8.5}
+      maxBounds={cameraBounds}
+      defaultSettings={defaultCamera}
+    />
+  );
 });
 
 export function MapCanvas({
@@ -126,6 +189,9 @@ export function MapCanvas({
   const trackingRef = useRef(tracking);
   const landed = useRef(false);
   const lastKick = useRef(0);
+  /** Quando a pessoa tocou no mapa pela última vez. Depois disso, o pino pedido para de insistir. */
+  const touchedAt = useRef(0);
+  const focusAt = useRef(0);
   /** No Android, os movimentos do próprio app chegam como gesto da pessoa. Estes são ignorados. */
   const programmaticUntil = useRef(Number.POSITIVE_INFINITY);
   const opened = useRef(false);
@@ -134,11 +200,13 @@ export function MapCanvas({
   /** Um gesto dentro da janela de espera faz da área onde o mapa parou uma escolha da pessoa. */
   const userMoved = useRef(false);
   /**
-   * Último destino gravado na câmera nativa. O setCamera do MapLibre vira prop nativa (`stop`) e,
-   * na New Architecture, o Android pode reaplicá-la depois sem ninguém pedir: era isso que puxava
-   * o mapa de volta para a pessoa. Por isso o destino gravado acompanha onde a pessoa deixou o mapa.
+   * Quando o último movimento do app termina. O setCamera do MapLibre vira prop nativa (`stop`) e,
+   * na New Architecture, o Android pode reaplicá-la depois sem ninguém pedir. Assim que o movimento
+   * acaba, o destino gravado vira o neutro (NEUTRAL_STOP). Antes, o app regravava a vista onde a
+   * pessoa parava; quando essa ordem chegava atrasada, já com o dedo num novo arrasto, o mapa
+   * voltava para trás.
    */
-  const lastStop = useRef<{ center: LngLat; zoom: number } | null>(null);
+  const moveEndsAt = useRef<number | null>(null);
 
   useEffect(() => {
     commitRef.current = onCommitBounds;
@@ -173,11 +241,11 @@ export function MapCanvas({
     policy.current = step.state;
     if (step.move) {
       programmaticUntil.current = Date.now() + 1000;
-      lastStop.current = { center: step.move.center, zoom: step.move.zoom };
+      moveEndsAt.current = Date.now() + MOVE_MS;
       camera.current?.setCamera({
         centerCoordinate: step.move.center,
         zoomLevel: step.move.zoom,
-        animationDuration: 600,
+        animationDuration: MOVE_MS,
         animationMode: 'easeTo',
       });
     }
@@ -250,13 +318,15 @@ export function MapCanvas({
   // O centro padrão é Belém, então insiste quando o mapa estiver de fato na tela.
   useEffect(() => {
     landed.current = false;
+    focusAt.current = Date.now();
   }, [focus]);
 
   useEffect(() => {
     if (!focus || !styleReady || !tracking) return;
     const point = focus;
     const kick = () => {
-      if (landed.current) return;
+      // A pessoa já mexeu no mapa: ela manda na câmera, o pino não puxa de volta.
+      if (landed.current || touchedAt.current > focusAt.current) return;
       lastKick.current = Date.now();
       apply({ type: 'pin', point });
     };
@@ -327,30 +397,23 @@ export function MapCanvas({
       opened.current = true;
       if (fromUser) userMoved.current = true;
       apply({ type: 'region', bounds, fromUser });
-      // A câmera parou longe do último destino gravado (a pessoa arrastou ou deu zoom): grava a
-      // vista atual, sem animação, para que uma reaplicação do nativo caia aqui mesmo.
-      const center = event.geometry.coordinates as LngLat;
-      const zoom = event.properties.zoomLevel;
-      const stop = lastStop.current;
-      if (
-        stop &&
-        (Math.abs(stop.center[0] - center[0]) > SAME_SPOT_DEG ||
-          Math.abs(stop.center[1] - center[1]) > SAME_SPOT_DEG ||
-          Math.abs(stop.zoom - zoom) > 0.01)
-      ) {
-        lastStop.current = { center, zoom };
-        camera.current?.setCamera({
-          centerCoordinate: center,
-          zoomLevel: zoom,
-          animationDuration: 0,
-          animationMode: 'moveTo',
-        });
+      // O movimento do app já terminou (ou a pessoa o interrompeu): troca o destino gravado
+      // pelo neutro. Antes do fim, isso cortaria a animação no meio.
+      const endsAt = moveEndsAt.current;
+      if (endsAt !== null && Date.now() >= endsAt) {
+        moveEndsAt.current = null;
+        camera.current?.setCamera(NEUTRAL_STOP);
       }
       const aim = focusRef.current;
       if (aim) {
         const framed = cameraFramesPoint(bounds, { longitude: aim[0], latitude: aim[1] });
         if (framed) landed.current = true;
-        else if (!landed.current && trackingRef.current && Date.now() > lastKick.current + 700) {
+        else if (
+          !landed.current &&
+          trackingRef.current &&
+          touchedAt.current <= focusAt.current &&
+          Date.now() > lastKick.current + 700
+        ) {
           lastKick.current = Date.now();
           apply({ type: 'pin', point: aim });
         }
@@ -436,7 +499,13 @@ export function MapCanvas({
   return (
     // Qualquer toque no mapa entrega a câmera à pessoa, mesmo quando o Android não marca a
     // mudança de câmera como gesto.
-    <View style={styles.fill} onTouchStart={() => apply({ type: 'gesture' })}>
+    <View
+      style={styles.fill}
+      onTouchStart={() => {
+        touchedAt.current = Date.now();
+        apply({ type: 'gesture' });
+      }}
+    >
       <MapView
         style={styles.fill}
         mapStyle={mapStyleUrl}
@@ -449,58 +518,16 @@ export function MapCanvas({
         onPress={onMapPress}
         onRegionDidChange={onRegionDidChange}
       >
-        <Camera
-          ref={camera}
-          minZoomLevel={8.5}
-          maxBounds={cameraBounds}
-          defaultSettings={defaultCamera}
-        />
+        <StableCamera cameraRef={camera} />
         <ShapeSource id="service-outline" shape={serviceOutline}>
-          <LineLayer
-            id="service-outline-line"
-            style={{
-              lineColor: mapColors.areaOutline,
-              lineWidth: 3,
-              lineJoin: 'round',
-              lineCap: 'round',
-            }}
-          />
+          <LineLayer id="service-outline-line" style={outlineStyle} />
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         {styleReady ? <Images key={sprite} images={pawImages} /> : null}
         {pinsReady ? (
           <ShapeSource key={sprite} id="alerts" shape={shape} onPress={onPinPress}>
-            <CircleLayer
-              id="pin-hit"
-              // Área de toque sobre a cabeça da gota, que fica acima do ponto (scripts/paw-pins.mjs).
-              style={{
-                circleRadius: 32,
-                circleColor: mapColors.hitArea,
-                circleOpacity: 0.01,
-                circleTranslate: [0, -44],
-              }}
-            />
-            <SymbolLayer
-              id="pins"
-              style={{
-                iconImage: [
-                  'match',
-                  ['get', 'urgency'],
-                  'high',
-                  'pawHigh',
-                  'medium',
-                  'pawMedium',
-                  'low',
-                  'pawLow',
-                  'pawMedium',
-                ],
-                iconSize: 0.6,
-                // A ponta da gota é o ponto do animal.
-                iconAnchor: 'bottom',
-                iconAllowOverlap: true,
-                iconIgnorePlacement: true,
-              }}
-            />
+            <CircleLayer id="pin-hit" style={hitStyle} />
+            <SymbolLayer id="pins" style={pinStyle} />
           </ShapeSource>
         ) : null}
       </MapView>
