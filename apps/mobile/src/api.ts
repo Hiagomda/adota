@@ -136,7 +136,10 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
     ms: Date.now() - started,
     bytes: Number.isFinite(bytes) ? bytes : 0,
   });
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) {
+    if (method !== 'GET') onWrite?.(method, path);
+    return undefined as T;
+  }
   let payload: unknown;
   try {
     payload = await response.json();
@@ -153,6 +156,7 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
       userFacingMessage(response.status, typeof message === 'string' ? message : undefined),
     );
   }
+  if (method !== 'GET') onWrite?.(method, path);
   if (!init.schema) return payload as T;
   const parsed = init.schema.safeParse(payload);
   if (parsed.success) return parsed.data;
@@ -191,6 +195,12 @@ function messageForStatus(status: number): string {
 }
 
 let onUnauthorized: (() => void) | null = null;
+let onWrite: ((method: string, path: string) => void) | null = null;
+
+/** Avisado depois de cada escrita que deu certo, para quem guarda cache recarregar o que mudou. */
+export function setWriteHandler(handler: (method: string, path: string) => void): void {
+  onWrite = handler;
+}
 
 /** Called when a request that sent a session token is rejected as expired or invalid. */
 export function setUnauthorizedHandler(handler: () => void): void {

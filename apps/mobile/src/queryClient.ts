@@ -1,5 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
-import { isRetryableError } from './api';
+import { isRetryableError, setWriteHandler } from './api';
+import { logBestEffort } from './crash/bestEffort';
+import { listsAfterWrite } from './postLists';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -11,4 +13,12 @@ export const queryClient = new QueryClient({
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     },
   },
+});
+
+// Depois de publicar, ajudar ou mudar status, perfil, adoção e stories também mostram a mudança,
+// sem esperar os 30 s do cache.
+setWriteHandler((method, path) => {
+  for (const queryKey of listsAfterWrite(method, path)) {
+    void queryClient.invalidateQueries({ queryKey }).catch(logBestEffort('cache:after-write'));
+  }
 });
