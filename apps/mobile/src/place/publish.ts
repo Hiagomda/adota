@@ -180,7 +180,16 @@ export async function publishAlert(
       addressText: draft.addressText ?? undefined,
       referencePoint: draft.referencePoint.trim() || undefined,
       approxLabel: draft.approxLabel,
+      // Se a resposta se perder e a fila mandar de novo, a API devolve o mesmo resgate.
+      ...(clientKeyPattern.test(draft.id) ? { clientKey: draft.id } : {}),
       media,
     },
   });
+}
+
+const clientKeyPattern = /^[A-Za-z0-9_-]{8,64}$/;
+
+/** Id do rascunho, que também vira a chave do envio: único mesmo com dois toques no mesmo ms. */
+export function newDraftId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }

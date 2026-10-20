@@ -25,7 +25,7 @@ import { insideServiceArea } from '../src/map/serviceArea';
 import { useAddress, placeLabel } from '../src/place/address';
 import { useAnimalGps } from '../src/place/gps';
 import { PlacePicker } from '../src/place/PlacePicker';
-import { isOfflineError, preparePhoto, publishAlert } from '../src/place/publish';
+import { isOfflineError, preparePhoto, newDraftId, publishAlert } from '../src/place/publish';
 import { permissionOutcome } from '../src/permissions';
 import { isTeamRole, useSession } from '../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../src/theme';
@@ -143,7 +143,7 @@ export default function DonateScreen() {
     setMessage(null);
     try {
       const created = await publishAlert({
-        id: `${Date.now()}`,
+        id: newDraftId(),
         token,
         photos,
         description: description.trim(),

@@ -34,7 +34,7 @@ import { Mascot } from '../../src/mascot';
 import { enqueueAlert } from '../../src/place/outbox';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src/permissions';
 import { PlacePicker } from '../../src/place/PlacePicker';
-import { isOfflineError, preparePhoto, publishAlert } from '../../src/place/publish';
+import { isOfflineError, preparePhoto, newDraftId, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
@@ -319,7 +319,7 @@ export default function CreateScreen() {
     setPending(true);
     setMessage(null);
     const draft = {
-      id: `${Date.now()}`,
+      id: newDraftId(),
       token,
       photos,
       description: description.trim(),

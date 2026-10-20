@@ -111,7 +111,7 @@ export async function remindHelper(
     [userId, JSON.stringify({ postId, title, body })],
   );
   if (!isQuiet(target.quiet_hours_start, target.quiet_hours_end, belemHour())) {
-    await sendPush(env, target.fcm_tokens, title, body, postId);
+    await sendPush(pool, env, target.fcm_tokens, title, body, postId);
   }
   return true;
 }
@@ -186,7 +186,7 @@ export async function dispatchRescueAlert(
       [target.id, JSON.stringify({ postId, title, body, urgent })],
     );
     if (!quiet) {
-      await sendPush(env, target.fcm_tokens, title, body, postId);
+      await sendPush(pool, env, target.fcm_tokens, title, body, postId);
     }
   }
 }
@@ -233,7 +233,7 @@ export async function notifyDiaryNote(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'diary', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(env, person.fcm_tokens, title, body, postId);
+    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
   }
 }
 
@@ -273,7 +273,7 @@ export async function notifySighting(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'sighting', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(env, person.fcm_tokens, title, body, postId);
+    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
   }
 }
 
@@ -318,7 +318,7 @@ export async function notifyAdoptionInterest(
     `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'adoption_interest', $2::jsonb)`,
     [authorId, JSON.stringify({ postId, title, body })],
   );
-  await sendPush(env, target.fcm_tokens, title, body, postId);
+  await sendPush(pool, env, target.fcm_tokens, title, body, postId);
 }
 
 /** A equipe decidiu o pedido de selo de ONG ou protetor. Fica só na tela Alertas. */
@@ -369,7 +369,7 @@ export async function notifyComment(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'comment', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(env, person.fcm_tokens, title, body, postId);
+    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
   }
 }
 
@@ -412,11 +412,12 @@ export async function notifyStatusChange(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'status', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body, status })],
     );
-    await sendPush(env, person.fcm_tokens, title, body, postId);
+    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
   }
 }
 
 async function sendPush(
+  pool: Pool,
   env: Env,
   tokens: string[],
   title: string,
@@ -427,17 +428,45 @@ async function sendPush(
   try {
     await ensureFirebaseApp(env);
     const admin = await import('firebase-admin');
-    await admin.messaging().sendEachForMulticast({
+    const result = await admin.messaging().sendEachForMulticast({
       tokens,
       notification: { title, body },
       data: { postId, url: `egua://post/${postId}` },
     });
+    const dead = deadPushTokens(
+      tokens,
+      result.responses.map((response) => response.error?.code ?? null),
+    );
+    if (dead.length > 0) {
+      // App desinstalado ou token trocado: o Firebase nunca mais entrega nesse endereço.
+      await pool.query(
+        `UPDATE users SET fcm_tokens = ARRAY(
+           SELECT t FROM unnest(fcm_tokens) AS t WHERE t <> ALL($1::text[])
+         )
+         WHERE fcm_tokens && $1::text[]`,
+        [dead],
+      );
+    }
   } catch (error) {
     // Push is best-effort: the in-app notification is already stored. Log it for the VPS logs.
     console.error(
       JSON.stringify({ level: 'error', where: 'notify:push', postId, error: String(error) }),
     );
   }
+}
+
+/** Códigos do Firebase que dizem que o token morreu; erro de rede ou cota não apaga nada. */
+const deadTokenCodes = new Set([
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+]);
+
+/** Os tokens que o Firebase recusou de vez, na mesma ordem do envio. */
+export function deadPushTokens(tokens: string[], errorCodes: (string | null)[]): string[] {
+  return tokens.filter((_, index) => {
+    const code = errorCodes[index];
+    return code !== null && code !== undefined && deadTokenCodes.has(code);
+  });
 }
 
 function belemHour(): number {

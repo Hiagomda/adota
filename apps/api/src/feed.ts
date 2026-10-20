@@ -275,6 +275,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     user.id,
     input.media.map((item) => item.url),
   );
+  if (input.clientKey) {
+    const replayed = await postByClientKey(pool, user.id, input.clientKey);
+    if (replayed) return replayed;
+  }
   const description = stripControls(input.description);
   const named = input.name?.trim() ?? '';
   const reviewStatus =
@@ -311,10 +315,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     const post = await client.query<{ id: string }>(
       `INSERT INTO posts (
          author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status,
-         accuracy_m, address_text, reference_point
+         accuracy_m, address_text, reference_point, client_key
        ) VALUES (
          $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $14, $9, $10,
-         $11, $12, $13
+         $11, $12, $13, $15
        ) RETURNING id`,
       [
         user.id,
@@ -331,6 +335,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.addressText ?? null,
         input.referencePoint ?? null,
         openingStatus,
+        input.clientKey ?? null,
       ],
     );
     const postId = post.rows[0]?.id;
@@ -355,13 +360,31 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
       );
     }
     await client.query('COMMIT');
-    return { id: postId, reviewStatus };
+    return { id: postId, reviewStatus, replayed: false };
   } catch (error) {
     await client.query('ROLLBACK');
+    // Dois envios da mesma chave ao mesmo tempo: o segundo devolve o que o primeiro salvou.
+    if (input.clientKey && isUnique(error)) {
+      const replayed = await postByClientKey(pool, user.id, input.clientKey);
+      if (replayed) return replayed;
+    }
     throw error;
   } finally {
     client.release();
   }
+}
+
+async function postByClientKey(
+  pool: Pool,
+  authorId: string,
+  clientKey: string,
+): Promise<{ id: string; reviewStatus: string; replayed: true } | null> {
+  const found = await pool.query<{ id: string; review_status: string }>(
+    `SELECT id, review_status FROM posts WHERE author_id = $1 AND client_key = $2`,
+    [authorId, clientKey],
+  );
+  const row = found.rows[0];
+  return row ? { id: row.id, reviewStatus: row.review_status, replayed: true } : null;
 }
 
 export async function changeStatus(
@@ -763,7 +786,7 @@ async function addDiaryNote(
   pool: Pool,
   user: SessionUser,
   input: CreatePostInput,
-): Promise<{ id: string; reviewStatus: string }> {
+): Promise<{ id: string; reviewStatus: string; replayed: boolean }> {
   const parentId = input.parentPostId;
   if (!parentId) throw new HttpError(400, 'Falta o resgate deste diário.');
   const parent = await pool.query<{ author_id: string }>(
@@ -798,7 +821,7 @@ async function addDiaryNote(
       [id, url, position],
     );
   }
-  return { id, reviewStatus };
+  return { id, reviewStatus, replayed: false };
 }
 
 const NOT_FOUND_NOTE = 'Não encontrei o animal.';
