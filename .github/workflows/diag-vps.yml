@@ -1,0 +1,22 @@
+name: Diagnóstico VPS
+on:
+  push:
+    branches: [diag/vps-check]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping
+        run: ping -c 4 -W 3 86.48.25.233 || true
+      - name: Portas
+        run: |
+          for p in 22 80 443 8000; do
+            timeout 6 bash -c "</dev/tcp/86.48.25.233/$p" 2>/dev/null && echo "porta $p ABERTA" || echo "porta $p FECHADA/sem resposta"
+          done
+      - name: HTTP
+        run: |
+          curl -sS -m 15 -o /dev/null -w "http://IP -> %{http_code}\n" http://86.48.25.233/ || true
+          curl -sSk -m 15 -o /dev/null -w "https://IP -> %{http_code}\n" https://86.48.25.233/ || true
+          curl -sS -m 15 -o /dev/null -w "sslip -> %{http_code}\n" http://86.48.25.233.sslip.io/ || true
+      - name: Traceroute
+        run: (sudo apt-get install -y -qq traceroute >/dev/null && traceroute -n -w 2 -m 20 86.48.25.233) || true
