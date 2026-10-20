@@ -30,14 +30,26 @@ export const statusTransitions: Record<
   z.infer<typeof animalStatusSchema>,
   readonly z.infer<typeof animalStatusSchema>[]
 > = {
-  open: ['on_the_way'],
+  // Quem publicou pode marcar "já está seguro" sem dizer antes que ia ajudar (ver ownerOnlyStatus).
+  open: ['on_the_way', 'rescued'],
   on_the_way: ['rescued', 'open', 'not_found'],
-  not_found: ['open', 'on_the_way'],
+  not_found: ['open', 'on_the_way', 'rescued'],
   rescued: ['fostered'],
   fostered: ['for_adoption'],
   for_adoption: ['adopted'],
   adopted: [],
 };
+
+/**
+ * Mudanças que só o autor ou a equipe fazem. Quem só disse "vou ajudar" marca resgatado a
+ * partir de "a caminho", não direto de um alerta aberto ou não encontrado.
+ */
+export function ownerOnlyStatus(
+  from: z.infer<typeof animalStatusSchema>,
+  to: z.infer<typeof animalStatusSchema>,
+): boolean {
+  return to === 'rescued' && from !== 'on_the_way';
+}
 
 export const leaveHelpOutcomeSchema = z.enum(['could_not', 'not_found']);
 
@@ -99,6 +111,11 @@ export const createPostSchema = z.object({
   referencePoint: z.string().trim().max(200).optional(),
   approxLabel: z.string().trim().min(1).max(120),
   parentPostId: z.string().uuid().optional(),
+  /** Gerada pelo celular para cada resgate: reenviar com a mesma chave não cria outro. */
+  clientKey: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8,64}$/)
+    .optional(),
   media: z
     .array(
       z.object({

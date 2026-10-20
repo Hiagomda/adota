@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -125,6 +125,10 @@ export default function PostScreen() {
   const [foundOpen, setFoundOpen] = useState(false);
   const [troubleOpen, setTroubleOpen] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [adoptedOpen, setAdoptedOpen] = useState(false);
+  // Caminho + método da ação que está indo ao servidor. Um segundo toque não manda de novo.
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const inFlight = useRef(new Set<string>());
   const [measuredFooter, setMeasuredFooter] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [comment, setComment] = useState('');
@@ -191,6 +195,10 @@ export default function PostScreen() {
       setNote('Entre na sua conta para continuar.');
       return false;
     }
+    const key = `${method} ${path}`;
+    if (inFlight.current.has(key)) return false;
+    inFlight.current.add(key);
+    setBusyAction(key);
     try {
       await api(path, { method, token, body });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
@@ -200,6 +208,9 @@ export default function PostScreen() {
     } catch (error) {
       setNote(messageFrom(error));
       return false;
+    } finally {
+      inFlight.current.delete(key);
+      setBusyAction((current) => (current === key ? null : current));
     }
   }
 
@@ -342,6 +353,18 @@ export default function PostScreen() {
     setNote('Égua, que alegria! Conte no diário como ele está.');
   }
 
+  async function markAdopted() {
+    const ok = await act(`/posts/${rescueId}/status`, 'PATCH', { status: 'adopted' });
+    setAdoptedOpen(false);
+    if (!ok) return;
+    await client.invalidateQueries({ queryKey: ['profile-posts'] });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      logBestEffort('post:adopted-haptic'),
+    );
+    setHelpBurst((count) => count + 1);
+    setNote('Égua, que alegria! Ele achou um lar. Conte no diário como foi a chegada.');
+  }
+
   function stepBack(outcome: 'could_not' | 'not_found') {
     setTroubleOpen(false);
     void leaveRescue(outcome);
@@ -394,6 +417,7 @@ export default function PostScreen() {
                   title: nextStepAction[following] ?? '',
                   icon: 'arrow-right',
                   variant: 'primary',
+                  loading: busyAction === `PATCH /posts/${item.id}/status`,
                   onPress: () =>
                     void act(`/posts/${item.id}/status`, 'PATCH', { status: following }),
                 }
@@ -792,7 +816,7 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {canOwn && !item.viewerWillHelp && item.status === 'on_the_way' ? (
+            {canOwn && !item.viewerWillHelp && openRescueStatuses.has(item.status) ? (
               <Button
                 title="O animal já está seguro"
                 icon="check"
@@ -807,7 +831,17 @@ export default function PostScreen() {
                 icon="rotate-ccw"
                 variant="ghost"
                 fullWidth
+                loading={busyAction === `PATCH /posts/${item.id}/status`}
                 onPress={() => void act(`/posts/${item.id}/status`, 'PATCH', { status: 'open' })}
+              />
+            ) : null}
+            {canOwn && forAdoption ? (
+              <Button
+                title="Foi adotado"
+                icon="home"
+                variant="outline"
+                fullWidth
+                onPress={() => setAdoptedOpen(true)}
               />
             ) : null}
 
@@ -1219,6 +1253,7 @@ export default function PostScreen() {
             title={replyTo ? 'Responder' : 'Publicar'}
             icon="send"
             disabled={comment.trim().length === 0}
+            loading={busyAction === `POST /posts/${item.id}/comments`}
             fullWidth
             onPress={() => {
               const body = comment.trim();
@@ -1302,6 +1337,34 @@ export default function PostScreen() {
             onPress={() => void markFound()}
           />
           <Button title="Ainda não" variant="ghost" fullWidth onPress={() => setFoundOpen(false)} />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={adoptedOpen}
+        onClose={() => setAdoptedOpen(false)}
+        title="Ele já está na casa nova?"
+      >
+        <View style={styles.help}>
+          <AppText color="textSecondary">
+            O anúncio sai da lista de adoção, vai para Adotados e quem acompanha recebe o aviso. Só
+            marque depois que o animal foi entregue.
+          </AppText>
+          <Button
+            title="Sim, foi adotado"
+            icon="check"
+            variant="secondary"
+            size="lg"
+            loading={busyAction === `PATCH /posts/${item.id}/status`}
+            fullWidth
+            onPress={() => void markAdopted()}
+          />
+          <Button
+            title="Ainda não"
+            variant="ghost"
+            fullWidth
+            onPress={() => setAdoptedOpen(false)}
+          />
         </View>
       </BottomSheet>
 

@@ -81,3 +81,40 @@ describe('GET /health', () => {
     await app.close();
   });
 });
+
+describe('CORS', () => {
+  it('libera PATCH e DELETE no preflight de uma origem permitida', async () => {
+    const app = await buildApp({
+      env: { ...env, NODE_ENV: 'production' },
+      ...createClients(true, true),
+    });
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/posts/x/status',
+      headers: { origin: env.WEB_ORIGIN, 'access-control-request-method': 'PATCH' },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe(env.WEB_ORIGIN);
+    expect(String(response.headers['access-control-allow-methods'])).toContain('PATCH');
+    expect(String(response.headers['access-control-allow-methods'])).toContain('DELETE');
+    await app.close();
+  });
+
+  it('continua sem liberar origem desconhecida em produção', async () => {
+    const app = await buildApp({
+      env: { ...env, NODE_ENV: 'production' },
+      ...createClients(true, true),
+    });
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/posts/x/status',
+      headers: { origin: 'https://outro-site.example', 'access-control-request-method': 'PATCH' },
+    });
+
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    await app.close();
+  });
+});

@@ -284,6 +284,37 @@ describe('posts', () => {
     expect((await save('neighbour@egua.local')).statusCode).toBe(200);
   });
 
+  it('lets only the author mark an open rescue as safe directly', async () => {
+    await insertUser('author@egua.local', 'author');
+    await insertUser('helper@egua.local', 'helper');
+    const created = await createAlert(app, 'author@egua.local', 'Gato no telhado.');
+    const postId = created.json().id as string;
+    const status = (email: string, next: string) =>
+      app.inject({
+        method: 'PATCH',
+        url: `/posts/${postId}/status`,
+        headers: { authorization: `Bearer dev:${email}` },
+        payload: { status: next },
+      });
+
+    // Quem disse "vou ajudar" e depois o autor voltou o alerta para aberto.
+    const help = await app.inject({
+      method: 'POST',
+      url: `/posts/${postId}/responses`,
+      headers: { authorization: 'Bearer dev:helper@egua.local' },
+      payload: { kind: 'will_help' },
+    });
+    expect(help.statusCode).toBeLessThan(300);
+    expect((await status('author@egua.local', 'open')).statusCode).toBe(200);
+
+    expect((await status('helper@egua.local', 'rescued')).statusCode).toBe(403);
+    expect((await status('author@egua.local', 'rescued')).statusCode).toBe(200);
+    const saved = await pool.query<{ status: string }>(`SELECT status FROM posts WHERE id = $1`, [
+      postId,
+    ]);
+    expect(saved.rows[0]?.status).toBe('rescued');
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');
