@@ -4,7 +4,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Mascot, type MascotPose } from '../../mascot';
 import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../../theme';
 import { AppText } from './AppText';
-import { PetPattern } from './PetPattern';
 
 export interface StateLayoutProps {
   pose: MascotPose;
@@ -17,7 +16,6 @@ export interface StateLayoutProps {
 }
 
 const COMPACT_MASCOT = 88;
-const PATTERN_OPACITY = 0.1;
 
 /** Shared frame of the empty and error states: mascot, text and action on a textured panel. */
 export function StateLayout({
@@ -38,7 +36,6 @@ export function StateLayout({
     >
       <View style={[shadows.sm, styles.shadow, { backgroundColor: colors.surfaceRaised }]}>
         <View style={styles.panel}>
-          <PetPattern color={colors.primary} opacity={PATTERN_OPACITY} />
           <View style={compact ? styles.compactBody : styles.body}>
             <Mascot pose={pose} size={compact ? COMPACT_MASCOT : size.mascot} />
             <View style={compact ? styles.compactText : styles.text}>

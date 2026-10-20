@@ -68,6 +68,7 @@ export default function NeedsScreen() {
                 <CampaignCard
                   key={post.id}
                   index={index}
+                  fullWidth
                   kind={post.helpRequest?.kind ?? ''}
                   place={`${placeOf(post.approxLabel)} · ${post.author.name}`}
                   goalAmount={post.helpRequest?.goalAmount ?? null}

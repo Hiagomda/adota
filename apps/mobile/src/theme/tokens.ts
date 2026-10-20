@@ -247,8 +247,8 @@ export const size = {
   control: 48,
   icon: { sm: 16, md: 20, lg: 24, xl: 32 },
   avatar: { sm: 32, md: 40, lg: 56, xl: 96 },
-  /** Mascot in empty and error states. */
-  mascot: 150,
+  /** Mascote nos estados vazios e de erro: presente, sem roubar a mensagem. */
+  mascot: 112,
   /** How deep the wave at the bottom of a hero header goes. */
   curve: 28,
   tabBar: 68,

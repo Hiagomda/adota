@@ -1,9 +1,8 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { motion, useTheme } from '../../theme';
 import type { Post } from '../../types';
-import { Icon, Touchable } from '../ui';
+import { Icon, Photo, Touchable } from '../ui';
 
 /** Ícone do canto da miniatura: adotado ou várias fotos. */
 function cornerIcon(post: Post) {
@@ -31,8 +30,9 @@ export function PostGrid({ posts }: { posts: Post[] }) {
           >
             <View style={[styles.fill, { backgroundColor: colors.surfaceMuted }]}>
               {post.media[0] ? (
-                <Image
-                  source={{ uri: post.media[0].thumbUrl }}
+                <Photo
+                  uri={post.media[0].thumbUrl}
+                  iconSize="md"
                   style={styles.image}
                   contentFit="cover"
                   transition={motion.base}

@@ -41,7 +41,6 @@ import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 import { canChooseScheme, toggleColorScheme } from '../../src/theme/schemeChoice';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
-import { Mascot } from '../../src/mascot';
 
 const emptyPosts: Post[] = [];
 const STORY_WIDTH = 76;
@@ -450,7 +449,6 @@ export default function HomeScreen() {
       <View style={[styles.mast, { paddingTop: insets.top + spacing.xs }]}>
         {/* Barra do topo como num app social: o nome do app à esquerda, ações rápidas à direita. */}
         <View style={styles.mastRow}>
-          <Mascot pose="wave" size={size.avatar.md} />
           <View style={styles.heroText}>
             <AppText variant="h2" numberOfLines={1} style={{ color: colors.primary }}>
               Égua, adota!

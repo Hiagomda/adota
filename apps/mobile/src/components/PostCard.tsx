@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { memo, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
@@ -18,7 +17,7 @@ import { distanceLabel, formatWhen } from '../format';
 import { useViewerLocation } from '../place/deviceLocation';
 import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../theme';
 import type { Post } from '../types';
-import { AppText, Avatar, Badge, Button, Icon, StatusPill, Touchable } from './ui';
+import { AppText, Avatar, Badge, Button, Icon, Photo, StatusPill, Touchable } from './ui';
 
 interface PostCardProps {
   post: Post;
@@ -141,8 +140,8 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
             onPress={onPhoto}
             style={styles.photo}
           >
-            <Image
-              source={{ uri: post.media[0]?.thumbUrl || post.media[0]?.url }}
+            <Photo
+              uri={post.media[0]?.thumbUrl || post.media[0]?.url}
               style={styles.photo}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -170,8 +169,8 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
                 onPress={onPhoto}
                 style={{ width: frameWidth, height: frameHeight }}
               >
-                <Image
-                  source={{ uri: media.thumbUrl || media.url }}
+                <Photo
+                  uri={media.thumbUrl || media.url}
                   style={styles.photo}
                   contentFit="cover"
                   transition={motion.base}

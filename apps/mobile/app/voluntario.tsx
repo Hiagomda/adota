@@ -11,6 +11,7 @@ import {
   Card,
   Chip,
   Header,
+  Icon,
   Notice,
   ProgressBar,
   SectionHeader,
@@ -18,8 +19,7 @@ import {
   Switch,
 } from '../src/components/ui';
 import { useSession } from '../src/session';
-import { screenColumn, spacing, useTheme } from '../src/theme';
-import { Mascot } from '../src/mascot';
+import { radius, screenColumn, size, spacing, useTheme } from '../src/theme';
 import { useVolunteerAvailability } from '../src/volunteer/availability';
 import { badgeArtFor } from '../src/volunteer/badgeArt';
 import { LevelUpBanner } from '../src/volunteer/LevelUpBanner';
@@ -35,7 +35,6 @@ const petChoices = [
 
 const dayChoices = [3, 7, 15, 30];
 
-const ROW_MASCOT = 64;
 // Three seals per row, leaving room for the gaps.
 const SEAL_COLUMN_WIDTH = '29%';
 const SEAL_SKELETON = 80;
@@ -192,7 +191,9 @@ export default function VolunteerScreen() {
             </Card>
             <Card>
               <View style={styles.row}>
-                <Mascot pose="home" size={ROW_MASCOT} />
+                <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="home" size="lg" color={colors.onPrimarySoft} />
+                </View>
                 <View style={styles.rowText}>
                   <Switch
                     label="Oferecer lar temporário"
@@ -269,7 +270,12 @@ export default function VolunteerScreen() {
                       // Ties share a place: three neighborhoods with one animal are all 1º.
                       label={`${1 + all.filter((other) => other.rescued > place.rescued).length}º ${place.name}`}
                       caption={place.rescued === 1 ? '1 animal' : `${place.rescued} animais`}
-                      tone={place.rescued === all[0]?.rescued ? 'secondary' : 'primary'}
+                      // Coral só para um líder sozinho: num empate geral tudo coral não destaca ninguém.
+                      tone={
+                        index === 0 && (all[1]?.rescued ?? -1) < place.rescued
+                          ? 'secondary'
+                          : 'primary'
+                      }
                     />
                   ))}
                 </View>
@@ -331,6 +337,13 @@ const styles = StyleSheet.create({
   levelBox: { gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowText: { flex: 1 },
+  rowIcon: {
+    width: size.avatar.lg,
+    height: size.avatar.lg,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   block: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   ranking: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.lg },

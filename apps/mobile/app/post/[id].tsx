@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -33,9 +32,9 @@ import {
   InfoChip,
   Input,
   ListItem,
-  PetPattern,
   Notice,
   PawBurst,
+  Photo,
   PhotoScrim,
   Skeleton,
   StatusPill,
@@ -49,7 +48,6 @@ import { formatWhatsApp } from '../../src/contact/whatsapp';
 import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { uploadProfilePhoto } from '../../src/place/publish';
-import { Mascot } from '../../src/mascot';
 import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
@@ -96,7 +94,6 @@ interface Comment {
 const NOTE_MS = 6000;
 const DOT = 8;
 const DOT_ACTIVE_WIDTH = 24;
-const MASCOT_ON_PHOTO = 160;
 const SHARE_BUTTON = size.control + spacing.sm;
 
 export default function PostScreen() {
@@ -516,9 +513,9 @@ export default function PostScreen() {
               onMomentumScrollEnd={onPhotoScroll}
             >
               {item.media.map((media, index) => (
-                <Image
+                <Photo
                   key={media.url}
-                  source={{ uri: media.url }}
+                  uri={media.url}
                   style={{ width, height: galleryHeight }}
                   contentFit="cover"
                   transition={motion.base}
@@ -529,9 +526,8 @@ export default function PostScreen() {
             </ScrollView>
           ) : (
             <View style={styles.photoEmpty}>
-              <PetPattern color={colors.primary} opacity={0.12} />
-              <Mascot pose="search" size={MASCOT_ON_PHOTO} />
-              <AppText color="textSecondary">Ainda sem foto deste bichinho</AppText>
+              <Icon name="camera-off" size="xl" color={colors.textDisabled} />
+              <AppText color="textSecondary">Ainda sem foto deste animal</AppText>
             </View>
           )}
           <PhotoScrim edge="top" stop={0.72} />
@@ -1099,9 +1095,10 @@ export default function PostScreen() {
       <View
         style={[
           styles.footer,
-          shadows.lg,
-          // The shadow of the footer goes up, over the content.
+          // A sombra do rodapé sobe, por cima do conteúdo. Ela vai num objeto só: no web, um
+          // shadowOffset solto em outro estilo virava uma faixa preta sólida.
           {
+            ...shadows.lg,
             shadowOffset: { width: 0, height: -spacing.sm },
             backgroundColor: colors.surfaceRaised,
           },

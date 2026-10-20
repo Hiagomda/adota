@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { Photo } from './Photo';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import {
@@ -63,8 +63,8 @@ export function AnimalCard({
         style={[styles.card, { backgroundColor: colors.surfaceMuted }]}
       >
         {photoUri ? (
-          <Image
-            source={{ uri: photoUri }}
+          <Photo
+            uri={photoUri}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={motion.base}
