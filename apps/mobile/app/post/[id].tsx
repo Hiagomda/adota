@@ -816,7 +816,7 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {canOwn && !item.viewerWillHelp && item.status === 'on_the_way' ? (
+            {canOwn && !item.viewerWillHelp && openRescueStatuses.has(item.status) ? (
               <Button
                 title="O animal já está seguro"
                 icon="check"

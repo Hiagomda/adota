@@ -2,6 +2,7 @@ import {
   canTransitionStatus,
   insideServiceArea,
   looksLikeAnimalSale,
+  ownerOnlyStatus,
   statusAfterLeavingHelp,
   type AnimalStatus,
   type CreatePostInput,
@@ -405,6 +406,13 @@ export async function changeStatus(
     }
     if (!canTransitionStatus(post.status, status)) {
       throw new HttpError(400, 'Essa mudança de status não é permitida.');
+    }
+    if (
+      ownerOnlyStatus(post.status, status) &&
+      user.id !== post.author_id &&
+      !isOperator(user.role)
+    ) {
+      throw new HttpError(403, 'Só quem publicou pode marcar esse alerta como resgatado.');
     }
     await applyStatus(client, postId, user.id, post.animal_id, status);
     await client.query('COMMIT');
