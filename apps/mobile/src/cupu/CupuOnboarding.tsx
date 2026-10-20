@@ -1,61 +1,84 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Image,
-  Modal,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type ImageSourcePropType,
-} from 'react-native';
-import Animated from 'react-native-reanimated';
-import { AppText, Button } from '../components/ui';
+import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { AppText, Button, Icon, Touchable, type IconName } from '../components/ui';
+import { Mascot, type MascotPose } from '../mascot';
 import { useSession } from '../session';
-import { motion, radius, spacing, useMotionDuration, useTheme } from '../theme';
+import { motion, radius, spacing, useMotionDuration, useTheme, type ColorRoles } from '../theme';
 import { vocativeFromName } from '../vocative';
 import { hasSeenCupuOnboarding, markCupuOnboardingSeen } from './onboardingStorage';
 
-const steps: {
-  image: ImageSourcePropType;
+interface Step {
+  pose: MascotPose;
+  /** Fundo do quadro do Cupu, um tom suave diferente em cada passo. */
+  tint: keyof ColorRoles;
   title: string;
   description: string;
+  /** Linha de destaque com ícone, para o que a pessoa precisa saber antes de usar. */
+  tip?: { icon: IconName; text: string };
   button: string;
-}[] = [
+}
+
+const steps: Step[] = [
   {
-    image: require('../../assets/images/cupu-welcome.png'),
-    title: 'Ei, mano(a)! Que bom te ver por aqui!',
+    pose: 'wave',
+    tint: 'primarySoft',
+    title: 'Ei, mano(a)! Eu sou o Cupu',
     description:
-      'Boas-vindas ao Égua, adota! 🐾\n\nEu sou o Cupuaçu, mas pode me chamar de Cupu! Vou te guiar pra tu saberes como ajudar os bichinhos da nossa terra.',
-    button: 'Prazer, Cupu!',
+      'O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
+    button: 'Bora ver',
   },
   {
-    image: require('../../assets/images/cupu-scout.png'),
-    title: 'Olha o que tu podes fazer:',
+    pose: 'camera',
+    tint: 'secondarySoft',
+    title: 'Viu um bicho precisando?',
     description:
-      'Podes cadastrar pets pra adoção, oferecer lar temporário ou sinalizar no mapa se vires algum animalzinho precisando de resgate.',
-    button: 'E como ganho selos?',
+      'Toca no + do meio: a câmera abre na hora. Tira a foto, marca onde ele está e publica. Quem está perto recebe o alerta.',
+    tip: {
+      icon: 'shield',
+      text: 'No feed aparece só a área aproximada. O ponto exato vai pra quem disser que vai ajudar.',
+    },
+    button: 'Entendi',
   },
   {
-    image: require('../../assets/images/cupu-happy.png'),
-    title: 'Ajuda e ganha XP!',
+    pose: 'map',
+    tint: 'infoSoft',
+    title: 'Ajuda quem está perto',
     description:
-      'A cada boa ação concluída, tu ganhas pontos, sobes de nível e liberas selos como Herói Local.',
+      'No início e no mapa tu vês os alertas do teu bairro. Toca em “Vou ajudar” e combina o resgate com quem publicou.',
+    button: 'E depois?',
+  },
+  {
+    pose: 'home',
+    tint: 'caramelSoft',
+    title: 'Adoção e Casa Amiga',
+    description:
+      'Encontra um bichinho pra adotar ou abre tua casa como lar temporário até ele achar uma família.',
+    button: 'Massa!',
+  },
+  {
+    pose: 'party',
+    tint: 'successSoft',
+    title: 'Cada ajuda vale XP',
+    description: 'Tu sobes de nível e ganhas selos como Herói Local.',
+    tip: {
+      icon: 'heart',
+      text: 'Doação é por PIX direto pra ONG verificada. O app nunca recebe dinheiro.',
+    },
     button: 'Bora lá, Cupu!',
   },
 ];
 
-const CARD_MAX_WIDTH = 360;
-const MASCOT_WIDTH = 210;
-const MASCOT_HEIGHT = 200;
-const PLATE = 230;
-const MASCOT_OVERLAP = 92;
-const CARD_TOP_SPACE = 96;
-const PAGES_MIN_HEIGHT = 168;
+const CARD_MAX_WIDTH = 380;
+const ART_HEIGHT = 196;
+const MASCOT = 184;
 const DOT = 8;
+const DOT_ACTIVE = 24;
 
 export default function CupuOnboarding() {
   const { colors, shadows } = useTheme();
   const duration = useMotionDuration();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const ready = useSession((state) => state.ready);
   const cupuPrompt = useSession((state) => state.cupuPrompt);
   const clearCupuPrompt = useSession((state) => state.clearCupuPrompt);
@@ -64,16 +87,16 @@ export default function CupuOnboarding() {
     () =>
       steps.map((item, itemIndex) =>
         itemIndex === 0
-          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Que bom te ver por aqui!` }
+          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupu` }
           : item,
       ),
     [userName],
   );
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
-  const [pageWidth, setPageWidth] = useState(0);
-  const cardWidth = Math.min(width - spacing.xxl * 2, CARD_MAX_WIDTH);
+  const cardWidth = Math.min(width - spacing.lg * 2, CARD_MAX_WIDTH);
   const step = pages[index] ?? pages[0];
+  const last = index === pages.length - 1;
 
   useEffect(() => {
     if (!ready || !cupuPrompt) return;
@@ -88,80 +111,114 @@ export default function CupuOnboarding() {
     };
   }, [clearCupuPrompt, cupuPrompt, ready]);
 
-  async function advance() {
-    if (index < pages.length - 1) {
-      setIndex(index + 1);
-      return;
-    }
+  async function finish() {
     await markCupuOnboardingSeen();
     setVisible(false);
+    setIndex(0);
     clearCupuPrompt();
   }
 
+  function advance() {
+    if (last) void finish();
+    else setIndex(index + 1);
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => undefined}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => void finish()}>
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-        <View style={[styles.stack, { width: cardWidth }]}>
-          <View style={styles.cupuWrap}>
-            <View style={[styles.cupuPlate, { backgroundColor: colors.surfaceRaised }]} />
-            <Image
-              source={step.image}
-              style={styles.cupu}
-              resizeMode="contain"
-              accessibilityLabel="Cupu, mascote do Égua, adota!"
-            />
+        <View
+          accessibilityViewIsModal
+          style={[
+            styles.card,
+            shadows.lg,
+            {
+              width: cardWidth,
+              maxHeight: height - spacing.xxl * 2,
+              backgroundColor: colors.surfaceRaised,
+            },
+          ]}
+        >
+          <View style={styles.topRow}>
+            <AppText variant="caption" color="textSecondary">
+              {`${index + 1} de ${pages.length}`}
+            </AppText>
+            {last ? null : (
+              <Touchable
+                onPress={() => void finish()}
+                accessibilityRole="button"
+                accessibilityLabel="Pular apresentação"
+                hitSlop={spacing.md}
+                style={styles.skip}
+              >
+                <AppText variant="bodySmallStrong" color="textSecondary">
+                  Pular
+                </AppText>
+              </Touchable>
+            )}
           </View>
-          <View style={[styles.card, shadows.lg, { backgroundColor: colors.surfaceRaised }]}>
-            <View
-              style={styles.pages}
-              onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}
+
+          <ScrollView bounces={false} contentContainerStyle={styles.body}>
+            <Animated.View
+              key={index}
+              entering={FadeIn.duration(duration(motion.slow))}
+              style={styles.body}
             >
-              {pageWidth > 0 ? (
-                <Animated.View
-                  style={[
-                    styles.track,
-                    {
-                      width: pageWidth * pages.length,
-                      transform: [{ translateX: -index * pageWidth }],
-                      transitionProperty: 'transform',
-                      transitionDuration: duration(motion.slow),
-                    },
-                  ]}
-                >
-                  {pages.map((item) => (
-                    <View key={item.button} style={[styles.page, { width: pageWidth }]}>
-                      <AppText variant="h2" style={styles.center}>
-                        {item.title}
-                      </AppText>
-                      <AppText color="textSecondary" style={styles.center}>
-                        {item.description}
-                      </AppText>
-                    </View>
-                  ))}
-                </Animated.View>
+              <View style={[styles.art, { backgroundColor: colors[step.tint] }]}>
+                <Mascot pose={step.pose} size={MASCOT} />
+              </View>
+              <View style={styles.text} accessibilityLiveRegion="polite">
+                <AppText variant="h2" style={styles.center} accessibilityRole="header">
+                  {step.title}
+                </AppText>
+                <AppText color="textSecondary" style={styles.center}>
+                  {step.description}
+                </AppText>
+              </View>
+              {step.tip ? (
+                <View style={[styles.tip, { backgroundColor: colors.surfaceMuted }]}>
+                  <Icon name={step.tip.icon} size="sm" color={colors.primary} />
+                  <AppText variant="bodySmall" style={styles.tipText}>
+                    {step.tip.text}
+                  </AppText>
+                </View>
               ) : null}
-            </View>
-            <View
-              accessible
-              accessibilityLabel={`Passo ${index + 1} de ${pages.length}`}
-              style={styles.dots}
-            >
-              {pages.map((item, dot) => (
-                <View
-                  key={item.button}
-                  style={[
-                    styles.dot,
-                    { backgroundColor: dot === index ? colors.secondary : colors.border },
-                  ]}
-                />
-              ))}
-            </View>
+            </Animated.View>
+          </ScrollView>
+
+          <View
+            accessible
+            accessibilityLabel={`Passo ${index + 1} de ${pages.length}`}
+            style={styles.dots}
+          >
+            {pages.map((item, dot) => (
+              <View
+                key={item.pose}
+                style={[
+                  styles.dot,
+                  dot === index && styles.dotActive,
+                  { backgroundColor: dot === index ? colors.secondary : colors.border },
+                ]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.actions}>
+            {index > 0 ? (
+              <Button
+                title="Voltar"
+                variant="ghost"
+                size="lg"
+                onPress={() => setIndex(index - 1)}
+              />
+            ) : null}
             <Button
               title={step.button}
               variant="secondary"
               size="lg"
-              fullWidth
-              onPress={() => void advance()}
+              icon={last ? undefined : 'arrow-right'}
+              iconPosition="right"
+              onPress={advance}
+              style={styles.next}
             />
           </View>
         </View>
@@ -175,37 +232,41 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xxl,
+    padding: spacing.lg,
   },
-  stack: { alignItems: 'center' },
-  cupuWrap: {
-    width: MASCOT_WIDTH,
-    height: MASCOT_HEIGHT,
-    marginBottom: -MASCOT_OVERLAP,
-    zIndex: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cupuPlate: {
-    position: 'absolute',
-    width: PLATE,
-    height: PLATE,
-    borderRadius: radius.pill,
-    top: -spacing.giant,
-  },
-  cupu: { width: MASCOT_WIDTH, height: MASCOT_HEIGHT },
   card: {
-    width: '100%',
     borderRadius: radius.xl,
-    paddingTop: CARD_TOP_SPACE,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
+    padding: spacing.xl,
     gap: spacing.lg,
   },
-  pages: { minHeight: PAGES_MIN_HEIGHT, overflow: 'hidden' },
-  track: { flexDirection: 'row' },
-  page: { gap: spacing.sm },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: spacing.xxl,
+  },
+  skip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
+  body: { gap: spacing.lg },
+  art: {
+    height: ART_HEIGHT,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  text: { gap: spacing.sm },
   center: { textAlign: 'center' },
+  tip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  tipText: { flex: 1 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
   dot: { width: DOT, height: DOT, borderRadius: radius.pill },
+  dotActive: { width: DOT_ACTIVE },
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  next: { flex: 1 },
 });
