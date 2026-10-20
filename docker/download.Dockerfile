@@ -1,5 +1,5 @@
 FROM nginx:1.27-alpine
-ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-32/egua-adota.apk
+ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-33/egua-adota.apk
 COPY docker/download-nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/download-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY download/index.html /usr/share/nginx/html/index.html
