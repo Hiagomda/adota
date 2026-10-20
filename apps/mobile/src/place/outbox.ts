@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { ApiError } from '../api';
 import { reportError } from '../crash/reporter';
+import { tokenForDraft } from './draftToken';
 import { alertDraftSchema, isOfflineError, publishAlert, type AlertDraft } from './publish';
 
 const storageKey = 'egua-outbox';
@@ -68,27 +69,35 @@ let inFlight: Promise<number> | null = null;
  * Sends queued drafts. Only one flush runs at a time: the app calls this on a timer, and a slow
  * upload that outlived the interval used to be published twice.
  */
-export function flushOutbox(): Promise<number> {
+export function flushOutbox(sessionToken: string | null): Promise<number> {
   if (!inFlight) {
-    inFlight = flush().finally(() => {
+    inFlight = flush(sessionToken).finally(() => {
       inFlight = null;
     });
   }
   return inFlight;
 }
 
-async function flush(): Promise<number> {
+async function flush(sessionToken: string | null): Promise<number> {
   const drafts = await readAll();
   if (drafts.length === 0) return 0;
   const pending: StoredDraft[] = [];
   let sent = 0;
   for (const draft of drafts) {
+    const token = tokenForDraft(draft.token, sessionToken);
+    if (!token) {
+      // Sem sessão, ou outra conta no celular: o resgate espera quem o escreveu entrar de novo.
+      pending.push(draft);
+      continue;
+    }
     try {
-      await publishAlert(draft);
+      await publishAlert({ ...draft, token });
       sent += 1;
     } catch (error) {
-      if (isOfflineError(error)) {
-        // Still no network: keep it as is and try again next time.
+      const sessionProblem =
+        error instanceof ApiError && error.kind === 'http' && error.status === 401;
+      if (isOfflineError(error) || sessionProblem) {
+        // Sem internet, ou a sessão caiu no meio: guarda como está e tenta de novo depois.
         pending.push(draft);
         continue;
       }

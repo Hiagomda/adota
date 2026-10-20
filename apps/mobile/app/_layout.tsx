@@ -117,7 +117,7 @@ function RootLayout() {
     // Storage itself failing is the only way this rejects; record it instead of a silent
     // unhandled rejection every 20 seconds.
     const flush = () =>
-      flushOutbox().catch((error: unknown) =>
+      flushOutbox(useSession.getState().token).catch((error: unknown) =>
         reportError(error, { source: 'handled', where: 'outbox:flush' }),
       );
     void flush();
