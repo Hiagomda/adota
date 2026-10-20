@@ -24,6 +24,7 @@ export {
   sexSchema,
   sizeSchema,
   speciesSchema,
+  ownerOnlyStatus,
   statusTransitions,
   updateMeSchema,
   updatePostSchema,
