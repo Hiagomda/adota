@@ -475,7 +475,7 @@ export function MapCanvas({
               // Área de toque sobre a cabeça da gota, que fica acima do ponto (scripts/paw-pins.mjs).
               style={{
                 circleRadius: 32,
-                circleColor: '#000000',
+                circleColor: mapColors.hitArea,
                 circleOpacity: 0.01,
                 circleTranslate: [0, -44],
               }}

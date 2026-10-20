@@ -111,6 +111,11 @@ export const createPostSchema = z.object({
   referencePoint: z.string().trim().max(200).optional(),
   approxLabel: z.string().trim().min(1).max(120),
   parentPostId: z.string().uuid().optional(),
+  /** Gerada pelo celular para cada resgate: reenviar com a mesma chave não cria outro. */
+  clientKey: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8,64}$/)
+    .optional(),
   media: z
     .array(
       z.object({

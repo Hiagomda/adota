@@ -14,6 +14,7 @@ import {
   ErrorState,
   Header,
   SkeletonCard,
+  useToast,
 } from '../src/components/ui';
 import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
@@ -33,6 +34,7 @@ export default function LostScreen() {
     queryFn: () => loadFeed(token, '?type=lost&limit=20'),
   });
   const refetchFeed = feed.refetch;
+  const toast = useToast();
 
   const like = useCallback(
     async (post: Post) => {
@@ -58,11 +60,14 @@ export default function LostScreen() {
       );
       try {
         await api(`/posts/${post.id}/like`, { method: 'POST', token });
-      } catch {
+      } catch (error) {
+        // A curtida otimista já apareceu: avisa e recarrega para o coração voltar ao real.
+        logBestEffort('lost:like')(error);
+        toast.show('Não consegui registrar a curtida. Tente de novo.', 'error');
         void refetchFeed();
       }
     },
-    [client, refetchFeed, token],
+    [client, refetchFeed, toast, token],
   );
 
   const openPost = useCallback(

@@ -276,6 +276,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     user.id,
     input.media.map((item) => item.url),
   );
+  if (input.clientKey) {
+    const replayed = await postByClientKey(pool, user.id, input.clientKey);
+    if (replayed) return replayed;
+  }
   const description = stripControls(input.description);
   const named = input.name?.trim() ?? '';
   const reviewStatus =
@@ -312,10 +316,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     const post = await client.query<{ id: string }>(
       `INSERT INTO posts (
          author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status,
-         accuracy_m, address_text, reference_point
+         accuracy_m, address_text, reference_point, client_key
        ) VALUES (
          $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $14, $9, $10,
-         $11, $12, $13
+         $11, $12, $13, $15
        ) RETURNING id`,
       [
         user.id,
@@ -332,6 +336,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.addressText ?? null,
         input.referencePoint ?? null,
         openingStatus,
+        input.clientKey ?? null,
       ],
     );
     const postId = post.rows[0]?.id;
@@ -356,13 +361,31 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
       );
     }
     await client.query('COMMIT');
-    return { id: postId, reviewStatus };
+    return { id: postId, reviewStatus, replayed: false };
   } catch (error) {
     await client.query('ROLLBACK');
+    // Dois envios da mesma chave ao mesmo tempo: o segundo devolve o que o primeiro salvou.
+    if (input.clientKey && isUnique(error)) {
+      const replayed = await postByClientKey(pool, user.id, input.clientKey);
+      if (replayed) return replayed;
+    }
     throw error;
   } finally {
     client.release();
   }
+}
+
+async function postByClientKey(
+  pool: Pool,
+  authorId: string,
+  clientKey: string,
+): Promise<{ id: string; reviewStatus: string; replayed: true } | null> {
+  const found = await pool.query<{ id: string; review_status: string }>(
+    `SELECT id, review_status FROM posts WHERE author_id = $1 AND client_key = $2`,
+    [authorId, clientKey],
+  );
+  const row = found.rows[0];
+  return row ? { id: row.id, reviewStatus: row.review_status, replayed: true } : null;
 }
 
 export async function changeStatus(
@@ -371,32 +394,57 @@ export async function changeStatus(
   user: SessionUser,
   status: AnimalStatus,
 ) {
-  const current = await pool.query<{
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const post = await lockRescue(client, postId);
+    const allowed = await canChange(client, post.author_id, postId, user);
+    if (!allowed) throw new HttpError(403, 'Você não pode atualizar esse alerta.');
+    // Quem ajuda leva o resgate até a adoção; dizer quem adotou é de quem publicou ou da equipe.
+    if (status === 'adopted' && user.id !== post.author_id && !isOperator(user.role)) {
+      throw new HttpError(403, 'Só quem publicou pode dizer que o animal foi adotado.');
+    }
+    if (!canTransitionStatus(post.status, status)) {
+      throw new HttpError(400, 'Essa mudança de status não é permitida.');
+    }
+    if (
+      ownerOnlyStatus(post.status, status) &&
+      user.id !== post.author_id &&
+      !isOperator(user.role)
+    ) {
+      throw new HttpError(403, 'Só quem publicou pode marcar esse alerta como resgatado.');
+    }
+    await applyStatus(client, postId, user.id, post.animal_id, status);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Trava a linha do resgate até o fim da transação: dois toques juntos em "Encontrei" não gravam
+ * dois registros no diário. Registro do diário, resgate oculto ou inexistente respondem 404.
+ */
+async function lockRescue(
+  client: PoolClient,
+  postId: string,
+): Promise<{ status: AnimalStatus; author_id: string; animal_id: string }> {
+  const current = await client.query<{
     status: AnimalStatus;
     author_id: string;
     animal_id: string;
-    longitude: number;
-    latitude: number;
   }>(
-    `SELECT status, author_id, animal_id, ST_X(location::geometry) AS longitude, ST_Y(location::geometry) AS latitude
-     FROM posts WHERE id = $1`,
+    `SELECT status, author_id, animal_id FROM posts
+     WHERE id = $1 AND parent_post_id IS NULL AND hidden = false
+     FOR UPDATE`,
     [postId],
   );
   const post = current.rows[0];
   if (!post) throw new HttpError(404, 'Esse alerta não existe.');
-  const allowed = await canChange(pool, post.author_id, postId, user);
-  if (!allowed) throw new HttpError(403, 'Você não pode atualizar esse alerta.');
-  if (!canTransitionStatus(post.status, status)) {
-    throw new HttpError(400, 'Essa mudança de status não é permitida.');
-  }
-  if (
-    ownerOnlyStatus(post.status, status) &&
-    user.id !== post.author_id &&
-    !isOperator(user.role)
-  ) {
-    throw new HttpError(403, 'Só quem publicou pode marcar esse alerta como resgatado.');
-  }
-  await applyStatus(pool, postId, user.id, post.animal_id, status);
+  return post;
 }
 
 async function applyStatus(
@@ -603,26 +651,43 @@ export async function addResponse(
   kind: 'will_help' | 'seen' | 'has_foster' | 'can_donate',
   note?: string,
 ) {
+  const client = await pool.connect();
   try {
-    await pool.query(
-      `INSERT INTO responses (post_id, user_id, kind, note) VALUES ($1, $2, $3, $4)`,
-      [postId, user.id, kind, note ?? null],
-    );
-  } catch (error) {
-    if (isUnique(error)) throw new HttpError(409, 'Você já respondeu esse alerta desse jeito.');
-    throw error;
-  }
-  if (kind === 'will_help') {
-    const current = await pool.query<{ status: AnimalStatus }>(
-      `SELECT status FROM posts WHERE id = $1`,
+    await client.query('BEGIN');
+    const post = await lockRescue(client, postId);
+    const published = await client.query(
+      `SELECT 1 FROM posts WHERE id = $1 AND review_status = 'published'`,
       [postId],
     );
-    const status = current.rows[0]?.status;
-    if (status === 'open' || status === 'not_found') {
-      await changeStatus(pool, postId, user, 'on_the_way');
+    if ((published.rowCount ?? 0) === 0) throw new HttpError(404, 'Esse alerta não existe.');
+    // "Vou ajudar" libera o ponto exato e o WhatsApp, e deixa mudar o status. Só vale enquanto
+    // alguém ainda pode ir até o animal; num anúncio de adoção o caminho é "Quero adotar".
+    if (kind === 'will_help' && !streetStatuses.has(post.status)) {
+      throw new HttpError(400, 'Esse resgate não precisa mais de alguém a caminho.');
     }
+    try {
+      await client.query(
+        `INSERT INTO responses (post_id, user_id, kind, note) VALUES ($1, $2, $3, $4)`,
+        [postId, user.id, kind, note ?? null],
+      );
+    } catch (error) {
+      if (isUnique(error)) throw new HttpError(409, 'Você já respondeu esse alerta desse jeito.');
+      throw error;
+    }
+    if (kind === 'will_help' && (post.status === 'open' || post.status === 'not_found')) {
+      await applyStatus(client, postId, user.id, post.animal_id, 'on_the_way');
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
+
+/** A parte de rua do resgate: ainda dá para ir, procurar ou desistir. */
+const streetStatuses = new Set<AnimalStatus>(['open', 'on_the_way', 'not_found']);
 
 /**
  * Desde quando o animal espera um lar. Para adoção só vira adotado, então a primeira linha do
@@ -754,7 +819,7 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
 }
 
 async function canChange(
-  pool: Pool,
+  pool: Pool | PoolClient,
   authorId: string,
   postId: string,
   user: SessionUser,
@@ -771,7 +836,7 @@ async function addDiaryNote(
   pool: Pool,
   user: SessionUser,
   input: CreatePostInput,
-): Promise<{ id: string; reviewStatus: string }> {
+): Promise<{ id: string; reviewStatus: string; replayed: boolean }> {
   const parentId = input.parentPostId;
   if (!parentId) throw new HttpError(400, 'Falta o resgate deste diário.');
   const parent = await pool.query<{ author_id: string }>(
@@ -806,7 +871,7 @@ async function addDiaryNote(
       [id, url, position],
     );
   }
-  return { id, reviewStatus };
+  return { id, reviewStatus, replayed: false };
 }
 
 const NOT_FOUND_NOTE = 'Não encontrei o animal.';
