@@ -11,7 +11,7 @@ import { StyleSheet, View } from 'react-native';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
 import { insideServiceArea, serviceCamera, serviceOutline } from '../map/serviceArea';
 import { mapColors } from '../map/layerColors';
-import { radius } from '../theme';
+import { radius, useTheme } from '../theme';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
 
@@ -31,6 +31,7 @@ export function PlacePicker({
   const camera = useRef<CameraRef>(null);
   const lastInside = useRef<MapPoint>({ latitude: belem[1], longitude: belem[0] });
   const snapping = useRef(false);
+  const { colors } = useTheme();
   const [mapHeight, setMapHeight] = useState(240);
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export function PlacePicker({
         );
         setMapHeight((current) => (current === next ? current : next));
       }}
-      style={[styles.frame, { height: mapHeight }]}
+      style={[styles.frame, { height: mapHeight, backgroundColor: colors.surfaceMuted }]}
     >
       <MapView
         style={styles.map}
@@ -119,7 +120,7 @@ export function PlacePicker({
 }
 
 const styles = StyleSheet.create({
-  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#E7F0EE' },
+  frame: { borderRadius: radius.lg, overflow: 'hidden' },
   map: { flex: 1 },
   pinLayer: {
     ...StyleSheet.absoluteFill,
