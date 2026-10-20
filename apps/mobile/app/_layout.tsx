@@ -20,6 +20,7 @@ import {
 import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
 import { syncNearbyPresence } from '../src/nearby/presence';
+import { usePushOpen } from '../src/nearby/usePushOpen';
 import { primeCreateDraft } from '../src/place/createDraftStore';
 import { primeColorScheme } from '../src/theme/schemeChoice';
 import { flushOutbox } from '../src/place/outbox';
@@ -67,6 +68,7 @@ function RootLayout() {
   // A font that fails to load must not lock the app: text falls back to the system font.
   const fontsSettled = fontsLoaded || fontError !== null;
   const started = (fontsSettled && sessionReady) || timedOut;
+  usePushOpen(started && !fatal);
 
   useEffect(() => {
     if (fontError) reportError(fontError, { source: 'handled', where: 'startup:fonts' });

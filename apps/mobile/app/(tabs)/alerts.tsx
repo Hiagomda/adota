@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { logBestEffort } from '../../src/crash/bestEffort';
 import { api, loadNotifications, messageFrom } from '../../src/api';
 import {
   AppText,
@@ -52,13 +53,14 @@ export default function AlertsScreen() {
   }
   const sections = [...groups.entries()].map(([title, data]) => ({ title, data }));
 
-  async function open(item: AppNotification) {
-    if (token) {
-      await api('/notifications/read', { method: 'POST', token });
-      await client.invalidateQueries({ queryKey: ['notifications', token] });
-    }
-    // Old adoption-chat notices also land on the animal: conversations moved to WhatsApp.
+  function open(item: AppNotification) {
+    // Primeiro abre o animal; marcar como lido é detalhe e, sem internet, não pode travar o toque.
+    // Avisos antigos da conversa de adoção também caem no animal: a conversa foi para o WhatsApp.
     if (item.payload.postId) router.push(`/post/${item.payload.postId}`);
+    if (!token) return;
+    api('/notifications/read', { method: 'POST', token })
+      .then(() => client.invalidateQueries({ queryKey: ['notifications', token] }))
+      .catch(logBestEffort('notifications:read'));
   }
 
   return (
@@ -116,7 +118,7 @@ export default function AlertsScreen() {
                 icon="bell"
                 accessibilityLabel={`${item.readAt ? '' : 'Não lida. '}${item.payload.title ?? 'Atualização'}. ${notificationBody(item.payload.body)}`}
                 trailing={item.readAt ? null : <Badge kind="dot" accessibilityLabel="Não lida" />}
-                onPress={() => void open(item)}
+                onPress={() => open(item)}
               />
             )}
           />
