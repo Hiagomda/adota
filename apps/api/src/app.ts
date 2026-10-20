@@ -67,6 +67,9 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
   await app.register(cors, {
     origin: env.NODE_ENV === 'production' ? [env.WEB_ORIGIN, env.ADMIN_ORIGIN] : true,
     credentials: true,
+    // O padrão do @fastify/cors só libera GET, HEAD e POST: sem isto o navegador barra no
+    // preflight o PATCH (status, perfil) e o DELETE (excluir) das páginas web e do painel.
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
   await app.register(rateLimit, {
     global: true,
