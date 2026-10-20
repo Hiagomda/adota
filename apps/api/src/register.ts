@@ -111,6 +111,10 @@ function perAccount(max: number) {
 const writeLimit = perAccount(30);
 /** Actions that change XP, verification or the account itself. */
 const strictLimit = perAccount(5);
+/** Publicar, responder, comentar, denunciar e pedir envio de foto. */
+const publishLimit = perAccount(20);
+/** Endereço pelo ponto do mapa: chama um serviço de fora a cada pedido. */
+const lookupLimit = perAccount(30);
 /** Asking for someone's WhatsApp: enough to talk to a few people, too few to harvest numbers. */
 const contactLimit = perAccount(10);
 
@@ -273,37 +277,29 @@ export async function registerRoutes(
     return { blocked: false };
   });
 
-  app.post(
-    '/uploads/presign',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request) => {
-      const user = requireUser(request.user);
-      const body = parse(presignSchema, request.body);
-      return { uploads: await presignUploads(env, storage, user.id, body.files) };
-    },
-  );
+  app.post('/uploads/presign', publishLimit, async (request) => {
+    const user = requireUser(request.user);
+    const body = parse(presignSchema, request.body);
+    return { uploads: await presignUploads(env, storage, user.id, body.files) };
+  });
 
-  app.get(
-    '/geocode/reverse',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
-    async (request) => {
-      const query = parse(
-        z.object({
-          latitude: z.coerce.number().gte(-90).lte(90),
-          longitude: z.coerce.number().gte(-180).lte(180),
-        }),
-        request.query,
-      );
-      try {
-        const address = await reverseAddress(query.latitude, query.longitude);
-        return { address };
-      } catch (error) {
-        // The address is a convenience; the pin alone is enough to publish.
-        request.log.warn({ err: error }, 'geocode: reverse lookup failed');
-        return { address: null };
-      }
-    },
-  );
+  app.get('/geocode/reverse', lookupLimit, async (request) => {
+    const query = parse(
+      z.object({
+        latitude: z.coerce.number().gte(-90).lte(90),
+        longitude: z.coerce.number().gte(-180).lte(180),
+      }),
+      request.query,
+    );
+    try {
+      const address = await reverseAddress(query.latitude, query.longitude);
+      return { address };
+    } catch (error) {
+      // The address is a convenience; the pin alone is enough to publish.
+      request.log.warn({ err: error }, 'geocode: reverse lookup failed');
+      return { address: null };
+    }
+  });
 
   app.get('/posts', async (request) => {
     const query = parse(feedQuerySchema, request.query);
@@ -338,43 +334,41 @@ export async function registerRoutes(
     return getPost(pool, env, id, request.user);
   });
 
-  app.post(
-    '/posts',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request, reply) => {
-      const user = requireUser(request.user);
-      const body = parse(createPostSchema, request.body);
-      // Diary notes may carry a photo too ("notícias da casa nova"), checked the same way.
-      if (!body.parentPostId || body.media.length > 0) {
-        await verifyUploadedImages(
-          env,
-          storage,
-          user.id,
-          body.media.map((item) => item.url),
-        );
-      }
-      const created = await createPost(pool, env, user, body);
-      if (
-        body.type === 'rescue_alert' &&
-        created.reviewStatus === 'published' &&
-        !body.parentPostId
-      ) {
-        await enqueueRescueAlert(queue, created.id, body.urgency).catch(
-          bestEffort(request, 'queue:rescue-alert'),
-        );
-      }
-      if (body.parentPostId && created.reviewStatus === 'published') {
-        await notifyDiaryNote(
-          pool,
-          env,
-          body.parentPostId,
-          user.id,
-          stripControls(body.description),
-        ).catch(bestEffort(request, 'notify:diary-note'));
-      }
-      return reply.code(201).send(created);
-    },
-  );
+  app.post('/posts', publishLimit, async (request, reply) => {
+    const user = requireUser(request.user);
+    const body = parse(createPostSchema, request.body);
+    // Diary notes may carry a photo too ("notícias da casa nova"), checked the same way.
+    if (!body.parentPostId || body.media.length > 0) {
+      await verifyUploadedImages(
+        env,
+        storage,
+        user.id,
+        body.media.map((item) => item.url),
+      );
+    }
+    const { replayed, ...created } = await createPost(pool, env, user, body);
+    // Reenvio da fila de um resgate já salvo: devolve o mesmo, sem avisar a vizinhança de novo.
+    if (replayed) return reply.code(200).send(created);
+    if (
+      body.type === 'rescue_alert' &&
+      created.reviewStatus === 'published' &&
+      !body.parentPostId
+    ) {
+      await enqueueRescueAlert(queue, created.id, body.urgency).catch(
+        bestEffort(request, 'queue:rescue-alert'),
+      );
+    }
+    if (body.parentPostId && created.reviewStatus === 'published') {
+      await notifyDiaryNote(
+        pool,
+        env,
+        body.parentPostId,
+        user.id,
+        stripControls(body.description),
+      ).catch(bestEffort(request, 'notify:diary-note'));
+    }
+    return reply.code(201).send(created);
+  });
 
   app.patch('/posts/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
@@ -393,26 +387,22 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.post(
-    '/posts/:id/help/leave',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request) => {
-      const user = requireUser(request.user);
-      const id = resourceId(request.params);
-      const body = parse(z.object({ outcome: leaveHelpOutcomeSchema }), request.body);
-      const result = await leaveHelp(pool, id, user, body.outcome);
-      if (result.changed) {
-        await notifyStatusChange(pool, env, id, result.status).catch(
-          bestEffort(request, 'notify:status'),
-        );
-      } else if (result.noted) {
-        await notifyDiaryNote(pool, env, id, user.id, 'Não encontrei o animal.').catch(
-          bestEffort(request, 'notify:diary-note'),
-        );
-      }
-      return result;
-    },
-  );
+  app.post('/posts/:id/help/leave', publishLimit, async (request) => {
+    const user = requireUser(request.user);
+    const id = resourceId(request.params);
+    const body = parse(z.object({ outcome: leaveHelpOutcomeSchema }), request.body);
+    const result = await leaveHelp(pool, id, user, body.outcome);
+    if (result.changed) {
+      await notifyStatusChange(pool, env, id, result.status).catch(
+        bestEffort(request, 'notify:status'),
+      );
+    } else if (result.noted) {
+      await notifyDiaryNote(pool, env, id, user.id, 'Não encontrei o animal.').catch(
+        bestEffort(request, 'notify:diary-note'),
+      );
+    }
+    return result;
+  });
 
   app.patch('/posts/:id/status', writeLimit, async (request) => {
     const user = requireUser(request.user);
@@ -425,23 +415,19 @@ export async function registerRoutes(
     return { status: body.status };
   });
 
-  app.post(
-    '/posts/:id/responses',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request, reply) => {
-      const user = requireUser(request.user);
-      const id = resourceId(request.params);
-      const body = parse(
-        z.object({ kind: responseKindSchema, note: z.string().max(300).optional() }),
-        request.body,
-      );
-      await addResponse(pool, id, user, body.kind, body.note);
-      if (body.kind === 'will_help') {
-        await enqueueHelperCheck(queue, id, user.id).catch(bestEffort(request, 'queue:help-check'));
-      }
-      return reply.code(201).send({ ok: true });
-    },
-  );
+  app.post('/posts/:id/responses', publishLimit, async (request, reply) => {
+    const user = requireUser(request.user);
+    const id = resourceId(request.params);
+    const body = parse(
+      z.object({ kind: responseKindSchema, note: z.string().max(300).optional() }),
+      request.body,
+    );
+    await addResponse(pool, id, user, body.kind, body.note);
+    if (body.kind === 'will_help') {
+      await enqueueHelperCheck(queue, id, user.id).catch(bestEffort(request, 'queue:help-check'));
+    }
+    return reply.code(201).send({ ok: true });
+  });
 
   app.get('/posts/:id/comments', async (request) => {
     const id = resourceId(request.params);
@@ -498,60 +484,56 @@ export async function registerRoutes(
     };
   });
 
-  app.post(
-    '/posts/:id/comments',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request, reply) => {
-      const user = requireUser(request.user);
-      const id = resourceId(request.params);
-      const body = parse(commentSchema, request.body);
-      // Same visibility as GET /posts/:id/comments: no comments on a hidden or unpublished post.
-      const post = await pool.query<{ author_id: string }>(
-        `SELECT author_id FROM posts
+  app.post('/posts/:id/comments', publishLimit, async (request, reply) => {
+    const user = requireUser(request.user);
+    const id = resourceId(request.params);
+    const body = parse(commentSchema, request.body);
+    // Same visibility as GET /posts/:id/comments: no comments on a hidden or unpublished post.
+    const post = await pool.query<{ author_id: string }>(
+      `SELECT author_id FROM posts
          WHERE id = $1 AND hidden = false AND review_status = 'published'`,
-        [id],
-      );
-      const postAuthorId = post.rows[0]?.author_id;
-      if (!postAuthorId) throw new HttpError(404, 'Esse resgate não está mais disponível.');
-      let parentAuthorId: string | null = null;
-      if (body.parentCommentId) {
-        const parent = await pool.query<{ user_id: string }>(
-          `SELECT user_id FROM comments
+      [id],
+    );
+    const postAuthorId = post.rows[0]?.author_id;
+    if (!postAuthorId) throw new HttpError(404, 'Esse resgate não está mais disponível.');
+    let parentAuthorId: string | null = null;
+    if (body.parentCommentId) {
+      const parent = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM comments
            WHERE id = $1 AND post_id = $2 AND hidden = false`,
-          [body.parentCommentId, id],
-        );
-        const parentRow = parent.rows[0];
-        if (!parentRow) throw new HttpError(404, 'Esse comentário não existe mais.');
-        parentAuthorId = parentRow.user_id;
-      }
-      // A block in either direction keeps both people out of each other's threads.
-      const others = [postAuthorId, parentAuthorId].filter(
-        (other): other is string => other !== null && other !== user.id,
+        [body.parentCommentId, id],
       );
-      if (others.length > 0) {
-        const blocked = await pool.query(
-          `SELECT 1 FROM blocks
+      const parentRow = parent.rows[0];
+      if (!parentRow) throw new HttpError(404, 'Esse comentário não existe mais.');
+      parentAuthorId = parentRow.user_id;
+    }
+    // A block in either direction keeps both people out of each other's threads.
+    const others = [postAuthorId, parentAuthorId].filter(
+      (other): other is string => other !== null && other !== user.id,
+    );
+    if (others.length > 0) {
+      const blocked = await pool.query(
+        `SELECT 1 FROM blocks
            WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[]))
               OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))
            LIMIT 1`,
-          [user.id, others],
-        );
-        if ((blocked.rowCount ?? 0) > 0) {
-          throw new HttpError(403, 'Você não pode comentar nesta conversa.');
-        }
+        [user.id, others],
+      );
+      if ((blocked.rowCount ?? 0) > 0) {
+        throw new HttpError(403, 'Você não pode comentar nesta conversa.');
       }
-      const inserted = await pool.query<{ id: string }>(
-        `INSERT INTO comments (post_id, user_id, body, parent_comment_id)
+    }
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO comments (post_id, user_id, body, parent_comment_id)
          VALUES ($1, $2, $3, $4) RETURNING id`,
-        [id, user.id, body.body, body.parentCommentId ?? null],
-      );
-      // The comment is saved; a failed notification must not answer 500 and invite a duplicate.
-      await notifyComment(pool, env, id, user.id, body.body, parentAuthorId).catch(
-        bestEffort(request, 'notify:comment'),
-      );
-      return reply.code(201).send({ id: inserted.rows[0]?.id });
-    },
-  );
+      [id, user.id, body.body, body.parentCommentId ?? null],
+    );
+    // The comment is saved; a failed notification must not answer 500 and invite a duplicate.
+    await notifyComment(pool, env, id, user.id, body.body, parentAuthorId).catch(
+      bestEffort(request, 'notify:comment'),
+    );
+    return reply.code(201).send({ id: inserted.rows[0]?.id });
+  });
 
   app.post('/posts/:id/like', writeLimit, async (request) => toggle(pool, 'likes', request));
   app.post('/posts/:id/save', writeLimit, async (request) => toggle(pool, 'saves', request));
@@ -710,25 +692,21 @@ export async function registerRoutes(
     return { ok: true };
   });
 
-  app.post(
-    '/reports',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    async (request, reply) => {
-      const user = requireUser(request.user);
-      const body = parse(reportSchema, request.body);
-      // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
-      await pool.query(
-        `INSERT INTO reports (reporter_id, target_type, target_id, reason)
+  app.post('/reports', publishLimit, async (request, reply) => {
+    const user = requireUser(request.user);
+    const body = parse(reportSchema, request.body);
+    // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
+    await pool.query(
+      `INSERT INTO reports (reporter_id, target_type, target_id, reason)
          SELECT $1, $2, $3, $4
          WHERE NOT EXISTS (
            SELECT 1 FROM reports
            WHERE reporter_id = $1 AND target_type = $2 AND target_id = $3 AND status = 'open'
          )`,
-        [user.id, body.targetType, body.targetId, body.reason],
-      );
-      return reply.code(201).send({ status: 'open' });
-    },
-  );
+      [user.id, body.targetType, body.targetId, body.reason],
+    );
+    return reply.code(201).send({ status: 'open' });
+  });
 
   app.get('/admin/reports', async (request) => {
     requireAdmin(request.user);
