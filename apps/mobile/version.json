@@ -1,10 +1,8 @@
 {
   "version": "0.1.0",
-  "build": 33,
+  "build": 34,
   "notes": [
-    "O Cupu agora explica o app em 5 passos, e o visual ficou mais limpo: foto que não carrega mostra um aviso no lugar do buraco.",
-    "Antes de publicar, o app avisa se já tem um resgate aberto perto dali.",
-    "Resgate não se perde nem duplica quando a internet cai, e quem publicou pode marcar o animal como seguro direto.",
-    "\"Foi adotado\" conclui a adoção, e tocar na notificação abre o resgate."
+    "O botão \"Vou ajudar\" do feed aparece inteiro de novo, sem cortar no \"Vou\".",
+    "O mapa não dá mais aquelas teleportadas nem trava ao arrastar: ele fica onde você deixou."
   ]
 }
