@@ -1,9 +1,9 @@
-import { File, UploadType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { z } from 'zod';
 import { ApiError, api, isNetworkError } from '../api';
 import type { MapPoint } from '../map/geo';
 import { logBestEffort } from '../crash/bestEffort';
+import { photoBytes, putPhotoFile } from './photoFile';
 
 export const alertDraftSchema = z.object({
   id: z.string().min(1),
@@ -62,8 +62,7 @@ async function compressPhoto(uri: string): Promise<PreparedPhoto> {
     compress: 0.7,
     format: ImageManipulator.SaveFormat.JPEG,
   });
-  const file = new File(compressed.uri);
-  const bytes = file.size ?? 0;
+  const bytes = await photoBytes(compressed.uri);
   if (bytes <= 0) throw new ApiError(0, 'Não consegui ler a foto. Tente de novo.');
   return { uri: compressed.uri, bytes };
 }
@@ -85,18 +84,12 @@ export function preparePhoto(uri: string): void {
 }
 
 async function putPhoto(uri: string, url: string): Promise<void> {
-  const file = new File(uri);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), uploadTimeoutMs);
   try {
-    const put = await file.upload(url, {
-      httpMethod: 'PUT',
-      uploadType: UploadType.BINARY_CONTENT,
-      headers: { 'content-type': 'image/jpeg' },
-      signal: controller.signal,
-    });
-    if (put.status < 200 || put.status >= 300) {
-      throw new ApiError(put.status, 'Não consegui enviar a foto. Tente de novo.');
+    const status = await putPhotoFile(uri, url, controller.signal);
+    if (status < 200 || status >= 300) {
+      throw new ApiError(status, 'Não consegui enviar a foto. Tente de novo.');
     }
   } catch (error) {
     if (controller.signal.aborted) {

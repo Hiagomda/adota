@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import {
   accountSchema,
   feedPageSchema,
@@ -12,6 +13,7 @@ import {
 } from './apiSchemas';
 import { appVersionHeaders } from './appVersion';
 import { reportError } from './crash/reporter';
+import { parseProxyRoutes, rewriteUrls } from './net/sameOrigin';
 import { recordRequest, requestPath } from './net/timings';
 import type { Account, AppNotification, Post } from './types';
 
@@ -21,6 +23,10 @@ export const apiUrl =
   process.env.EXPO_PUBLIC_API_URL ??
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
   'http://localhost:3010';
+
+/** Só na versão web: fotos e envios em http:// passam pelo próprio site (net/sameOrigin.ts). */
+const webProxyRoutes =
+  Platform.OS === 'web' ? parseProxyRoutes(process.env.EXPO_PUBLIC_WEB_PROXY_ROUTES) : [];
 
 /** Default per request. Uploads use a longer one. */
 export const requestTimeoutMs = 15_000;
@@ -142,7 +148,7 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
   }
   let payload: unknown;
   try {
-    payload = await response.json();
+    payload = rewriteUrls(await response.json(), webProxyRoutes);
   } catch {
     // An HTML error page from the proxy, or a cut connection mid-body.
     if (!response.ok) throw new ApiError(response.status, messageForStatus(response.status));

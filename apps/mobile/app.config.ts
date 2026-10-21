@@ -182,6 +182,9 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       ],
       experiments: {
         typedRoutes: true,
+        // O app web do iPhone mora em <download>/app. Só o `expo export --platform web` do
+        // workflow define isto; o celular e o `expo start` continuam na raiz.
+        ...(process.env.EXPO_WEB_BASE_URL ? { baseUrl: process.env.EXPO_WEB_BASE_URL } : {}),
       },
     }),
   );

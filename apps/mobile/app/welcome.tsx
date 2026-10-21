@@ -1,6 +1,6 @@
 import { Redirect, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { requestGoogleIdToken } from '../src/auth/googleNative';
@@ -82,7 +82,8 @@ export default function WelcomeScreen() {
           <View style={styles.column}>
             {signedOutReason ? <Notice message={signedOutReason} tone="warning" /> : null}
             {notice ? <Notice message={notice} tone="info" /> : null}
-            <GoogleButton onPress={continueWithGoogle} />
+            {/* O login com Google é nativo; o app web do iPhone entra só com e-mail. */}
+            {Platform.OS !== 'web' ? <GoogleButton onPress={continueWithGoogle} /> : null}
             <Button
               title="Entrar com e-mail"
               icon="mail"

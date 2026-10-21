@@ -41,10 +41,11 @@ function readOptions(): FirebaseOptions | null {
 }
 
 function startAuth(app: FirebaseApp): Auth {
-  // Web preview keeps the session in memory. Phones use the Keychain/Keystore via secureAuthStorage.
+  // The web app keeps the session in the browser, so the iPhone home-screen app stays signed in.
+  // Phones use the Keychain/Keystore via secureAuthStorage.
   // When Google sign-in is added on iOS, Sign in with Apple has to ship in the same build.
   const persistence =
-    Platform.OS === 'web' ? firebaseAuthModule.inMemoryPersistence : nativePersistence();
+    Platform.OS === 'web' ? firebaseAuthModule.browserLocalPersistence : nativePersistence();
   try {
     return firebaseAuthModule.initializeAuth(app, { persistence });
   } catch (error) {

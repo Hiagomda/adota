@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Criar o release apk-<versão>-<build> com o egua-adota.apk'
+        description: 'Criar o release apk-<versão>-<build> com o egua-adota.apk e o app web'
         type: boolean
         default: false
 
@@ -68,6 +68,21 @@ jobs:
           test -n "$MOBILE_ENV" || { echo "O secret MOBILE_ENV está vazio"; exit 1; }
           printf '%s\n' "$MOBILE_ENV" > apps/mobile/.env
 
+      # App web do iPhone, do mesmo commit do APK. Fica em <download>/app e chama a API e as fotos
+      # pelo próprio site (docker/download-nginx.conf), porque lá é HTTPS e a API ainda é HTTP.
+      - name: Exportar o app web
+        working-directory: apps/mobile
+        env:
+          EXPO_WEB_BASE_URL: /app
+          EXPO_PUBLIC_API_URL: /api
+          EXPO_PUBLIC_WEB_PROXY_ROUTES: >-
+            http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/img,http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/media
+        run: |
+          set -eu
+          npx expo export --platform web --output-dir "$RUNNER_TEMP/web"
+          node scripts/web-pwa.mjs "$RUNNER_TEMP/web" /app
+          tar -czf "$RUNNER_TEMP/egua-adota-web.tar.gz" -C "$RUNNER_TEMP/web" .
+
       - name: Chave de upload
         env:
           KEYSTORE_BASE64: ${{ secrets.EGUA_UPLOAD_KEYSTORE_BASE64 }}
@@ -114,7 +129,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: egua-adota-apk
-          path: ${{ runner.temp }}/egua-adota.apk
+          path: |
+            ${{ runner.temp }}/egua-adota.apk
+            ${{ runner.temp }}/egua-adota-web.tar.gz
           retention-days: 14
 
       - name: Release no GitHub
@@ -128,9 +145,9 @@ jobs:
           tag="apk-$version-$build"
           node -p "require('./apps/mobile/version.json').notes.map((n) => '- ' + n).join('\n')" > "$RUNNER_TEMP/notes.md"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$RUNNER_TEMP/egua-adota.apk" --clobber
+            gh release upload "$tag" "$RUNNER_TEMP/egua-adota.apk" "$RUNNER_TEMP/egua-adota-web.tar.gz" --clobber
           else
-            gh release create "$tag" "$RUNNER_TEMP/egua-adota.apk" \
+            gh release create "$tag" "$RUNNER_TEMP/egua-adota.apk" "$RUNNER_TEMP/egua-adota-web.tar.gz" \
               --target "$GITHUB_SHA" --title "Égua, adota! $version (build $build)" \
               --notes-file "$RUNNER_TEMP/notes.md"
           fi
