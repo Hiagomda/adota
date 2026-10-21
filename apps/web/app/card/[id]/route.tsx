@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import QRCode from 'qrcode';
 import { getPost } from '../../../lib/api';
-import { statusLabel, speciesLabel } from '../../../lib/labels';
+import { statusLabelFor, speciesLabel } from '../../../lib/labels';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -41,7 +41,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           {post.animal.name?.trim() || speciesLabel[post.animal.species] || 'Animal'}
         </div>
         <div style={{ fontSize: 40 }}>{post.approxLabel}</div>
-        <div style={{ fontSize: 36 }}>{statusLabel[post.status]}</div>
+        <div style={{ fontSize: 36 }}>{statusLabelFor(post.type, post.status)}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <div style={{ display: 'flex', fontSize: 28, color: '#bbbbbb' }}>{pageUrl}</div>
           {/* eslint-disable-next-line @next/next/no-img-element */}

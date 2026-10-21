@@ -354,6 +354,38 @@ describe('posts', () => {
     expect((await status('helper@egua.local', 'adopted')).statusCode).toBe(403);
   });
 
+  it('keeps a lost pet on its way home, not to foster or adoption', async () => {
+    await insertUser('author@egua.local', 'author');
+    await insertUser('helper@egua.local', 'helper');
+    const created = await createAlert(app, 'author@egua.local', 'Fugiu de casa ontem.');
+    const postId = created.json().id as string;
+    await pool.query(`UPDATE posts SET type = 'lost' WHERE id = $1`, [postId]);
+    const status = (email: string, next: string) =>
+      app.inject({
+        method: 'PATCH',
+        url: `/posts/${postId}/status`,
+        headers: { authorization: `Bearer dev:${email}` },
+        payload: { status: next },
+      });
+    const help = await app.inject({
+      method: 'POST',
+      url: `/posts/${postId}/responses`,
+      headers: { authorization: 'Bearer dev:helper@egua.local' },
+      payload: { kind: 'will_help' },
+    });
+    expect(help.statusCode).toBeLessThan(300);
+
+    expect((await status('helper@egua.local', 'fostered')).statusCode).toBe(400);
+    expect((await status('helper@egua.local', 'rescued')).statusCode).toBe(403);
+    expect((await status('author@egua.local', 'adopted')).statusCode).toBe(400);
+    expect((await status('author@egua.local', 'rescued')).statusCode).toBe(200);
+    const diary = await pool.query<{ description: string }>(
+      `SELECT description FROM posts WHERE parent_post_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [postId],
+    );
+    expect(diary.rows[0]?.description).toBe('Voltou para casa.');
+  });
+
   it('rejects an invalid status jump and a forbidden species', async () => {
     await insertUser('author@egua.local', 'author');
     const created = await createAlert(app, 'author@egua.local', 'Cadela na praça.');

@@ -36,3 +36,12 @@ test('the note says what changed', () => {
   assert.ok(pause);
   assert.match(choiceNote(pause, 'for_adoption'), /pausada/);
 });
+
+test('a lost pet only goes back home, and only its family says so', () => {
+  assert.deepEqual(
+    statusChoices('open', true, 'lost').map((choice) => choice.status),
+    ['rescued'],
+  );
+  assert.deepEqual(statusChoices('on_the_way', false, 'lost'), []);
+  assert.deepEqual(statusChoices('rescued', true, 'lost'), []);
+});

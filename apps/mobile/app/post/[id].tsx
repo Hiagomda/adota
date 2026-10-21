@@ -41,7 +41,9 @@ import {
   Touchable,
   type ButtonVariant,
   type IconName,
+  type Tone,
 } from '../../src/components/ui';
+import { toneColors } from '../../src/components/ui/tones';
 import { AnimalDiary } from '../../src/diary';
 import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
 import { formatWhatsApp } from '../../src/contact/whatsapp';
@@ -281,6 +283,9 @@ export default function PostScreen() {
   const adoptionContact = forAdoption || adopted;
   // The street part of the rescue: someone can still go, look, or step back.
   const rescueOpen = openRescueStatuses.has(item.status);
+  // Animal perdido tem família: quem viu marca onde ou chama o tutor; o tutor diz que voltou.
+  const lost = item.type === 'lost';
+  const lostOpen = lost && rescueOpen;
   const helpingNow = item.viewerWillHelp && rescueOpen;
   const helpers = item.helpersCount ?? 0;
   const othersGoing = Math.max(helpers - (item.viewerWillHelp ? 1 : 0), 0);
@@ -331,6 +336,7 @@ export default function PostScreen() {
   async function chooseStatus(choice: StatusChoice) {
     if (marking) return;
     const from = item?.status ?? '';
+    const type = item?.type;
     setMarking(true);
     const ok = await act(`/posts/${rescueId}/status`, 'PATCH', { status: choice.status });
     setMarking(false);
@@ -346,7 +352,7 @@ export default function PostScreen() {
       );
       setHelpBurst((count) => count + 1);
     }
-    setNote(choiceNote(choice, from));
+    setNote(choiceNote(choice, from, type));
   }
 
   async function markAdopted() {
@@ -394,35 +400,49 @@ export default function PostScreen() {
             loading: contactBusy,
             onPress: () => (forAdoption ? startAdoption() : talkToAuthor()),
           }
-        : helpingNow
+        : lostOpen && canOwn
           ? {
-              title: 'Encontrei o animal',
-              icon: 'check',
+              title: 'Ele voltou para casa',
+              icon: 'home',
               variant: 'secondary',
               onPress: () => setFoundOpen(true),
             }
-          : rescueOpen
+          : lostOpen
             ? {
-                title: item.status === 'not_found' ? 'Vou procurar' : 'Eu vou ajudar',
-                icon: item.status === 'not_found' ? 'search' : 'heart',
+                title: 'Vi esse animal',
+                icon: 'eye',
                 variant: 'secondary',
-                onPress: onHelpPress,
+                onPress: () => router.push(`/sighting/${item.id}`),
               }
-            : canMoveStatus && (item.status === 'rescued' || item.status === 'fostered')
+            : helpingNow
               ? {
-                  title: 'Próximo passo',
-                  icon: 'arrow-right',
-                  variant: 'primary',
-                  loading: marking,
+                  title: 'Encontrei o animal',
+                  icon: 'check',
+                  variant: 'secondary',
                   onPress: () => setFoundOpen(true),
                 }
-              : {
-                  title: 'Compartilhar',
-                  icon: 'share-2',
-                  variant: 'primary',
-                  onPress: share,
-                  share: true,
-                };
+              : rescueOpen
+                ? {
+                    title: item.status === 'not_found' ? 'Vou procurar' : 'Eu vou ajudar',
+                    icon: item.status === 'not_found' ? 'search' : 'heart',
+                    variant: 'secondary',
+                    onPress: onHelpPress,
+                  }
+                : canMoveStatus && (item.status === 'rescued' || item.status === 'fostered')
+                  ? {
+                      title: 'Próximo passo',
+                      icon: 'arrow-right',
+                      variant: 'primary',
+                      loading: marking,
+                      onPress: () => setFoundOpen(true),
+                    }
+                  : {
+                      title: 'Compartilhar',
+                      icon: 'share-2',
+                      variant: 'primary',
+                      onPress: share,
+                      share: true,
+                    };
   const footerLine = helpingNow
     ? othersGoing > 0
       ? `Você e mais ${othersGoing} a caminho · ponto exato liberado`
@@ -440,7 +460,9 @@ export default function PostScreen() {
     if (!item) return;
     const text = adoptionContact
       ? `Oi, ${authorFirstName}! Vi o post de adoção de ${animalRef} no Égua, adota! e quero adotar. ${postLink}`
-      : `Oi, ${authorFirstName}! Vou ajudar no resgate de ${animalRef} em ${placeOf(item.approxLabel)}, pelo Égua, adota!. ${postLink}`;
+      : lost
+        ? `Oi, ${authorFirstName}! Vi o post de ${animalRef} perdido no Égua, adota! e tenho notícias dele. ${postLink}`
+        : `Oi, ${authorFirstName}! Vou ajudar no resgate de ${animalRef} em ${placeOf(item.approxLabel)}, pelo Égua, adota!. ${postLink}`;
     void whatsapp.open(`/posts/${item.id}/contact`, text);
   }
 
@@ -556,7 +578,9 @@ export default function PostScreen() {
             <View style={styles.titleBlock}>
               <AppText variant="display">{animalHeadline(item.animal)}</AppText>
               <View style={styles.pills}>
-                {journeyOf(item.type, item.status) ? null : <StatusPill status={item.status} />}
+                {journeyOf(item.type, item.status) ? null : (
+                  <StatusPill status={item.status} type={item.type} />
+                )}
                 {/* Urgency only matters while nobody has the animal yet. */}
                 {item.status === 'open' ? <StatusPill urgency={item.urgency} /> : null}
               </View>
@@ -810,7 +834,17 @@ export default function PostScreen() {
               </AppText>
             </View>
 
-            {canOwn && !item.viewerWillHelp && openRescueStatuses.has(item.status) ? (
+            {lostOpen && !canOwn ? (
+              <Button
+                title="Está comigo ou sei onde ele está"
+                icon="message-circle"
+                variant="outline"
+                fullWidth
+                loading={contactBusy}
+                onPress={talkToAuthor}
+              />
+            ) : null}
+            {canOwn && !lost && !item.viewerWillHelp && openRescueStatuses.has(item.status) ? (
               <Button
                 title="O animal já está seguro"
                 icon="check"
@@ -857,7 +891,9 @@ export default function PostScreen() {
               />
             ) : null}
 
-            {fosterList.length > 0 ? (
+            {/* Casa Amiga serve a quem ainda procura onde o animal fica: não a perdido, que tem
+                família, nem depois que ele já tem lar temporário ou família. */}
+            {fosterList.length > 0 && !lost && (rescueOpen || item.status === 'rescued') ? (
               <View style={styles.section}>
                 <AppText variant="h2">Casas Amigas</AppText>
                 <AppText color="textSecondary">
@@ -915,7 +951,7 @@ export default function PostScreen() {
                     ))}
                   </Card>
                 )}
-                {rescueOpen ? (
+                {rescueOpen && !lost ? (
                   <Button
                     title="Vi esse animal"
                     icon="eye"
@@ -1175,6 +1211,7 @@ export default function PostScreen() {
         visible={interestOpen}
         postId={item.id}
         species={item.animal.species}
+        care={item.animal.care}
         token={token}
         onClose={() => setInterestOpen(false)}
         onSent={sendInterest}
@@ -1334,30 +1371,36 @@ export default function PostScreen() {
         visible={foundOpen}
         onClose={() => setFoundOpen(false)}
         title={
-          rescueOpen
-            ? 'Onde ele fica agora?'
-            : adoptionContact
-              ? 'O que mudou?'
-              : 'Qual o próximo passo?'
+          lost
+            ? 'Ele voltou para casa?'
+            : rescueOpen
+              ? 'Onde ele fica agora?'
+              : adoptionContact
+                ? 'O que mudou?'
+                : 'Qual o próximo passo?'
         }
       >
         <View style={styles.help}>
           <AppText color="textSecondary">
-            {rescueOpen
-              ? 'Você encontrou o animal. Conte onde ele fica, e quem acompanha recebe o aviso.'
-              : 'Quem acompanha recebe o aviso, e fica registrado no diário.'}
+            {lost
+              ? 'Só marque quando ele estiver em casa com você.'
+              : rescueOpen
+                ? 'Você encontrou o animal. Conte onde ele fica, e quem acompanha recebe o aviso.'
+                : 'Quem acompanha recebe o aviso, e fica registrado no diário.'}
           </AppText>
-          {statusChoices(item.status, canOwn).length === 0 ? (
+          {statusChoices(item.status, canOwn, item.type).length === 0 ? (
             <AppText>
               Esse passo agora é com quem publicou. Combine com a pessoa pelos comentários.
             </AppText>
           ) : null}
-          {statusChoices(item.status, canOwn).map((choice) => (
+          {statusChoices(item.status, canOwn, item.type).map((choice) => (
             <OutcomeOption
               key={choice.status}
               icon={choice.icon}
               title={choice.title}
               body={choice.body}
+              tone={choice.tone}
+              next={{ status: choice.status, type: item.type }}
               onPress={() => void chooseStatus(choice)}
             />
           ))}
@@ -1444,14 +1487,21 @@ function OutcomeOption({
   icon,
   title,
   body,
+  tone = 'neutral',
+  next,
   onPress,
 }: {
   icon: IconName;
   title: string;
   body: string;
+  /** Cor do ícone; a mesma do selo do status para onde a escolha leva. */
+  tone?: Tone;
+  /** O selo do status que a escolha grava, para a pessoa ver para onde vai. */
+  next?: { status: string; type?: string };
   onPress: () => void;
 }) {
   const { colors } = useTheme();
+  const tint = toneColors(colors, tone);
   return (
     <Touchable
       accessibilityRole="button"
@@ -1463,18 +1513,19 @@ function OutcomeOption({
         styles.option,
         {
           backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-          borderColor: colors.border,
+          borderColor: tone === 'neutral' ? colors.border : tint.background,
         },
       ]}
     >
-      <View style={[styles.optionIcon, { backgroundColor: colors.surfaceMuted }]}>
-        <Icon name={icon} color={colors.text} />
+      <View style={[styles.optionIcon, { backgroundColor: tint.background }]}>
+        <Icon name={icon} color={tint.foreground} />
       </View>
       <View style={styles.optionText}>
         <AppText variant="bodyStrong">{title}</AppText>
         <AppText variant="bodySmall" color="textSecondary">
           {body}
         </AppText>
+        {next ? <StatusPill status={next.status} type={next.type} /> : null}
       </View>
       <Icon name="chevron-right" color={colors.textSecondary} />
     </Touchable>

@@ -1,5 +1,5 @@
 import { listPosts } from '../../lib/api';
-import { statusLabel } from '../../lib/labels';
+import { statusLabelFor } from '../../lib/labels';
 import { CityMap } from './city-map';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ export default async function MapPage({
         posts={posts.map((post) => ({
           id: post.id,
           label: post.approxLabel,
-          status: statusLabel[post.status] ?? post.status,
+          status: statusLabelFor(post.type, post.status),
           urgency: post.urgency,
           latitude: post.location.latitude,
           longitude: post.location.longitude,

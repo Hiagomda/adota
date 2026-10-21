@@ -1,5 +1,5 @@
 import { listPosts } from '../lib/api';
-import { statusLabel, urgencyLabel } from '../lib/labels';
+import { statusLabelFor, urgencyLabel } from '../lib/labels';
 import { formatWhen } from '../lib/time';
 import { Feed } from '../components/feed';
 
@@ -43,7 +43,7 @@ export default async function HomePage({
         likes: post.counts.likes,
         comments: post.counts.comments,
         time: formatWhen(post.createdAt),
-        status: statusLabel[post.status] ?? post.status,
+        status: statusLabelFor(post.type, post.status),
         urgency: urgencyLabel[post.urgency] ?? post.urgency,
       }))}
     />

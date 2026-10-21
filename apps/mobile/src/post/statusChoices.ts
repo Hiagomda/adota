@@ -10,6 +10,8 @@ export interface StatusChoice {
   body: string;
   /** Nome de ícone do Feather. */
   icon: 'shield' | 'home' | 'heart' | 'star' | 'pause-circle' | 'rotate-ccw';
+  /** Cor do ícone: a mesma do selo do status de destino; pausar e devolver ficam neutros. */
+  tone: 'primary' | 'caramel' | 'warning' | 'success' | 'neutral';
 }
 
 const keepSafe: StatusChoice = {
@@ -17,6 +19,7 @@ const keepSafe: StatusChoice = {
   title: 'Está comigo, ainda vou decidir',
   body: 'Ele sai da rua e fica com você enquanto pensa no próximo passo.',
   icon: 'shield',
+  tone: 'primary',
 };
 
 const fosterFound: StatusChoice = {
@@ -24,6 +27,7 @@ const fosterFound: StatusChoice = {
   title: 'Está comigo em lar temporário',
   body: 'Você cuida dele até achar um lar. Pode colocar para adoção quando quiser.',
   icon: 'home',
+  tone: 'caramel',
 };
 
 const fosterLater: StatusChoice = {
@@ -31,6 +35,7 @@ const fosterLater: StatusChoice = {
   title: 'Foi para um lar temporário',
   body: 'Com você, com uma Casa Amiga ou com alguém que se ofereceu.',
   icon: 'home',
+  tone: 'caramel',
 };
 
 const offerFound: StatusChoice = {
@@ -38,6 +43,7 @@ const offerFound: StatusChoice = {
   title: 'Já pode ser adotado',
   body: 'Entra na lista de adoção e quem quer adotar pode te chamar.',
   icon: 'heart',
+  tone: 'warning',
 };
 
 const offerLater: StatusChoice = {
@@ -45,6 +51,7 @@ const offerLater: StatusChoice = {
   title: 'Colocar para adoção',
   body: 'Entra na lista de adoção e quem quer adotar pode te chamar.',
   icon: 'heart',
+  tone: 'warning',
 };
 
 const keepForever: StatusChoice = {
@@ -52,6 +59,7 @@ const keepForever: StatusChoice = {
   title: 'Decidi adotar',
   body: 'Ele fica com você para sempre e o resgate termina como Adotado.',
   icon: 'star',
+  tone: 'success',
 };
 
 const fosterKeeps: StatusChoice = {
@@ -59,6 +67,7 @@ const fosterKeeps: StatusChoice = {
   title: 'Decidi ficar com ele',
   body: 'O lar temporário virou casa. O resgate termina como Adotado.',
   icon: 'star',
+  tone: 'success',
 };
 
 const pauseAdoption: StatusChoice = {
@@ -66,6 +75,7 @@ const pauseAdoption: StatusChoice = {
   title: 'Pausar a adoção',
   body: 'Ele sai da lista e volta para o lar temporário. Dá para reabrir depois.',
   icon: 'pause-circle',
+  tone: 'neutral',
 };
 
 const returned: StatusChoice = {
@@ -73,6 +83,15 @@ const returned: StatusChoice = {
   title: 'Foi devolvido',
   body: 'A adoção não deu certo e ele volta para a lista procurando outro lar.',
   icon: 'rotate-ccw',
+  tone: 'neutral',
+};
+
+const backHome: StatusChoice = {
+  status: 'rescued',
+  title: 'Voltou para casa',
+  body: 'O post sai da lista de perdidos e quem acompanha recebe o aviso.',
+  icon: 'home',
+  tone: 'success',
 };
 
 /**
@@ -80,7 +99,13 @@ const returned: StatusChoice = {
  * ajudar" escolhe a partir de "a caminho" e não pausa a adoção nem registra devolução. "Foi
  * adotado por outra pessoa" tem botão e confirmação próprios, por isso não entra aqui.
  */
-export function statusChoices(status: string, owner: boolean): StatusChoice[] {
+export function statusChoices(status: string, owner: boolean, type?: string): StatusChoice[] {
+  // Animal perdido tem família: só volta para casa, e quem diz isso é o tutor.
+  if (type === 'lost') {
+    return owner && (status === 'open' || status === 'on_the_way' || status === 'not_found')
+      ? [backHome]
+      : [];
+  }
   switch (status) {
     case 'on_the_way':
       return [keepSafe, fosterFound, offerFound, keepForever];
@@ -101,7 +126,8 @@ export function statusChoices(status: string, owner: boolean): StatusChoice[] {
 }
 
 /** O que aparece depois da escolha, para a pessoa saber que deu certo. */
-export function choiceNote(choice: StatusChoice, from: string): string {
+export function choiceNote(choice: StatusChoice, from: string, type?: string): string {
+  if (type === 'lost') return 'Égua, que alegria! Ele está em casa de novo.';
   const fromStreet = from === 'open' || from === 'on_the_way' || from === 'not_found';
   switch (choice.status) {
     case 'rescued':

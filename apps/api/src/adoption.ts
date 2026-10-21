@@ -50,13 +50,8 @@ export function canOrganizeEvents(user: SessionUser): boolean {
 
 /** Respostas guardadas sem a nota, que vai numa coluna própria. */
 function storedAnswers(input: AdoptionInterestInput): Omit<AdoptionInterestInput, 'note'> {
-  return {
-    home: input.home,
-    safeHome: input.safeHome,
-    otherAnimals: input.otherAnimals,
-    household: input.household,
-    hadPets: input.hadPets,
-  };
+  const { note: _note, ...answers } = input;
+  return answers;
 }
 
 interface InterestRow {

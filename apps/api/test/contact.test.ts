@@ -24,6 +24,12 @@ describe('canAskAuthorContact', () => {
     ).toBe(true);
   });
 
+  it('lets anyone who saw a lost pet call its family until it is home', () => {
+    const lost = { viewer: person('a'), authorId: 'b', viewerWillHelp: false, type: 'lost' };
+    expect(canAskAuthorContact({ ...lost, status: 'open' })).toBe(true);
+    expect(canAskAuthorContact({ ...lost, status: 'rescued' })).toBe(false);
+  });
+
   it('never hands the author their own number', () => {
     expect(
       canAskAuthorContact({
