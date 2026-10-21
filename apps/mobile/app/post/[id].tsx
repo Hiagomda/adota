@@ -60,17 +60,10 @@ import {
   interestMessage,
   type AdoptionAnswers,
 } from '../../src/post/adoptionInterest';
+import { choiceNote, statusChoices, type StatusChoice } from '../../src/post/statusChoices';
 import { waitingLabel } from '../../src/post/waiting';
 import { isTeamRole, useSession } from '../../src/session';
-import {
-  contentMaxWidth,
-  motion,
-  nextStatus,
-  radius,
-  size,
-  spacing,
-  useTheme,
-} from '../../src/theme';
+import { contentMaxWidth, motion, radius, size, spacing, useTheme } from '../../src/theme';
 import { useLightStatusBar } from '../../src/useLightStatusBar';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { reportError } from '../../src/crash/reporter';
@@ -280,7 +273,6 @@ export default function PostScreen() {
     );
   }
 
-  const following = nextStatus[item.status];
   const isAuthor = userId === item.author.id;
   const canOwn = isAuthor || isTeamRole(user?.role);
   const canMoveStatus = canOwn || item.viewerWillHelp;
@@ -336,18 +328,25 @@ export default function PostScreen() {
     }
   }
 
-  async function markFound() {
+  async function chooseStatus(choice: StatusChoice) {
     if (marking) return;
+    const from = item?.status ?? '';
     setMarking(true);
-    const ok = await act(`/posts/${rescueId}/status`, 'PATCH', { status: 'rescued' });
+    const ok = await act(`/posts/${rescueId}/status`, 'PATCH', { status: choice.status });
     setMarking(false);
     setFoundOpen(false);
     if (!ok) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      logBestEffort('post:found-haptic'),
-    );
-    setHelpBurst((count) => count + 1);
-    setNote('Égua, que alegria! Conte no diário como ele está.');
+    if (choice.status === 'adopted') {
+      await client.invalidateQueries({ queryKey: ['profile-posts'] });
+    }
+    // Pausar e devolver não são festa.
+    if (from !== 'for_adoption' && from !== 'adopted') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        logBestEffort('post:found-haptic'),
+      );
+      setHelpBurst((count) => count + 1);
+    }
+    setNote(choiceNote(choice, from));
   }
 
   async function markAdopted() {
@@ -409,14 +408,13 @@ export default function PostScreen() {
                 variant: 'secondary',
                 onPress: onHelpPress,
               }
-            : canMoveStatus && following && nextStepAction[following]
+            : canMoveStatus && (item.status === 'rescued' || item.status === 'fostered')
               ? {
-                  title: nextStepAction[following] ?? '',
+                  title: 'Próximo passo',
                   icon: 'arrow-right',
                   variant: 'primary',
-                  loading: busyAction === `PATCH /posts/${item.id}/status`,
-                  onPress: () =>
-                    void act(`/posts/${item.id}/status`, 'PATCH', { status: following }),
+                  loading: marking,
+                  onPress: () => setFoundOpen(true),
                 }
               : {
                   title: 'Compartilhar',
@@ -838,6 +836,24 @@ export default function PostScreen() {
                 variant="outline"
                 fullWidth
                 onPress={() => setAdoptedOpen(true)}
+              />
+            ) : null}
+            {canOwn && forAdoption ? (
+              <Button
+                title="Pausar a adoção"
+                icon="pause-circle"
+                variant="ghost"
+                fullWidth
+                onPress={() => setFoundOpen(true)}
+              />
+            ) : null}
+            {canOwn && adopted ? (
+              <Button
+                title="A adoção não deu certo"
+                icon="rotate-ccw"
+                variant="ghost"
+                fullWidth
+                onPress={() => setFoundOpen(true)}
               />
             ) : null}
 
@@ -1317,22 +1333,34 @@ export default function PostScreen() {
       <BottomSheet
         visible={foundOpen}
         onClose={() => setFoundOpen(false)}
-        title="Você está com o animal?"
+        title={
+          rescueOpen
+            ? 'Onde ele fica agora?'
+            : adoptionContact
+              ? 'O que mudou?'
+              : 'Qual o próximo passo?'
+        }
       >
         <View style={styles.help}>
           <AppText color="textSecondary">
-            O resgate passa para Resgatado e quem acompanha recebe o aviso. Depois conte no diário
-            como ele está.
+            {rescueOpen
+              ? 'Você encontrou o animal. Conte onde ele fica, e quem acompanha recebe o aviso.'
+              : 'Quem acompanha recebe o aviso, e fica registrado no diário.'}
           </AppText>
-          <Button
-            title="Sim, está comigo"
-            icon="check"
-            variant="secondary"
-            size="lg"
-            loading={marking}
-            fullWidth
-            onPress={() => void markFound()}
-          />
+          {statusChoices(item.status, canOwn).length === 0 ? (
+            <AppText>
+              Esse passo agora é com quem publicou. Combine com a pessoa pelos comentários.
+            </AppText>
+          ) : null}
+          {statusChoices(item.status, canOwn).map((choice) => (
+            <OutcomeOption
+              key={choice.status}
+              icon={choice.icon}
+              title={choice.title}
+              body={choice.body}
+              onPress={() => void chooseStatus(choice)}
+            />
+          ))}
           <Button title="Ainda não" variant="ghost" fullWidth onPress={() => setFoundOpen(false)} />
         </View>
       </BottomSheet>
@@ -1400,12 +1428,6 @@ export default function PostScreen() {
 
 /** The street part of a rescue, while someone can still go and look. */
 const openRescueStatuses = new Set(['open', 'on_the_way', 'not_found']);
-
-/** The footer's single action once the animal is safe, said as what happens next. */
-const nextStepAction: Record<string, string | undefined> = {
-  fostered: 'Foi para um lar temporário',
-  for_adoption: 'Colocar para adoção',
-};
 
 interface FooterAction {
   title: string;

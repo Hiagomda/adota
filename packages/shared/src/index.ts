@@ -25,6 +25,7 @@ export {
   sizeSchema,
   speciesSchema,
   ownerOnlyStatus,
+  selfAdoption,
   statusTransitions,
   updateMeSchema,
   updatePostSchema,
