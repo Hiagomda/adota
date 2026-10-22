@@ -83,6 +83,7 @@ export default function CupuOnboarding() {
   const cupuPrompt = useSession((state) => state.cupuPrompt);
   const clearCupuPrompt = useSession((state) => state.clearCupuPrompt);
   const userName = useSession((state) => state.user?.name);
+  const userId = useSession((state) => state.user?.id);
   const pages = useMemo(
     () =>
       steps.map((item, itemIndex) =>
@@ -99,9 +100,9 @@ export default function CupuOnboarding() {
   const last = index === pages.length - 1;
 
   useEffect(() => {
-    if (!ready || !cupuPrompt) return;
+    if (!ready || !cupuPrompt || !userId) return;
     let cancelled = false;
-    void hasSeenCupuOnboarding().then((seen) => {
+    void hasSeenCupuOnboarding(userId).then((seen) => {
       if (cancelled) return;
       if (!seen) setVisible(true);
       else clearCupuPrompt();
@@ -109,10 +110,10 @@ export default function CupuOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [clearCupuPrompt, cupuPrompt, ready]);
+  }, [clearCupuPrompt, cupuPrompt, ready, userId]);
 
   async function finish() {
-    await markCupuOnboardingSeen();
+    if (userId) await markCupuOnboardingSeen(userId);
     setVisible(false);
     setIndex(0);
     clearCupuPrompt();
