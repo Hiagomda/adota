@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPost, listComments } from '../../../lib/api';
-import { helpKindLabel, speciesLabel, statusLabel, urgencyLabel } from '../../../lib/labels';
+import { helpKindLabel, speciesLabel, statusLabelFor, urgencyLabel } from '../../../lib/labels';
 import { formatWhen } from '../../../lib/time';
 import { ShareBar } from './share-bar';
 
@@ -48,7 +48,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <div className="meta">
             <span className={`chip ${post.urgency}`}>{urgencyLabel[post.urgency]}</span>
             <span>
-              {statusLabel[post.status]} · {formatWhen(post.createdAt)}
+              {statusLabelFor(post.type, post.status)} · {formatWhen(post.createdAt)}
             </span>
           </div>
           <h1>{post.approxLabel}</h1>

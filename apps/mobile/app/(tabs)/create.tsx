@@ -64,6 +64,14 @@ const kindOptions = [
   { value: 'adoption', label: 'Adoção' },
 ] as const;
 
+/** Perdido é o animal da própria pessoa: o texto fala de quando sumiu e como chamar. */
+const lostSuggestions = [
+  'Fugiu de casa e ainda não voltou.',
+  'Usa coleira e atende pelo nome.',
+  'Tem medo de gente estranha. Chame com calma.',
+  'Sumiu durante os fogos.',
+];
+
 const adoptionSuggestions = [
   'Já está em casa e procura um lar definitivo.',
   'Vacinado e castrado, pronto para adoção.',
@@ -341,7 +349,9 @@ export default function CreateScreen() {
       sex,
       name: animalName.trim(),
       ...(age ? { ageEstimate: age } : {}),
-      care,
+      // Castrado, vacinado e convivência são o que quem adota pergunta; no resgate e no perdido
+      // ninguém sabe ainda, e isso entra depois, ao editar.
+      care: kind === 'adoption' ? care : {},
       urgency,
       point,
       accuracyM: gps.fix?.accuracy ?? null,
@@ -407,7 +417,9 @@ export default function CreateScreen() {
         setMessage(
           kind === 'adoption'
             ? 'Sem internet. A adoção ficou neste aparelho e sai sozinha quando a rede voltar.'
-            : 'Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.',
+            : kind === 'lost'
+              ? 'Sem internet. O aviso de perdido ficou neste aparelho e sai sozinho quando a rede voltar.'
+              : 'Sem internet. O resgate ficou neste aparelho e sai sozinho quando a rede voltar.',
         );
         return;
       }
@@ -425,7 +437,13 @@ export default function CreateScreen() {
   const thumbSize = { width: thumb, height: Math.round(thumb * THUMB_RATIO) };
   const missing = [
     ...(description.trim().length === 0
-      ? [kind === 'adoption' ? 'contar sobre ele' : 'contar o que aconteceu']
+      ? [
+          kind === 'adoption'
+            ? 'contar sobre ele'
+            : kind === 'lost'
+              ? 'contar como ele sumiu'
+              : 'contar o que aconteceu',
+        ]
       : []),
     ...(point ? [] : ['marcar o lugar no mapa']),
   ];
@@ -545,7 +563,13 @@ export default function CreateScreen() {
               />
               <View style={styles.section}>
                 <SectionHeader
-                  title={kind === 'adoption' ? 'Conte sobre ele' : 'O que está acontecendo'}
+                  title={
+                    kind === 'adoption'
+                      ? 'Conte sobre ele'
+                      : kind === 'lost'
+                        ? 'Como ele sumiu'
+                        : 'O que está acontecendo'
+                  }
                   flush
                 />
                 {kind !== 'adoption' ? (
@@ -572,7 +596,12 @@ export default function CreateScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.suggestionRow}
                   >
-                    {(kind === 'adoption' ? adoptionSuggestions : suggestions).map((text) => (
+                    {(kind === 'adoption'
+                      ? adoptionSuggestions
+                      : kind === 'lost'
+                        ? lostSuggestions
+                        : suggestions
+                    ).map((text) => (
                       <Chip
                         key={text}
                         label={text}
@@ -594,14 +623,28 @@ export default function CreateScreen() {
                   placeholder={
                     kind === 'adoption'
                       ? 'Jeito, saúde e com quem ele se dá bem'
-                      : 'O que você viu e como o animal está'
+                      : kind === 'lost'
+                        ? 'Quando sumiu, como ele é e como chamar'
+                        : 'O que você viu e como o animal está'
                   }
                 />
               </View>
               <View style={styles.section}>
                 <SectionHeader
-                  title="Onde o animal está"
-                  subtitle="No app aparece só o bairro. O ponto exato fica com quem for ajudar."
+                  title={
+                    kind === 'adoption'
+                      ? 'Bairro onde ele está'
+                      : kind === 'lost'
+                        ? 'Onde ele sumiu'
+                        : 'Onde o animal está'
+                  }
+                  subtitle={
+                    kind === 'adoption'
+                      ? 'No app aparece só o bairro. O endereço vocês combinam na conversa.'
+                      : kind === 'lost'
+                        ? 'No app aparece só o bairro. Quem vir o animal marca onde viu.'
+                        : 'No app aparece só o bairro. O ponto exato fica com quem for ajudar.'
+                  }
                   flush
                 />
                 <AppText variant="bodySmall" color="textSecondary">
@@ -719,7 +762,11 @@ export default function CreateScreen() {
                   icon={detailsOpen ? 'chevron-up' : 'chevron-down'}
                   iconPosition="right"
                   variant="ghost"
-                  accessibilityHint="Sexo, idade, nome e o que você já sabe sobre ele"
+                  accessibilityHint={
+                    kind === 'adoption'
+                      ? 'Sexo, idade, nome e o que você já sabe sobre ele'
+                      : 'Sexo, idade e nome'
+                  }
                   onPress={() => setDetailsOpen((open) => !open)}
                 />
                 {detailsOpen ? (
@@ -750,34 +797,36 @@ export default function CreateScreen() {
                         ))}
                       </View>
                     </View>
-                    <View style={styles.group}>
-                      <AppText variant="bodyStrong">O que você já sabe</AppText>
-                      <AppText variant="bodySmall" color="textSecondary">
-                        Marque só o que tem certeza. É o que quem adota pergunta primeiro.
-                      </AppText>
-                      <View style={styles.chips}>
-                        {careKeys.map((key) => (
-                          <Chip
-                            key={key}
-                            label={careQuestion[key]}
-                            selected={care[key] === true}
-                            onPress={() =>
-                              setCare((current) => {
-                                const next = { ...current };
-                                if (next[key]) delete next[key];
-                                else next[key] = true;
-                                return next;
-                              })
-                            }
-                          />
-                        ))}
+                    {kind === 'adoption' ? (
+                      <View style={styles.group}>
+                        <AppText variant="bodyStrong">O que você já sabe</AppText>
+                        <AppText variant="bodySmall" color="textSecondary">
+                          Marque só o que tem certeza. É o que quem adota pergunta primeiro.
+                        </AppText>
+                        <View style={styles.chips}>
+                          {careKeys.map((key) => (
+                            <Chip
+                              key={key}
+                              label={careQuestion[key]}
+                              selected={care[key] === true}
+                              onPress={() =>
+                                setCare((current) => {
+                                  const next = { ...current };
+                                  if (next[key]) delete next[key];
+                                  else next[key] = true;
+                                  return next;
+                                })
+                              }
+                            />
+                          ))}
+                        </View>
                       </View>
-                    </View>
+                    ) : null}
                     <Input
-                      label="Nome (se souber)"
+                      label={kind === 'lost' ? 'Nome dele' : 'Nome (se souber)'}
                       value={animalName}
                       onChangeText={setAnimalName}
-                      placeholder="Ex.: Pretinho da esquina"
+                      placeholder={kind === 'lost' ? 'Como ele atende' : 'Ex.: Pretinho da esquina'}
                       maxLength={80}
                       helper="Vira o título do card. Sem nome, o card mostra a espécie."
                     />

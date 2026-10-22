@@ -207,7 +207,7 @@ export default function ExploreScreen() {
                 <View style={styles.info}>
                   <View style={styles.pills}>
                     <StatusPill urgency={selected.urgency} />
-                    <StatusPill status={selected.status} />
+                    <StatusPill status={selected.status} type={selected.type} />
                   </View>
                   <AppText variant="bodyStrong">
                     {speciesLabel[selected.animal.species] ?? 'Animal'}

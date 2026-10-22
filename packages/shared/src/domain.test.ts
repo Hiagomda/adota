@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionStatus, ownerOnlyStatus, statusAfterLeavingHelp } from './domain.js';
+import {
+  canTransitionStatus,
+  ownerOnlyStatus,
+  selfAdoption,
+  statusAfterLeavingHelp,
+} from './domain.js';
 
 describe('rescue status', () => {
   it('lets the last helper step back from on the way', () => {
@@ -24,5 +29,31 @@ describe('rescue status', () => {
     expect(ownerOnlyStatus('not_found', 'rescued')).toBe(true);
     expect(ownerOnlyStatus('on_the_way', 'rescued')).toBe(false);
     expect(ownerOnlyStatus('open', 'on_the_way')).toBe(false);
+  });
+
+  it('lets whoever found the animal say where it stays', () => {
+    for (const to of ['rescued', 'fostered', 'for_adoption', 'adopted'] as const) {
+      expect(canTransitionStatus('on_the_way', to)).toBe(true);
+      expect(ownerOnlyStatus('on_the_way', to)).toBe(false);
+      expect(ownerOnlyStatus('open', to)).toBe(true);
+      expect(ownerOnlyStatus('not_found', to)).toBe(true);
+    }
+  });
+
+  it('lets a foster keep the animal and an adoption pause or come back', () => {
+    expect(canTransitionStatus('rescued', 'adopted')).toBe(true);
+    expect(canTransitionStatus('fostered', 'adopted')).toBe(true);
+    expect(canTransitionStatus('for_adoption', 'fostered')).toBe(true);
+    expect(canTransitionStatus('adopted', 'for_adoption')).toBe(true);
+    expect(ownerOnlyStatus('for_adoption', 'fostered')).toBe(true);
+    expect(ownerOnlyStatus('adopted', 'for_adoption')).toBe(true);
+    expect(ownerOnlyStatus('fostered', 'adopted')).toBe(false);
+  });
+
+  it('tells keeping the animal apart from a stranger adopting it', () => {
+    expect(selfAdoption('on_the_way', 'adopted')).toBe(true);
+    expect(selfAdoption('fostered', 'adopted')).toBe(true);
+    expect(selfAdoption('for_adoption', 'adopted')).toBe(false);
+    expect(selfAdoption('fostered', 'for_adoption')).toBe(false);
   });
 });

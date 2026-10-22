@@ -30,25 +30,51 @@ export const statusTransitions: Record<
   z.infer<typeof animalStatusSchema>,
   readonly z.infer<typeof animalStatusSchema>[]
 > = {
-  // Quem publicou pode marcar "já está seguro" sem dizer antes que ia ajudar (ver ownerOnlyStatus).
-  open: ['on_the_way', 'rescued'],
-  on_the_way: ['rescued', 'open', 'not_found'],
-  not_found: ['open', 'on_the_way', 'rescued'],
-  rescued: ['fostered'],
-  fostered: ['for_adoption'],
-  for_adoption: ['adopted'],
-  adopted: [],
+  // Ao encontrar, a pessoa diz onde o animal fica: com ela por enquanto (rescued), em lar
+  // temporário, já para adoção, ou ela mesma adota. Do aberto, só o autor (ver ownerOnlyStatus).
+  open: ['on_the_way', 'rescued', 'fostered', 'for_adoption', 'adopted'],
+  on_the_way: ['rescued', 'fostered', 'for_adoption', 'adopted', 'open', 'not_found'],
+  not_found: ['open', 'on_the_way', 'rescued', 'fostered', 'for_adoption', 'adopted'],
+  rescued: ['fostered', 'for_adoption', 'adopted'],
+  // Quem acolhe pode decidir ficar com o animal.
+  fostered: ['for_adoption', 'adopted'],
+  // A adoção pode pausar: o animal volta para o lar temporário.
+  for_adoption: ['adopted', 'fostered'],
+  // Devolução: o animal volta a procurar um lar.
+  adopted: ['for_adoption'],
 };
 
+/** Onde o animal está seguro, fora da rua. */
+const safeStatuses: readonly z.infer<typeof animalStatusSchema>[] = [
+  'rescued',
+  'fostered',
+  'for_adoption',
+  'adopted',
+];
+
 /**
- * Mudanças que só o autor ou a equipe fazem. Quem só disse "vou ajudar" marca resgatado a
- * partir de "a caminho", não direto de um alerta aberto ou não encontrado.
+ * Mudanças que só o autor ou a equipe fazem. Quem só disse "vou ajudar" diz que encontrou a
+ * partir de "a caminho", não direto de um alerta aberto ou não encontrado. Pausar a adoção e
+ * registrar devolução também ficam com quem publicou.
  */
 export function ownerOnlyStatus(
   from: z.infer<typeof animalStatusSchema>,
   to: z.infer<typeof animalStatusSchema>,
 ): boolean {
-  return to === 'rescued' && from !== 'on_the_way';
+  if (safeStatuses.includes(to) && (from === 'open' || from === 'not_found')) return true;
+  if (from === 'for_adoption' && to === 'fostered') return true;
+  return from === 'adopted';
+}
+
+/**
+ * "Adotado" vindo do resgate ou do lar temporário é quem marca dizendo que fica com o animal.
+ * De "para adoção", quem adotou é outra pessoa, e isso só o autor ou a equipe dizem.
+ */
+export function selfAdoption(
+  from: z.infer<typeof animalStatusSchema>,
+  to: z.infer<typeof animalStatusSchema>,
+): boolean {
+  return to === 'adopted' && from !== 'for_adoption';
 }
 
 export const leaveHelpOutcomeSchema = z.enum(['could_not', 'not_found']);

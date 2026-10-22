@@ -19,7 +19,16 @@ const urgencyTone: Record<string, Tone> = {
   low: 'success',
 };
 
-export type StatusPillProps = { status: string } | { urgency: 'high' | 'medium' | 'low' };
+/** Animal perdido tem família: enquanto some, está "Procurando"; achado, "Voltou para casa". */
+const lostLabel: Record<string, string> = {
+  open: 'Procurando',
+  on_the_way: 'Procurando',
+  not_found: 'Procurando',
+  rescued: 'Voltou para casa',
+};
+
+export type StatusPillProps =
+  { status: string; type?: string } | { urgency: 'high' | 'medium' | 'low' };
 
 /** Pill for the rescue status (Aberto…Adotado) or the urgency (Urgente, Atenção, Pode esperar). */
 export function StatusPill(props: StatusPillProps) {
@@ -27,7 +36,11 @@ export function StatusPill(props: StatusPillProps) {
   const isUrgency = 'urgency' in props;
   const key = isUrgency ? props.urgency : props.status;
   const tone = (isUrgency ? urgencyTone[key] : statusTone[key]) ?? 'neutral';
-  const label = (isUrgency ? urgencyLabel[key] : statusLabel[key]) ?? 'Resgate';
+  const lost = !isUrgency && props.type === 'lost';
+  const label =
+    (isUrgency ? urgencyLabel[key] : lost ? lostLabel[key] : undefined) ??
+    (isUrgency ? undefined : statusLabel[key]) ??
+    'Resgate';
   const { background, foreground } = toneColors(colors, tone);
   return (
     <View style={[styles.pill, { backgroundColor: background }]}>

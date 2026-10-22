@@ -3,18 +3,34 @@ import { z } from 'zod';
 /**
  * Ficha de quem quer adotar. Perguntas curtas, de tocar, que quem cuida faria na primeira
  * conversa. Nada aqui é documento nem endereço: só o suficiente para a conversa começar melhor.
+ * Algumas perguntas só aparecem conforme a resposta anterior (condomínio só para apartamento,
+ * criança só para quem não mora só, cuidados só para quem já tem animais). Versões antigas do
+ * app não mandam essas, e a resposta que não combina com o resto é descartada.
  */
 export const adoptionInterestSchema = z
   .object({
     home: z.enum(['house', 'apartment', 'other']),
+    /** Só em apartamento: o condomínio aceita animais. */
+    buildingAllows: z.enum(['yes', 'unknown', 'no']).optional(),
     /** Tela nas janelas, muro alto ou portão fechado: o animal não sai sozinho. */
     safeHome: z.enum(['yes', 'no', 'will_do']),
     otherAnimals: z.enum(['none', 'dogs', 'cats', 'both']),
+    /** Só para quem já tem animais: eles são vacinados e castrados. */
+    othersCared: z.enum(['yes', 'some', 'no']).optional(),
     household: z.enum(['alone', 'all_agree', 'not_sure']),
+    /** Só para quem não mora só. */
+    kids: z.boolean().optional(),
     hadPets: z.boolean(),
     note: z.string().trim().max(300).optional(),
   })
-  .strict();
+  .strict()
+  .transform((value) => {
+    const coherent = { ...value };
+    if (coherent.home !== 'apartment') delete coherent.buildingAllows;
+    if (coherent.otherAnimals === 'none') delete coherent.othersCared;
+    if (coherent.household === 'alone') delete coherent.kids;
+    return coherent;
+  });
 
 export type AdoptionInterestInput = z.infer<typeof adoptionInterestSchema>;
 

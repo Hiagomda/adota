@@ -72,3 +72,29 @@ test('takes the first name', () => {
   assert.equal(firstName('  Maria   Souza '), 'Maria');
   assert.equal(firstName('Lucia'), 'Lucia');
 });
+
+test('the first line follows the kind of post, and a lost pet goes home', () => {
+  const base = {
+    id: 'p',
+    description: 'Sumiu ontem.',
+    createdAt: '2026-10-01T10:00:00Z',
+    author: { name: 'Ana Souza', handle: 'ana' },
+  };
+  assert.equal(diaryLines({ ...base, type: 'adoption' })[0]?.title, 'Ana colocou para adoção');
+  const lost = diaryLines({
+    ...base,
+    type: 'lost',
+    updates: [
+      {
+        id: 'u',
+        description: 'Voltou para casa.',
+        status: 'rescued',
+        kind: 'status',
+        createdAt: '2026-10-02T10:00:00Z',
+        author: { name: 'Ana Souza', handle: 'ana' },
+      },
+    ],
+  });
+  assert.equal(lost[0]?.title, 'Ana avisou que ele sumiu');
+  assert.equal(lost[1]?.title, 'Voltou para casa');
+});
