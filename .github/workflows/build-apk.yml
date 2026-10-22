@@ -79,7 +79,9 @@ jobs:
             http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/img,http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/media
         run: |
           set -eu
-          npx expo export --platform web --output-dir "$RUNNER_TEMP/web"
+          # O `expo export` avalia o app.config.ts antes de ler o .env, e a trava de release falhava.
+          # O --env-file do Node carrega o .env sem sobrescrever o EXPO_PUBLIC_API_URL=/api acima.
+          node --env-file=.env ../../node_modules/expo/bin/cli export --platform web --output-dir "$RUNNER_TEMP/web"
           node scripts/web-pwa.mjs "$RUNNER_TEMP/web" /app
           tar -czf "$RUNNER_TEMP/egua-adota-web.tar.gz" -C "$RUNNER_TEMP/web" .
 
