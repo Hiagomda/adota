@@ -47,14 +47,15 @@ interface SessionState extends Flags {
 }
 
 async function readToken(): Promise<string | null> {
-  if (Platform.OS === 'web') return sessionStorage.getItem(tokenKey);
+  // O app web instalado no iPhone fecha e abre como app: o login precisa sobreviver a isso.
+  if (Platform.OS === 'web') return localStorage.getItem(tokenKey);
   return SecureStore.getItemAsync(tokenKey);
 }
 
 async function writeToken(token: string | null): Promise<void> {
   if (Platform.OS === 'web') {
-    if (token) sessionStorage.setItem(tokenKey, token);
-    else sessionStorage.removeItem(tokenKey);
+    if (token) localStorage.setItem(tokenKey, token);
+    else localStorage.removeItem(tokenKey);
     return;
   }
   if (token) await SecureStore.setItemAsync(tokenKey, token);

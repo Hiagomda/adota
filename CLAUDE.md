@@ -34,6 +34,7 @@ pnpm test                         # vitest (api, shared) + node:test (mobile)
 - A versão mora em `apps/mobile/version.json`. `pnpm --filter @patinha/mobile version:bump` sobe o build; `--sync` alinha o `android/app/build.gradle`; `version:publish` (ou `bump-build.mjs --publish`) escreve `download/version.json`, que é o que o app compara para oferecer atualização.
 - A atualização vem só da VPS: ao abrir, `startStartupUpdateCheck()` (primeira ação em `app/_layout.tsx`) lê `<download>/version.json` com timeout de 3 s e nunca bloqueia a abertura. Não existe OTA (`expo-updates` foi removido).
 - A versão e o build aparecem em Configurações, no perfil, em Suporte e na tela de erro (`src/diagnostics/VersionMark.tsx`).
+- App web para iPhone: o workflow **Compilar APK** também roda `expo export --platform web` do mesmo commit e anexa `egua-adota-web.tar.gz` ao release `apk-<version>-<build>`. O `docker/download.Dockerfile` baixa esse arquivo ao lado do APK (mesma `APK_URL`) e serve em `<download>/app`. Como o download é HTTPS e a API/fotos/MinIO são HTTP, o nginx do download repassa `/api/`, `/img/` e `/media/`, e o app troca os endereços das respostas (`src/net/sameOrigin.ts`, `EXPO_PUBLIC_WEB_PROXY_ROUTES`). No iPhone o login é só por e-mail e não há push.
 
 ## Como publicar (APK + VPS) — playbook do agente
 

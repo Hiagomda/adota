@@ -63,12 +63,34 @@
         background: var(--acai);
         color: var(--areia);
       }
+      a.link {
+        display: inline;
+        min-height: 0;
+        margin: 0;
+        background: none;
+        color: var(--acai);
+        font-size: 15px;
+        text-decoration: underline;
+      }
       a.abrir + a {
         margin-top: 12px;
       }
       a[aria-disabled='true'] {
         background: #e4d4b8;
         pointer-events: none;
+      }
+      ol {
+        margin: 16px 0 0;
+        padding-left: 20px;
+        text-align: left;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      ol[hidden] {
+        display: none;
+      }
+      small[hidden] {
+        display: none;
       }
       small {
         display: block;
@@ -84,7 +106,18 @@
       <p id="texto">Teste do app de resgate de animais em Belém. O arquivo é só para Android.</p>
       <a id="abrir" class="abrir" href="#" hidden>Abrir no app</a>
       <a id="baixar" href="/egua-adota.apk" aria-disabled="true">Preparando o arquivo...</a>
+      <ol id="passos-iphone" hidden>
+        <li>Abra esta página no Safari e toque no botão acima.</li>
+        <li>
+          Já dentro do app, toque em Compartilhar (o quadrado com a seta) e depois em Adicionar à
+          Tela de Início.
+        </li>
+        <li>O Égua, adota! aparece na tela como um app e se atualiza sozinho.</li>
+      </ol>
       <small id="aviso">Se o botão não liberar, atualize a página daqui a pouco.</small>
+      <small id="outro"
+        ><a class="link" href="/app/">Tem iPhone? Use a versão para iPhone</a></small
+      >
     </main>
     <script>
       const botao = document.getElementById('baixar');
@@ -103,12 +136,30 @@
         document.getElementById('texto').textContent =
           'Te mandaram um bichinho do Égua, adota! Já tem o app? Abre o post. Ainda não tem? Baixa e depois toca no link de novo.';
       }
-      fetch('/egua-adota.apk', { method: 'HEAD' }).then((resposta) => {
-        if (!resposta.ok) return;
-        botao.textContent = 'Baixar o app';
+      // iPhone e iPad não instalam APK: o botão abre o app web (/app), que vai para a tela de início.
+      const iphone =
+        /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+      if (iphone) {
+        const temPost = post && /^[A-Za-z0-9-]{1,64}$/.test(post);
+        document.getElementById('abrir').hidden = true;
+        botao.href = temPost ? `/app/post/${post}` : '/app/';
+        botao.textContent = temPost ? 'Ver o bichinho' : 'Abrir a versão para iPhone';
         botao.setAttribute('aria-disabled', 'false');
-        aviso.textContent = 'Toque no botão e confirme a instalação no Android.';
-      });
+        document.getElementById('texto').textContent = temPost
+          ? 'Te mandaram um bichinho do Égua, adota! No iPhone ele abre direto aqui.'
+          : 'App de resgate de animais em Belém. No iPhone ele roda pelo Safari, sem loja.';
+        document.getElementById('passos-iphone').hidden = false;
+        aviso.textContent = '';
+        document.getElementById('outro').hidden = true;
+      } else {
+        fetch('/egua-adota.apk', { method: 'HEAD' }).then((resposta) => {
+          if (!resposta.ok) return;
+          botao.textContent = 'Baixar o app';
+          botao.setAttribute('aria-disabled', 'false');
+          aviso.textContent = 'Toque no botão e confirme a instalação no Android.';
+        });
+      }
     </script>
   </body>
 </html>

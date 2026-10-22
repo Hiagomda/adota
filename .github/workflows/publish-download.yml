@@ -42,4 +42,8 @@ jobs:
             docker exec -u root "$cid" cp -f /opt/egua-adota.apk /apk/egua-adota.apk
             echo "$VERSION_JSON_B64" | base64 -d | docker exec -i -u root "$cid" sh -c 'cat > /opt/version.json'
             docker exec -u root "$cid" cp -f /opt/version.json /apk/version.json
+            # App web do iPhone do mesmo release, quando existe (releases antigos não têm).
+            if docker exec -u root "$cid" wget -O /tmp/web.tar.gz "https://github.com/Hiagomda/adota/releases/download/${RELEASE_TAG}/egua-adota-web.tar.gz"; then
+              docker exec -u root "$cid" sh -c 'rm -rf /tmp/app && mkdir /tmp/app && tar -xzf /tmp/web.tar.gz -C /tmp/app && rm -rf /usr/share/nginx/html/app && mv /tmp/app /usr/share/nginx/html/app && rm /tmp/web.tar.gz'
+            fi
             docker exec -u root "$cid" wc -c /apk/egua-adota.apk /apk/version.json

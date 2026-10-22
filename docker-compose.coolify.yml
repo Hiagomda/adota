@@ -143,6 +143,8 @@ services:
       dockerfile: docker/download.Dockerfile
     environment:
       SERVICE_URL_DOWNLOAD_80: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      # O app web (/app) envia fotos por /media/ e o MinIO confere a assinatura com este host.
+      MINIO_PUBLIC_HOST: minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
     volumes:
       - apk:/apk
     restart: unless-stopped
