@@ -47,6 +47,8 @@ export function BottomSheet({ visible, onClose, onClosed, title, children }: Bot
     onClosedRef.current?.();
   }, [mounted]);
 
+  // Gesture callbacks run on the UI thread, so they can't call `duration` (a JS function).
+  const settleMs = duration(motion.fast);
   const pan = Gesture.Pan()
     .onUpdate((event) => {
       drag.value = Math.max(0, event.translationY);
@@ -55,7 +57,7 @@ export function BottomSheet({ visible, onClose, onClosed, title, children }: Bot
       if (event.translationY > CLOSE_DRAG || event.velocityY > 800) {
         runOnJS(onClose)();
       }
-      drag.value = withTiming(0, { duration: duration(motion.fast) });
+      drag.value = withTiming(0, { duration: settleMs });
     });
 
   const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
