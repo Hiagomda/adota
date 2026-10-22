@@ -23,9 +23,9 @@ const steps: Step[] = [
   {
     pose: 'wave',
     tint: 'primarySoft',
-    title: 'Ei, mano(a)! Eu sou o Cupu',
+    title: 'Ei, mano(a)! Eu sou o Cupuaçu',
     description:
-      'O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
+      'Mas pode me chamar de Cupu. O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
     button: 'Bora ver',
   },
   {
@@ -83,11 +83,12 @@ export default function CupuOnboarding() {
   const cupuPrompt = useSession((state) => state.cupuPrompt);
   const clearCupuPrompt = useSession((state) => state.clearCupuPrompt);
   const userName = useSession((state) => state.user?.name);
+  const userId = useSession((state) => state.user?.id);
   const pages = useMemo(
     () =>
       steps.map((item, itemIndex) =>
         itemIndex === 0
-          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupu` }
+          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupuaçu` }
           : item,
       ),
     [userName],
@@ -99,9 +100,9 @@ export default function CupuOnboarding() {
   const last = index === pages.length - 1;
 
   useEffect(() => {
-    if (!ready || !cupuPrompt) return;
+    if (!ready || !cupuPrompt || !userId) return;
     let cancelled = false;
-    void hasSeenCupuOnboarding().then((seen) => {
+    void hasSeenCupuOnboarding(userId).then((seen) => {
       if (cancelled) return;
       if (!seen) setVisible(true);
       else clearCupuPrompt();
@@ -109,10 +110,10 @@ export default function CupuOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [clearCupuPrompt, cupuPrompt, ready]);
+  }, [clearCupuPrompt, cupuPrompt, ready, userId]);
 
   async function finish() {
-    await markCupuOnboardingSeen();
+    if (userId) await markCupuOnboardingSeen(userId);
     setVisible(false);
     setIndex(0);
     clearCupuPrompt();
