@@ -26,8 +26,8 @@ Root `packageManager: pnpm@9.15.9`. pnpm 10 cannot install this lockfile. `.npmr
 2. `node apps/mobile/scripts/bump-build.mjs --sync` so `android/app/build.gradle` `versionCode` matches `version.json`.
 3. Keep `apps/mobile/.env` on the compile tree (do not commit):
 
-- `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
-- `EXPO_PUBLIC_DOWNLOAD_URL=https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
+- `EXPO_PUBLIC_API_URL=https://adota-api.warlord-core.site`
+- `EXPO_PUBLIC_DOWNLOAD_URL=https://adota.warlord-core.site`
 
 ## Gradle
 
@@ -45,7 +45,7 @@ Expected APK: `apps\mobile\android\app\build\outputs\apk\release\app-release.apk
 
 1. Commit + push `master` with bumped `version.json`, `download/version.json`, and `docker/download.Dockerfile` `APK_URL` pointing at the new tag.
 2. GitHub release tag `apk-<version>-<build>`, asset filename **`egua-adota.apk`**. `gh` is not installed — use `git credential fill` + a temp Node script under `C:\Temp`; never print the token; delete the script after.
-3. Coolify Deploy on app `fpmewu0com3qkbfihrsihc6y` (header Deploy button, not the sidebar expander). Panel host: `painel.86.48.25.233.sslip.io:8000`. Do not touch MetalRiff, chatbot, teste-AtivaFacil; do not Cancel / Danger Zone / Coolify upgrade.
+3. Coolify Deploy on app `fpmewu0com3qkbfihrsihc6y` (header Deploy button, not the sidebar expander). Panel host: `painel.warlord-core.site`. Do not touch MetalRiff, chatbot, teste-AtivaFacil; do not Cancel / Danger Zone / Coolify upgrade.
 4. Confirm live `https://download-…/version.json` has the new `androidVersionCode` before telling Hiago to reopen the app.
 
 Volume-only APK copies are wiped by `docker/download-entrypoint.sh` on every start. Durable path = GitHub release + Dockerfile `APK_URL` + Coolify rebuild.

@@ -9,7 +9,7 @@ import { check, sleep } from 'k6';
 
 const base = __ENV.BASE_URL || 'http://127.0.0.1:3010';
 
-if (/sslip\.io|eguaadota\.app/i.test(base) && __ENV.ALLOW_LOADTEST !== '1') {
+if (/sslip\.io|eguaadota\.app|warlord-core\.site/i.test(base) && __ENV.ALLOW_LOADTEST !== '1') {
   throw new Error(
     'Refusing to load-test the public host. Use a local API, or set ALLOW_LOADTEST=1 on a staging copy.',
   );

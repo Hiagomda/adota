@@ -65,7 +65,14 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   });
   await app.register(cors, {
-    origin: env.NODE_ENV === 'production' ? [env.WEB_ORIGIN, env.ADMIN_ORIGIN] : true,
+    // WEB_ORIGIN e ADMIN_ORIGIN aceitam vários endereços separados por vírgula (domínio novo e o sslip antigo).
+    origin:
+      env.NODE_ENV === 'production'
+        ? `${env.WEB_ORIGIN},${env.ADMIN_ORIGIN}`
+            .split(',')
+            .map((o) => o.trim())
+            .filter(Boolean)
+        : true,
     credentials: true,
     // O padrão do @fastify/cors só libera GET, HEAD e POST: sem isto o navegador barra no
     // preflight o PATCH (status, perfil) e o DELETE (excluir) das páginas web e do painel.
