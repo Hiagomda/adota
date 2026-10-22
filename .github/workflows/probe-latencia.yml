@@ -1,0 +1,21 @@
+name: Medir latência da VPS
+on:
+  push:
+    branches: [probe/latencia-painel]
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tempo de resposta
+        run: |
+          S=fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+          for u in "http://painel.86.48.25.233.sslip.io:8000/login" "http://86.48.25.233:8000/login" "http://api-$S/health" "https://download-$S/version.json" "http://imgproxy-$S/health"; do
+            for i in 1 2 3; do
+              curl -s -o /dev/null -m 30 -w "$u  code=%{http_code} conectar=%{time_connect}s primeiro_byte=%{time_starttransfer}s total=%{time_total}s\n" "$u" || echo "$u falhou"
+            done
+          done
+      - name: DNS do domínio novo
+        run: |
+          dig +short NS warlord-core.site
+          dig +short A warlord-core.site
+          dig +short A painel.warlord-core.site
