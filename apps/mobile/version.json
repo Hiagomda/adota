@@ -1,8 +1,10 @@
 {
   "version": "0.1.0",
-  "build": 34,
+  "build": 35,
   "notes": [
-    "O botão \"Vou ajudar\" do feed aparece inteiro de novo, sem cortar no \"Vou\".",
-    "O mapa não dá mais aquelas teleportadas nem trava ao arrastar: ele fica onde você deixou."
+    "\"Encontrei o animal\" agora pergunta onde ele fica: com você, em lar temporário, já para adoção ou se você decidiu adotar.",
+    "A ficha de adoção só pergunta o que combina com a sua casa e mostra quanto falta.",
+    "Animal perdido ganhou fluxo próprio: \"Vi esse animal\", \"Está comigo\" e \"Ele voltou para casa\".",
+    "Quem tem iPhone já pode usar o Égua, adota! pelo navegador, na página de download."
   ]
 }
