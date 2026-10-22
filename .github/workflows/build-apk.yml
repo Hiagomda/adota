@@ -69,14 +69,14 @@ jobs:
           printf '%s\n' "$MOBILE_ENV" > apps/mobile/.env
 
       # App web do iPhone, do mesmo commit do APK. Fica em <download>/app e chama a API e as fotos
-      # pelo próprio site (docker/download-nginx.conf), porque lá é HTTPS e a API ainda é HTTP.
+      # pelo próprio site (docker/download-nginx.conf), na mesma origem e sem depender de CORS.
       - name: Exportar o app web
         working-directory: apps/mobile
         env:
           EXPO_WEB_BASE_URL: /app
           EXPO_PUBLIC_API_URL: /api
           EXPO_PUBLIC_WEB_PROXY_ROUTES: >-
-            http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/img,http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io=/media
+            https://adota-img.warlord-core.site=/img,https://adota-media.warlord-core.site=/media
         run: |
           set -eu
           # O `expo export` avalia o app.config.ts antes de ler o .env, e a trava de release falhava.

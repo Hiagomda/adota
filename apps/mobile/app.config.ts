@@ -130,7 +130,7 @@ export default ({ config }: ConfigContext): ExpoConfig =>
         apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010',
         downloadPageUrl:
           process.env.EXPO_PUBLIC_DOWNLOAD_URL ??
-          'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io',
+          'https://adota.warlord-core.site',
         build: buildInfo,
         eas: {
           projectId: 'b5a8c1e6-e9bd-45f0-9f94-9042c41f4732',

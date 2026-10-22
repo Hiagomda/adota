@@ -70,8 +70,8 @@ Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não r
 2. Não rode `pnpm install` completo. Se `@patinha/shared` quebrar o tsc, `pnpm --filter @patinha/shared build` na árvore de compile.
 3. `node apps/mobile/scripts/bump-build.mjs --sync` em `C:\dev\egua-adota` para o `versionCode` do Gradle bater com `version.json`.
 4. Confirme `C:\dev\egua-adota\apps\mobile\.env` com (não commitar, não imprimir valores além do host):
-   - `EXPO_PUBLIC_API_URL=http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io` (HTTP de propósito)
-   - `EXPO_PUBLIC_DOWNLOAD_URL=https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`
+   - `EXPO_PUBLIC_API_URL=https://adota-api.warlord-core.site`
+   - `EXPO_PUBLIC_DOWNLOAD_URL=https://adota.warlord-core.site`
 5. Gradle **release** (não debug), JDK 17 já em `android/gradle.properties` (Adoptium sob `~/.gradle/jdks/…` neste PC):
 
 ```powershell
@@ -92,7 +92,7 @@ $env:TEMP = "C:\Temp"; $env:TMP = "C:\Temp"
 
 ### 4. Deploy Coolify (obrigatório para o celular ver a att)
 
-- Painel: `http://painel.86.48.25.233.sslip.io:8000` (não o IP cru — Kaspersky bloqueia). App: `adota:master-…` / id `fpmewu0com3qkbfihrsihc6y`.
+- Painel: `https://painel.warlord-core.site` (não o IP cru — Kaspersky bloqueia). App: `adota:master-…` / id `fpmewu0com3qkbfihrsihc6y`.
 - Compose: `docker-compose.coolify.yml`. Ao subir: API faz `db:migrate` + `db:seed` (`SEED_IF_EMPTY`) + `start`; o serviço `download` rebuilda com o `APK_URL` e copia `version.json` + APK.
 - Clique no **Deploy do cabeçalho** (`wire:click=deploy` / botão roxo, ao lado de "More actions"), **não** no "Deploy" da sidebar (só expande seção). O clique às vezes não pega: confira no histórico (`…/application/fpmewu0com3qkbfihrsihc6y/deployment`) uma linha "In progress" antes de esperar; na página `/deployment` o botão do cabeçalho funcionou. Não clique Log out, Cancel, Danger Zone, nem upgrade do Coolify. Não toque MetalRiff, chatbot, teste-AtivaFacil.
 - Websocket "Cannot connect to real-time service" é normal; o deploy ainda roda — acompanhe Deployment Logs / histórico.
@@ -101,9 +101,9 @@ $env:TEMP = "C:\Temp"; $env:TMP = "C:\Temp"
 ### 5. Verificar
 
 ```powershell
-curl.exe -sS "https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/version.json"
-curl.exe -sS -I "https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/egua-adota.apk"
-curl.exe -sS "http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/health"
+curl.exe -sS "https://adota.warlord-core.site/version.json"
+curl.exe -sS -I "https://adota.warlord-core.site/egua-adota.apk"
+curl.exe -sS "https://adota-api.warlord-core.site/health"
 ```
 
 Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, APK com `Content-Length` do release. Só então diga ao Hiago para fechar e reabrir o app.
@@ -111,7 +111,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 ### Deploy (VPS) — referência rápida
 
 - Coolify sobe `docker-compose.coolify.yml` a partir do GitHub **`master`**.
-- Domínios de teste (sslip): API/MinIO/imgproxy em HTTP; download em HTTPS. Mudar host quebra APKs já instalados.
+- Domínios: `adota` (download e /app), `adota-api`, `adota-img`, `adota-media` e `adota-admin` em `warlord-core.site`, todos HTTPS. Os sslip antigos continuam como segundo domínio de cada serviço no Coolify, porque APKs já instalados chamam `http://api-…sslip.io`. Não tire o sslip da API sem todo mundo atualizar.
 - `docker/download-entrypoint.sh` copia `/opt/egua-adota.apk` e `/opt/version.json` sobre o volume a cada start — cópia só no volume some no restart. Caminho durável = release GitHub + `APK_URL` no Dockerfile + redeploy.
 - `docker-compose.prod.yml` + `deploy.yml` (Caddy em `/opt/patinha`) **não** estão em uso.
 - `publish-download.yml` espelha o APK do release `apk-<version>-<build>` lendo `download/version.json`.

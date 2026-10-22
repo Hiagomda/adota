@@ -103,7 +103,7 @@ pnpm dlx eas-cli build --profile development --platform ios
 
 4. Instale o binário no aparelho e rode `pnpm dev:mobile`. No Windows, sem Android Studio, `pnpm dev:mobile:preview` abre a mesma interface num quadro de celular no navegador.
 
-O perfil `preview` gera um APK que já fala com a API de teste em `http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`. A página para baixar esse arquivo é `http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io`. Essa VPS já usa o proxy do Coolify nas portas 80 e 443, então o teste sobe com `docker-compose.coolify.yml`, sem um segundo Caddy.
+O perfil `preview` gera um APK que já fala com a API de teste em `https://adota-api.warlord-core.site`. A página para baixar esse arquivo é `https://adota.warlord-core.site`. Essa VPS já usa o proxy do Coolify nas portas 80 e 443, então o teste sobe com `docker-compose.coolify.yml`, sem um segundo Caddy.
 
 A versão instalada no teste é um alpha (`0.1.0`). O aviso de atualização mostra até quatro frases curtas do que mudou, publicadas em `download/version.json` no campo `notes`. Ajustes mostra só a versão.
 

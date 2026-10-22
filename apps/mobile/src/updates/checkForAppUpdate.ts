@@ -6,7 +6,7 @@ import { reportError } from '../crash/reporter';
 import { withDeadline } from './deadline';
 import { isNewerNativeRelease, parsePublishedNativeApp } from './publishedVersion';
 
-const fallbackDownloadPage = 'http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io';
+const fallbackDownloadPage = 'https://adota.warlord-core.site';
 
 /** The VPS answers in well under a second. Past this, the app opens and skips the offer. */
 export const UPDATE_CHECK_TIMEOUT_MS = 3000;
