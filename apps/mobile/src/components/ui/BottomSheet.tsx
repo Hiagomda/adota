@@ -16,7 +16,7 @@ import { useOverlay } from './useOverlay';
 export interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** Fires after the sheet has left the screen, so a navigation is not covered by the modal. */
+  /** Dispara quando a folha já saiu da tela, para a navegação não ficar sob o modal. */
   onClosed?: () => void;
   title?: string;
   children: ReactNode;
@@ -25,7 +25,7 @@ export interface BottomSheetProps {
 const CLOSE_DRAG = 90;
 const HIDDEN_OFFSET = 480;
 
-/** Sheet that slides up, closes by tapping the backdrop, dragging the handle down or with Android back. */
+/** Folha que sobe de baixo; fecha ao tocar no fundo, arrastar a alça ou no voltar do Android. */
 export function BottomSheet({ visible, onClose, onClosed, title, children }: BottomSheetProps) {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
@@ -47,7 +47,7 @@ export function BottomSheet({ visible, onClose, onClosed, title, children }: Bot
     onClosedRef.current?.();
   }, [mounted]);
 
-  // Gesture callbacks run on the UI thread, so they can't call `duration` (a JS function).
+  // Os callbacks do gesto rodam na thread de UI e não podem chamar `duration` (função JS).
   const settleMs = duration(motion.fast);
   const pan = Gesture.Pan()
     .onUpdate((event) => {
