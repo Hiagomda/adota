@@ -40,12 +40,3 @@ export const urgencyLabel: Record<string, string> = {
   medium: 'Atenção',
   low: 'Pode esperar',
 };
-
-export const nextStatus: Record<string, string | undefined> = {
-  open: 'on_the_way',
-  on_the_way: 'rescued',
-  not_found: 'open',
-  rescued: 'fostered',
-  fostered: 'for_adoption',
-  for_adoption: 'adopted',
-};

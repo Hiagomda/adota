@@ -117,10 +117,10 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
           </View>
         </Touchable>
         {/* A urgência só importa enquanto ninguém está com o animal. */}
-        {post.status === 'open' ? (
+        {post.status === 'open' && post.type !== 'lost' ? (
           <StatusPill urgency={post.urgency} />
         ) : (
-          <StatusPill status={post.status} />
+          <StatusPill status={post.status} type={post.type} />
         )}
       </View>
 

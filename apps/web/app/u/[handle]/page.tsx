@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getProfile, listPosts } from '../../../lib/api';
-import { statusLabel } from '../../../lib/labels';
+import { statusLabelFor } from '../../../lib/labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +50,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
               ) : null}
               <div className="card-body">
                 <h2>{post.approxLabel}</h2>
-                <p>{statusLabel[post.status]}</p>
+                <p>{statusLabelFor(post.type, post.status)}</p>
               </div>
             </Link>
           ))}

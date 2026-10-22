@@ -32,6 +32,33 @@ describe('adoption interest', () => {
     expect(adoptionInterestSchema.safeParse({ ...answers, home: 'castle' }).success).toBe(false);
     expect(adoptionInterestSchema.safeParse({ ...answers, cpf: '123' }).success).toBe(false);
   });
+
+  it('keeps the follow-up answers only where they fit', () => {
+    const parsed = adoptionInterestSchema.parse({
+      home: 'house',
+      buildingAllows: 'no',
+      safeHome: 'yes',
+      otherAnimals: 'none',
+      othersCared: 'yes',
+      household: 'alone',
+      kids: true,
+      hadPets: true,
+    });
+    expect(parsed).not.toHaveProperty('buildingAllows');
+    expect(parsed).not.toHaveProperty('othersCared');
+    expect(parsed).not.toHaveProperty('kids');
+    const flat = adoptionInterestSchema.parse({
+      home: 'apartment',
+      buildingAllows: 'yes',
+      safeHome: 'yes',
+      otherAnimals: 'cats',
+      othersCared: 'some',
+      household: 'all_agree',
+      kids: false,
+      hadPets: true,
+    });
+    expect(flat).toMatchObject({ buildingAllows: 'yes', othersCared: 'some', kids: false });
+  });
 });
 
 describe('adoption events', () => {

@@ -379,12 +379,14 @@ export async function notifyStatusChange(
   postId: string,
   status: string,
 ): Promise<void> {
-  const post = await pool.query<{ author_id: string; approx_label: string }>(
-    `SELECT author_id, approx_label FROM posts WHERE id = $1`,
+  const post = await pool.query<{ author_id: string; approx_label: string; type: string }>(
+    `SELECT author_id, approx_label, type FROM posts WHERE id = $1`,
     [postId],
   );
   const alert = post.rows[0];
   if (!alert) return;
+  // Animal perdido tem tutor: "resgatado" ali quer dizer que voltou para casa.
+  const lostHome = alert.type === 'lost' && status === 'rescued';
   const people = await pool.query<{ id: string; fcm_tokens: string[] }>(
     `SELECT id, fcm_tokens FROM users WHERE id = $1
      UNION
@@ -392,13 +394,17 @@ export async function notifyStatusChange(
     [alert.author_id, postId],
   );
   const missed = status === 'not_found';
-  const title = missed ? 'Ninguém encontrou o animal' : 'Atualização de resgate';
+  const title = missed
+    ? 'Ninguém encontrou o animal'
+    : lostHome
+      ? 'O animal perdido voltou para casa'
+      : 'Atualização de resgate';
   const statusName =
     {
       open: 'Aberto',
       on_the_way: 'A caminho',
       not_found: 'Não encontrado',
-      rescued: 'Resgatado',
+      rescued: lostHome ? 'Voltou para casa' : 'Resgatado',
       fostered: 'Lar temporário',
       for_adoption: 'Para adoção',
       adopted: 'Adotado',

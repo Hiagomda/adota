@@ -19,13 +19,19 @@ export interface AuthorContactGate {
   authorId: string;
   status: string;
   viewerWillHelp: boolean;
+  /** Post type. Older callers leave it out. */
+  type?: string;
 }
 
-/** Adoption is open to anyone signed in; a rescue only to who can already see its exact pin. */
+/**
+ * Adoption is open to anyone signed in, and so is a lost pet still missing: whoever saw or took
+ * it in calls the family. A rescue only to who can already see its exact pin.
+ */
 export function canAskAuthorContact(gate: AuthorContactGate): boolean {
   if (gate.viewer.id === gate.authorId) return false;
   return (
     adoptionStatuses.has(gate.status) ||
+    (gate.type === 'lost' && gate.status !== 'rescued') ||
     canSeeExactPlace(gate.viewer, gate.authorId, gate.viewerWillHelp)
   );
 }
@@ -34,6 +40,7 @@ interface PostGate {
   id: string;
   author_id: string;
   status: string;
+  type: string;
   species: string;
   author_phone: string | null;
   author_whatsapp: boolean;
@@ -62,7 +69,7 @@ function params<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.
 
 async function loadPost(pool: Pool, postId: string, viewerId: string): Promise<PostGate> {
   const result = await pool.query<PostGate>(
-    `SELECT p.id, p.author_id, p.status, a.species,
+    `SELECT p.id, p.author_id, p.status, p.type, a.species,
             u.phone AS author_phone, u.whatsapp_opt_in AS author_whatsapp,
             EXISTS (
               SELECT 1 FROM responses r
@@ -137,6 +144,7 @@ export function registerContactRoutes(
       authorId: post.author_id,
       status: post.status,
       viewerWillHelp: post.viewer_will_help,
+      type: post.type,
     });
     if (!allowed) {
       throw new HttpError(403, 'Diga "vou ajudar" no resgate para ver o contato de quem publicou.');

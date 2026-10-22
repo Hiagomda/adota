@@ -3,6 +3,7 @@ import {
   insideServiceArea,
   looksLikeAnimalSale,
   ownerOnlyStatus,
+  selfAdoption,
   statusAfterLeavingHelp,
   type AnimalStatus,
   type CreatePostInput,
@@ -400,8 +401,25 @@ export async function changeStatus(
     const post = await lockRescue(client, postId);
     const allowed = await canChange(client, post.author_id, postId, user);
     if (!allowed) throw new HttpError(403, 'Você não pode atualizar esse alerta.');
-    // Quem ajuda leva o resgate até a adoção; dizer quem adotou é de quem publicou ou da equipe.
-    if (status === 'adopted' && user.id !== post.author_id && !isOperator(user.role)) {
+    const owner = user.id === post.author_id || isOperator(user.role);
+    // Animal perdido tem família: ele volta para casa, não vai para lar temporário nem adoção, e
+    // quem diz que voltou é o tutor. Quem achou fala com o tutor pelo WhatsApp.
+    if (post.type === 'lost') {
+      if (status === 'fostered' || status === 'for_adoption' || status === 'adopted') {
+        throw new HttpError(400, 'Animal perdido tem família. Marque que ele voltou para casa.');
+      }
+      if (status === 'rescued' && !owner) {
+        throw new HttpError(403, 'Só quem publicou marca que ele voltou para casa.');
+      }
+    }
+    // Quem ajuda leva o resgate até a adoção e pode dizer que fica com o animal; dizer que outra
+    // pessoa adotou é de quem publicou ou da equipe.
+    if (
+      status === 'adopted' &&
+      !selfAdoption(post.status, status) &&
+      user.id !== post.author_id &&
+      !isOperator(user.role)
+    ) {
       throw new HttpError(403, 'Só quem publicou pode dizer que o animal foi adotado.');
     }
     if (!canTransitionStatus(post.status, status)) {
@@ -412,9 +430,9 @@ export async function changeStatus(
       user.id !== post.author_id &&
       !isOperator(user.role)
     ) {
-      throw new HttpError(403, 'Só quem publicou pode marcar esse alerta como resgatado.');
+      throw new HttpError(403, 'Só quem publicou pode fazer essa mudança no alerta.');
     }
-    await applyStatus(client, postId, user.id, post.animal_id, status);
+    await applyStatus(client, postId, user.id, post.animal_id, status, post.type);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -431,13 +449,14 @@ export async function changeStatus(
 async function lockRescue(
   client: PoolClient,
   postId: string,
-): Promise<{ status: AnimalStatus; author_id: string; animal_id: string }> {
+): Promise<{ status: AnimalStatus; author_id: string; animal_id: string; type: string }> {
   const current = await client.query<{
     status: AnimalStatus;
     author_id: string;
     animal_id: string;
+    type: string;
   }>(
-    `SELECT status, author_id, animal_id FROM posts
+    `SELECT status, author_id, animal_id, type FROM posts
      WHERE id = $1 AND parent_post_id IS NULL AND hidden = false
      FOR UPDATE`,
     [postId],
@@ -453,6 +472,7 @@ async function applyStatus(
   userId: string,
   animalId: string,
   status: AnimalStatus,
+  type?: string,
 ) {
   await db.query('UPDATE posts SET status = $2 WHERE id = $1', [postId, status]);
   await db.query(
@@ -463,7 +483,12 @@ async function applyStatus(
     `INSERT INTO posts (author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id)
      SELECT $2, animal_id, 'update', urgency, $3, location, approx_label, $4, id
      FROM posts WHERE id = $1`,
-    [postId, userId, statusLabel(status), status],
+    [
+      postId,
+      userId,
+      type === 'lost' && status === 'rescued' ? 'Voltou para casa.' : statusLabel(status),
+      status,
+    ],
   );
 }
 

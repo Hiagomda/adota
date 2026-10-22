@@ -8,6 +8,18 @@ export const statusLabel: Record<string, string> = {
   adopted: 'Adotado',
 };
 
+/** Animal perdido tem família: some ("Procurando") e volta para casa, não é resgatado. */
+const lostStatusLabel: Record<string, string> = {
+  open: 'Procurando',
+  on_the_way: 'Procurando',
+  not_found: 'Procurando',
+  rescued: 'Voltou para casa',
+};
+
+export function statusLabelFor(type: string, status: string): string {
+  return (type === 'lost' ? lostStatusLabel[status] : undefined) ?? statusLabel[status] ?? status;
+}
+
 export const urgencyLabel: Record<string, string> = {
   high: 'Urgente',
   medium: 'Atenção',

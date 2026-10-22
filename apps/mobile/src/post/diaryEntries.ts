@@ -23,6 +23,8 @@ export interface DiaryPhoto {
 
 interface DiarySource {
   id: string;
+  /** rescue_alert, lost or adoption. Older callers leave it out and read as a rescue. */
+  type?: string;
   description: string;
   createdAt: string;
   author: { name: string; handle: string };
@@ -52,12 +54,19 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+/** A primeira linha conta como o animal chegou ao app, que muda com o tipo do post. */
+function openingLine(type: string | undefined, name: string): string {
+  if (type === 'adoption') return `${name} colocou para adoção`;
+  if (type === 'lost') return `${name} avisou que ele sumiu`;
+  return `${name} encontrou o animal na rua`;
+}
+
 export function diaryLines(post: DiarySource): DiaryLine[] {
   const lines: DiaryLine[] = [
     {
       id: post.id,
       tone: 'found',
-      title: `${firstName(post.author.name)} encontrou o animal na rua`,
+      title: openingLine(post.type, firstName(post.author.name)),
       body: post.description,
       when: post.createdAt,
       handle: post.author.handle,
@@ -81,7 +90,10 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
       lines.push({
         id: update.id,
         tone: 'status',
-        title: stepLines[update.status](name),
+        title:
+          post.type === 'lost' && update.status === 'rescued'
+            ? 'Voltou para casa'
+            : stepLines[update.status](name),
         body: null,
         when: update.createdAt,
         handle: update.author.handle,

@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import QRCode from 'qrcode';
 import { getPost } from '../../../lib/api';
-import { statusLabel } from '../../../lib/labels';
+import { statusLabelFor } from '../../../lib/labels';
 
 export const size = { width: 1080, height: 1080 };
 export const contentType = 'image/png';
@@ -50,7 +50,7 @@ export function Card({
       <div style={{ display: 'flex', flexDirection: 'column', padding: 48, gap: 12 }}>
         <div style={{ color: '#F7B84B', fontSize: 36, fontWeight: 700 }}>Égua, adota! · Belém</div>
         <div style={{ fontSize: 48, fontWeight: 700 }}>{post?.approxLabel ?? 'Alerta'}</div>
-        <div style={{ fontSize: 32 }}>{post ? statusLabel[post.status] : ''}</div>
+        <div style={{ fontSize: 32 }}>{post ? statusLabelFor(post.type, post.status) : ''}</div>
         <div style={{ display: 'flex' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img alt="" src={qr} width={140} height={140} />
