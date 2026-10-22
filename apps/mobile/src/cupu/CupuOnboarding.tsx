@@ -23,9 +23,9 @@ const steps: Step[] = [
   {
     pose: 'wave',
     tint: 'primarySoft',
-    title: 'Ei, mano(a)! Eu sou o Cupu',
+    title: 'Ei, mano(a)! Eu sou o Cupuaçu',
     description:
-      'O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
+      'Mas pode me chamar de Cupu. O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
     button: 'Bora ver',
   },
   {
@@ -88,7 +88,7 @@ export default function CupuOnboarding() {
     () =>
       steps.map((item, itemIndex) =>
         itemIndex === 0
-          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupu` }
+          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupuaçu` }
           : item,
       ),
     [userName],
