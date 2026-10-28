@@ -691,6 +691,15 @@ export default function PostScreen() {
                   ))}
                 </Card>
               ) : null}
+              <Card padding="none" elevation="sm">
+                <ListItem
+                  title="Passaporte do animal"
+                  subtitle="Saúde, lares, adoção e outras ocorrências dele"
+                  icon="book-open"
+                  showChevron
+                  onPress={() => router.push(`/animal/${item.animal.id}`)}
+                />
+              </Card>
             </View>
 
             <View style={styles.section}>

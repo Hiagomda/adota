@@ -19,6 +19,7 @@ import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
 import { registerContactRoutes } from './contact.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
+import { registerPassportRoutes } from './passport.js';
 import { registerSightingRoutes } from './sightings.js';
 import {
   anonymizeUser,
@@ -849,6 +850,7 @@ export async function registerRoutes(
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, { env, pool, writeLimit });
   registerNeighborhoodRoutes(app, { pool });
+  registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   await registerStaffRoutes(app, { env, pool, queue });
 }
 

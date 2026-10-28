@@ -17,6 +17,7 @@ import { isOperator } from './authz.js';
 import { HttpError } from './http.js';
 import { assertOwnedMedia, ownedMediaKey } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
+import { recordCustody } from './passport.js';
 import { assertHelpRequest, canSeeExactPlace, publicPixKey, publicPlace } from './privacy.js';
 import { rowsOf, type SessionUser } from './session.js';
 import { stripControls } from './text.js';
@@ -474,7 +475,16 @@ async function applyStatus(
   status: AnimalStatus,
   type?: string,
 ) {
+  const before = await db.query<{ status: AnimalStatus }>(
+    'SELECT status FROM posts WHERE id = $1',
+    [postId],
+  );
   await db.query('UPDATE posts SET status = $2 WHERE id = $1', [postId, status]);
+  // Perdido que volta para casa não muda de guarda: ele sempre foi do tutor.
+  const previous = before.rows[0]?.status;
+  if (previous && type !== 'lost') {
+    await recordCustody(db, animalId, postId, userId, previous, status);
+  }
   await db.query(
     "UPDATE animals SET status = $2, current_owner_id = CASE WHEN $2 = 'adopted' THEN $3 ELSE current_owner_id END WHERE id = $1",
     [animalId, status, userId],

@@ -128,6 +128,7 @@ export const notificationSchema: Schema<AppNotification> = z.object({
     body: z.string().optional(),
     postId: z.string().optional(),
     adopterId: z.string().optional(),
+    route: z.string().optional(),
   }),
   readAt: nullableString,
   createdAt: isoDate,

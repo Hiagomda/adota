@@ -16,6 +16,7 @@ import {
 import { useSession } from '../../src/session';
 import { screenColumn, spacing, statusLabel, useTheme } from '../../src/theme';
 import type { AppNotification } from '../../src/types';
+import { routeFromPush } from '../../src/nearby/pushTarget';
 
 function notificationBody(body: string | undefined): string {
   if (!body) return '';
@@ -56,7 +57,8 @@ export default function AlertsScreen() {
   function open(item: AppNotification) {
     // Primeiro abre o animal; marcar como lido é detalhe e, sem internet, não pode travar o toque.
     // Avisos antigos da conversa de adoção também caem no animal: a conversa foi para o WhatsApp.
-    if (item.payload.postId) router.push(`/post/${item.payload.postId}`);
+    const route = routeFromPush(item.payload);
+    if (route) router.push(route as never);
     if (!token) return;
     api('/notifications/read', { method: 'POST', token })
       .then(() => client.invalidateQueries({ queryKey: ['notifications', token] }))

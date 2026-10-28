@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { postIdFromPush } from './pushTarget.ts';
+import { postIdFromPush, routeFromPush } from './pushTarget.ts';
 
 const id = '3f2b8c1e-9a4d-4e2f-8b7a-1c2d3e4f5a6b';
 
@@ -18,4 +18,16 @@ test('ignora push sem resgate ou com dado estranho', () => {
   assert.equal(postIdFromPush({ postId: '../settings' }), null);
   assert.equal(postIdFromPush({ url: 'egua://post/../../settings' }), null);
   assert.equal(postIdFromPush({ url: `https://exemplo.com/post/${id}` }), null);
+});
+
+test('abre a tela do aviso novo quando ela está na lista', () => {
+  assert.equal(routeFromPush({ route: `/animal/${id}` }), `/animal/${id}`);
+  assert.equal(routeFromPush({ route: '/casa-amiga' }), '/casa-amiga');
+  assert.equal(routeFromPush({ postId: id }), `/post/${id}`);
+});
+
+test('ignora rota fora da lista', () => {
+  assert.equal(routeFromPush({ route: '/settings' }), null);
+  assert.equal(routeFromPush({ route: '/animal/../settings' }), null);
+  assert.equal(routeFromPush({ route: `/animal/${id}/x` }), null);
 });

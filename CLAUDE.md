@@ -125,6 +125,7 @@ apps/api/src/feed.ts          posts, status, localização aproximada
 apps/api/src/adoptionChat.ts  conversa de adoção
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
+apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)
@@ -150,6 +151,7 @@ download/                     página de download servida pelo container `downlo
 - Banco só por migração nova e reversível (arquivo em `db/migrations` + reverso em `db/down`), com aviso de backup antes.
 - Nada de `catch {}` vazio. Erro esperado: trate e explique. Erro de "melhor esforço" (push, geocode): registre no log. Na API, falha do servidor nunca vira 401, porque o app desloga em 401.
 - Rate limit: o global (600/min por IP) roda antes da autenticação. Rota de escrita nova usa `writeLimit` ou `strictLimit` de `register.ts`, que contam por conta, porque muitos celulares dividem o mesmo IP da operadora.
+- Avisos dos recursos novos usam `notifyPeople` (`notify.ts`): grava em Alertas e manda push com `route` (tela que o app abre; lista fechada em `src/nearby/pushTarget.ts`). Apps antigos só entendem `postId`.
 - Excluir conta (`anonymizeUser`): tabela nova com dado pessoal entra em `personalTables` ou ganha tratamento ali.
 - Privacidade: feed e API pública devolvem localização aproximada (grade de ~500 m). Casa Amiga é casa de alguém: só autor, equipe e quem vai ajudar veem a lista, em km inteiros. A exata vai só para o autor, a equipe e quem respondeu "vou ajudar". Telefone nunca aparece no feed.
 - Proibido vender animais. PIX só aparece em pedido de ajuda de perfil verificado.

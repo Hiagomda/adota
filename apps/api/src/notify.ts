@@ -532,6 +532,79 @@ async function sendPush(
   body: string,
   postId: string,
 ): Promise<void> {
+  await sendPushData(pool, env, tokens, title, body, { postId, url: `egua://post/${postId}` });
+}
+
+/**
+ * Destino que o app abre ao tocar no aviso. `route` é a tela (ex.: `/animal/<id>`); os apps
+ * antigos só entendem `postId`, então ele vai junto quando o aviso é de um resgate.
+ */
+export interface NotifyTarget {
+  title: string;
+  body: string;
+  postId?: string;
+  route?: string;
+}
+
+/**
+ * Aviso no app para cada pessoa e, fora do horário de silêncio de cada uma, push. Quem
+ * desligou os avisos só vê na tela Alertas. Usado pelos recursos novos (passaporte, Casas
+ * Amigas, central, campanhas e agenda).
+ */
+export async function notifyPeople(
+  pool: Pool,
+  env: Env,
+  userIds: readonly string[],
+  type: string,
+  target: NotifyTarget,
+  options: { push?: boolean } = {},
+): Promise<void> {
+  const unique = [...new Set(userIds)];
+  if (unique.length === 0) return;
+  const people = await pool.query<{
+    id: string;
+    fcm_tokens: string[];
+    quiet_hours_start: number | null;
+    quiet_hours_end: number | null;
+    notifications_enabled: boolean;
+  }>(
+    `SELECT id, fcm_tokens, quiet_hours_start, quiet_hours_end, notifications_enabled
+     FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND suspended = false`,
+    [unique],
+  );
+  const hour = belemHour();
+  const data: Record<string, string> = {};
+  if (target.postId) {
+    data.postId = target.postId;
+    data.url = `egua://post/${target.postId}`;
+  }
+  if (target.route) {
+    data.route = target.route;
+    data.url = `egua:/${target.route}`;
+  }
+  for (const person of people.rows) {
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, payload) VALUES ($1, $2, $3::jsonb)`,
+      [person.id, type, JSON.stringify(target)],
+    );
+    if (
+      options.push !== false &&
+      person.notifications_enabled &&
+      !isQuiet(person.quiet_hours_start, person.quiet_hours_end, hour)
+    ) {
+      await sendPushData(pool, env, person.fcm_tokens, target.title, target.body, data);
+    }
+  }
+}
+
+async function sendPushData(
+  pool: Pool,
+  env: Env,
+  tokens: string[],
+  title: string,
+  body: string,
+  data: Record<string, string>,
+): Promise<void> {
   if (!env.FIREBASE_PROJECT_ID || tokens.length === 0) return;
   try {
     await ensureFirebaseApp(env);
@@ -539,7 +612,7 @@ async function sendPush(
     const result = await admin.messaging().sendEachForMulticast({
       tokens,
       notification: { title, body },
-      data: { postId, url: `egua://post/${postId}` },
+      data,
     });
     const dead = deadPushTokens(
       tokens,
@@ -558,7 +631,7 @@ async function sendPush(
   } catch (error) {
     // Push is best-effort: the in-app notification is already stored. Log it for the VPS logs.
     console.error(
-      JSON.stringify({ level: 'error', where: 'notify:push', postId, error: String(error) }),
+      JSON.stringify({ level: 'error', where: 'notify:push', data, error: String(error) }),
     );
     captureServerError(error, { where: 'notify:push' });
   }

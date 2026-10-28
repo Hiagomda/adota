@@ -65,3 +65,17 @@ export {
   type AdoptionInterestInput,
   type VerificationRequestInput,
 } from './adoption.js';
+export {
+  animalLinkSchema,
+  belemToday,
+  custodyChange,
+  healthKindSchema,
+  healthRecordSchema,
+  healthRecordSchemaAt,
+  healthVisibilitySchema,
+  type AnimalLinkInput,
+  type CustodyKind,
+  type HealthKind,
+  type HealthRecordInput,
+  type HealthVisibility,
+} from './passport.js';
