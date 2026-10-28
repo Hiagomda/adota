@@ -64,7 +64,7 @@ const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 
 /** "R$ 1.500,00" com espaço comum, para o texto ler igual no app e no push. */
 export function formatCents(cents: number): string {
-  return brl.format(cents / 100).replace(/ /g, ' ');
+  return brl.format(cents / 100).replace(/\u00a0/g, ' ');
 }
 
 function formatDay(day: string): string {
