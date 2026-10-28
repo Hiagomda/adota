@@ -111,6 +111,8 @@ services:
       # Endereço do painel da equipe (repositório AdotaSite).
       ADMIN_ORIGIN: https://admin-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       SEED_IF_EMPTY: 'true'
+      # Erros da API no Sentry. Cole o DSN do projeto da API nas variáveis do Coolify; vazio desliga.
+      SENTRY_DSN: ${SENTRY_DSN:-}
     command:
       - sh
       - -c

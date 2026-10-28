@@ -2,9 +2,11 @@ import { Redis } from 'ioredis';
 import { Pool } from 'pg';
 import { buildApp } from './app.js';
 import { loadEnv } from './config.js';
+import { flushMonitoring, initMonitoring } from './monitoring.js';
 import { startWorker } from './notify.js';
 
 const env = loadEnv();
+initMonitoring(env);
 const app = await buildApp({ env });
 const workerRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 const workerPool = new Pool({ connectionString: env.DATABASE_URL });
@@ -15,6 +17,7 @@ const shutdown = async () => {
   await app.close();
   await workerPool.end();
   workerRedis.disconnect();
+  await flushMonitoring();
 };
 
 process.on('SIGINT', () => {

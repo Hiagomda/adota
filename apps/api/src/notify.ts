@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import type { Env } from './config.js';
 import { releaseStaleHelper } from './feed.js';
 import { ensureFirebaseApp } from './firebaseAdmin.js';
+import { captureServerError } from './monitoring.js';
 import { rowsOf } from './session.js';
 
 const queueName = 'rescue-alerts';
@@ -26,7 +27,7 @@ export function createQueue(redis: Redis): Queue<RescueJob> {
 }
 
 export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJob> {
-  return new Worker<RescueJob>(
+  const worker = new Worker<RescueJob>(
     queueName,
     async (job) => {
       if (job.name === 'expand') {
@@ -45,6 +46,11 @@ export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJo
     },
     { connection: redis as unknown as ConnectionOptions },
   );
+  // Alerta de resgate ou lembrete que falhou some em silêncio se ninguém olhar o log.
+  worker.on('failed', (job, error) => {
+    captureServerError(error, { where: `worker:${job?.name ?? 'desconhecido'}` });
+  });
+  return worker;
 }
 
 export async function enqueueRescueAlert(
@@ -554,6 +560,7 @@ async function sendPush(
     console.error(
       JSON.stringify({ level: 'error', where: 'notify:push', postId, error: String(error) }),
     );
+    captureServerError(error, { where: 'notify:push' });
   }
 }
 
