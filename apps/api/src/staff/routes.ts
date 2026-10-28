@@ -6,6 +6,7 @@ import type { Env } from '../config.js';
 import { HttpError } from '../http.js';
 import type { createQueue } from '../notify.js';
 import { rowsOf } from '../session.js';
+import { registerEventModerationRoutes } from './events.js';
 import { registerModerationRoutes } from './moderation.js';
 import { decoyHash, verifyPassword } from './password.js';
 import {
@@ -478,6 +479,7 @@ export async function registerStaffRoutes(
   });
 
   registerModerationRoutes(app, { env, pool, queue });
+  registerEventModerationRoutes(app, { env, pool });
 }
 
 export type StaffPermissionName = Permission;

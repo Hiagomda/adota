@@ -3,6 +3,7 @@ import {
   adoptionInterestSchema,
   insideServiceArea,
   looksLikeAnimalSale,
+  neighborhoodFromPlace,
   verificationRequestSchema,
   type AdoptionInterestInput,
 } from '@patinha/shared';
@@ -11,6 +12,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import { isOperator, requireUser } from './authz.js';
 import type { Env } from './config.js';
+import { cancelEvent, inTransaction, recordChange } from './events.js';
 import { listWaitingForAdoption } from './feed.js';
 import { HttpError } from './http.js';
 import { publicMediaUrl } from './media.js';
@@ -221,6 +223,8 @@ export function registerAdoptionRoutes(
        FROM adoption_events e
        JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL AND u.suspended = false
        WHERE e.hidden = false AND e.ends_at > now()
+         AND e.category = 'adoption_fair' AND e.review_status = 'published'
+         AND e.cancelled_at IS NULL
          AND ($1::uuid IS NULL OR NOT EXISTS (
            SELECT 1 FROM blocks b
            WHERE (b.blocker_id = $1 AND b.blocked_id = e.user_id)
@@ -273,34 +277,55 @@ export function registerAdoptionRoutes(
     if (looksLikeAnimalSale(title) || looksLikeAnimalSale(description)) {
       throw new HttpError(400, 'Não é permitido vender animais. Feira aqui é só de adoção.');
     }
-    const created = await pool.query<{ id: string }>(
-      `INSERT INTO adoption_events (user_id, title, description, place_label, location, starts_at, ends_at)
-       VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, $7, $8)
-       RETURNING id`,
-      [
-        user.id,
-        title,
-        description || null,
-        stripControls(input.placeLabel).trim(),
-        input.longitude,
-        input.latitude,
-        input.startsAt,
-        input.endsAt,
-      ],
-    );
-    return reply.code(201).send({ id: created.rows[0]?.id });
+    const placeLabel = stripControls(input.placeLabel).trim();
+    const id = await inTransaction(pool, async (client) => {
+      const created = await client.query<{ id: string }>(
+        `INSERT INTO adoption_events
+           (user_id, title, description, place_label, neighborhood, location, starts_at, ends_at)
+         VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $9)
+         RETURNING id`,
+        [
+          user.id,
+          title,
+          description || null,
+          placeLabel,
+          neighborhoodFromPlace(placeLabel),
+          input.longitude,
+          input.latitude,
+          input.startsAt,
+          input.endsAt,
+        ],
+      );
+      const createdId = created.rows[0]?.id;
+      if (createdId) {
+        await recordChange(client, createdId, user.id, 'created', { category: 'adoption_fair' });
+      }
+      return createdId;
+    });
+    return reply.code(201).send({ id });
   });
 
   app.delete('/adoption-events/:id', writeLimit, async (request) => {
     const user = requireUser(request.user);
     const parsed = z.object({ id: z.string().uuid() }).safeParse(request.params);
     if (!parsed.success) throw new HttpError(404, 'Essa feira não existe mais.');
-    const result = await pool.query(
-      `UPDATE adoption_events SET hidden = true
-       WHERE id = $1 AND hidden = false AND (user_id = $2 OR $3::boolean)`,
-      [parsed.data.id, user.id, isOperator(user.role)],
-    );
-    if ((result.rowCount ?? 0) === 0) throw new HttpError(404, 'Essa feira não existe mais.');
+    // Apps antigos cancelam por aqui: vira cancelamento da agenda, com aviso aos inscritos.
+    await cancelEvent(
+      pool,
+      env,
+      parsed.data.id,
+      user,
+      'Cancelado por quem organizou.',
+      (error: unknown) => {
+        request.log.error({ err: error, where: 'notify:event-cancelled' }, 'best-effort');
+      },
+    ).catch((error: unknown) => {
+      // O app antigo espera 404 quando a feira já saiu da lista.
+      if (error instanceof HttpError && error.statusCode === 409) {
+        throw new HttpError(404, 'Essa feira não existe mais.');
+      }
+      throw error;
+    });
     return { removed: true };
   });
 

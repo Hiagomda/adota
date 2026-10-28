@@ -309,6 +309,8 @@ const personalTables = [
   'adoption_terms',
   'adoption_interests',
   'adoption_events',
+  'event_registrations',
+  'event_reports',
   'verification_requests',
   'staff_totp',
   'staff_recovery_codes',
