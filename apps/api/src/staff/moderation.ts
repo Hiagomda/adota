@@ -10,6 +10,7 @@ import {
   notifyVerificationDecision,
   type createQueue,
 } from '../notify.js';
+import { formatCents, notifyCampaignSuspension, setCampaignSuspended } from '../campaigns.js';
 import { rowsOf } from '../session.js';
 import { assertPermission, isStaffRole } from './policy.js';
 import { clientIp, loadSession, userAgent, writeAudit } from './routes.js';
@@ -44,6 +45,17 @@ const reviewSchema = z.object({ action: z.enum(['approve', 'reject']) }).strict(
 const visibilitySchema = z
   .object({
     hidden: z.boolean(),
+    justification: z.string().trim().min(10).max(500),
+  })
+  .strict();
+
+const campaignListSchema = z
+  .object({ filter: z.enum(['reported', 'active', 'suspended', 'all']).default('reported') })
+  .strict();
+
+const campaignStatusSchema = z
+  .object({
+    suspended: z.boolean(),
     justification: z.string().trim().min(10).max(500),
   })
   .strict();
@@ -196,7 +208,7 @@ export function registerModerationRoutes(
     const query = parse(reportListSchema, request.query ?? {});
     const result = await pool.query<{
       id: string;
-      target_type: 'post' | 'comment' | 'user';
+      target_type: 'post' | 'comment' | 'user' | 'campaign';
       target_id: string;
       reason: string;
       status: string;
@@ -212,16 +224,19 @@ export function registerModerationRoutes(
               CASE r.target_type
                 WHEN 'post' THEN left(p.description, 280)
                 WHEN 'comment' THEN left(c.body, 280)
+                WHEN 'campaign' THEN left(cp.title || ': ' || cp.purpose, 280)
                 ELSE tu.name
               END AS target_text,
               CASE r.target_type
                 WHEN 'post' THEN pa.handle
                 WHEN 'comment' THEN ca.handle
+                WHEN 'campaign' THEN cpo.handle
                 ELSE tu.handle
               END AS target_handle,
               CASE r.target_type
                 WHEN 'post' THEN p.hidden
                 WHEN 'comment' THEN c.hidden
+                WHEN 'campaign' THEN cp.status = 'suspended'
                 ELSE tu.suspended
               END AS target_hidden,
               (SELECT count(*)::int FROM reports same
@@ -233,6 +248,8 @@ export function registerModerationRoutes(
        LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
        LEFT JOIN users ca ON ca.id = c.user_id
        LEFT JOIN users tu ON r.target_type = 'user' AND tu.id = r.target_id
+       LEFT JOIN campaigns cp ON r.target_type = 'campaign' AND cp.id = r.target_id
+       LEFT JOIN users cpo ON cpo.id = cp.owner_id
        WHERE r.status = $1
        ORDER BY r.created_at ${query.status === 'open' ? 'ASC' : 'DESC'}
        LIMIT 100`,
@@ -263,6 +280,7 @@ export function registerModerationRoutes(
     const status = body.action === 'hide' ? 'hidden' : 'dismissed';
     const client = await pool.connect();
     let reporterId: string;
+    let suspendedCampaign: { id: string; ownerId: string } | null = null;
     try {
       await client.query('BEGIN');
       const report = await client.query<{
@@ -289,6 +307,17 @@ export function registerModerationRoutes(
         if (target.target_type === 'user') {
           await client.query(`UPDATE users SET suspended = true WHERE id = $1`, [target.target_id]);
         }
+        if (target.target_type === 'campaign') {
+          const changed = await setCampaignSuspended(client, {
+            campaignId: target.target_id,
+            actorId: session.user_id,
+            suspended: true,
+            reason: 'Denúncia aceita pela equipe.',
+          });
+          if (changed?.changed) {
+            suspendedCampaign = { id: target.target_id, ownerId: changed.ownerId };
+          }
+        }
       }
       await client.query(`UPDATE reports SET status = $2 WHERE id = $1`, [id, status]);
       await writeAudit(client, {
@@ -311,7 +340,124 @@ export function registerModerationRoutes(
     await notifyReportResolved(pool, reporterId, body.action).catch((error: unknown) => {
       request.log.error({ err: error, where: 'notify:report' }, 'best-effort step failed');
     });
+    if (suspendedCampaign) {
+      await notifyCampaignSuspension(
+        pool,
+        env,
+        suspendedCampaign.id,
+        suspendedCampaign.ownerId,
+        true,
+      ).catch((error: unknown) => {
+        request.log.error({ err: error, where: 'notify:campaign' }, 'best-effort step failed');
+      });
+    }
     return { status };
+  });
+
+  // Campanhas para a revisão financeira: as denunciadas primeiro, com os números do livro-caixa.
+  app.get('/admin/v1/campaigns', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'campaigns.review');
+    const query = parse(campaignListSchema, request.query ?? {});
+    const where =
+      query.filter === 'reported'
+        ? `EXISTS (SELECT 1 FROM reports r WHERE r.target_type = 'campaign'
+             AND r.target_id = c.id AND r.status = 'open')`
+        : query.filter === 'active'
+          ? `c.status = 'active'`
+          : query.filter === 'suspended'
+            ? `c.status = 'suspended'`
+            : 'true';
+    const result = await pool.query<{
+      id: string;
+      title: string;
+      status: string;
+      goal_cents: number;
+      deadline: string;
+      created_at: Date;
+      owner_handle: string;
+      owner_name: string;
+      raised: string;
+      spent: string;
+      pending: number;
+      open_reports: number;
+    }>(
+      `SELECT c.id, c.title, c.status, c.goal_cents, to_char(c.deadline, 'YYYY-MM-DD') AS deadline,
+              c.created_at, u.handle AS owner_handle, u.name AS owner_name,
+              COALESCE(sum(e.amount_cents) FILTER (WHERE e.kind = 'donation' AND e.status = 'confirmed'), 0)::text AS raised,
+              COALESCE(sum(e.amount_cents) FILTER (WHERE e.kind = 'expense' AND e.status = 'confirmed'), 0)::text AS spent,
+              count(e.id) FILTER (WHERE e.status = 'pending')::int AS pending,
+              (SELECT count(*)::int FROM reports r WHERE r.target_type = 'campaign'
+                AND r.target_id = c.id AND r.status = 'open') AS open_reports
+       FROM campaigns c
+       JOIN users u ON u.id = c.owner_id
+       LEFT JOIN campaign_entries e ON e.campaign_id = c.id
+       WHERE ${where}
+       GROUP BY c.id, u.id
+       ORDER BY open_reports DESC, c.updated_at DESC
+       LIMIT 100`,
+    );
+    return {
+      campaigns: result.rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        goalCents: row.goal_cents,
+        goal: formatCents(row.goal_cents),
+        raisedCents: Number(row.raised),
+        spentCents: Number(row.spent),
+        pendingCount: row.pending,
+        openReports: row.open_reports,
+        deadline: row.deadline,
+        ownerHandle: row.owner_handle,
+        ownerName: row.owner_name,
+        createdAt: row.created_at.toISOString(),
+      })),
+    };
+  });
+
+  app.post('/admin/v1/campaigns/:id/status', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'campaigns.review');
+    const id = parse(idSchema, request.params).id;
+    const body = parse(campaignStatusSchema, request.body);
+    const client = await pool.connect();
+    let changed: Awaited<ReturnType<typeof setCampaignSuspended>> = null;
+    try {
+      await client.query('BEGIN');
+      changed = await setCampaignSuspended(client, {
+        campaignId: id,
+        actorId: session.user_id,
+        suspended: body.suspended,
+        reason: body.justification,
+      });
+      if (!changed) throw new HttpError(404, 'Campanha não encontrada.');
+      if (changed.changed) {
+        await writeAudit(client, {
+          actorId: session.user_id,
+          action: body.suspended ? 'campaign.suspend' : 'campaign.reinstate',
+          targetType: 'campaign',
+          targetId: id,
+          before: { suspended: !body.suspended },
+          after: { suspended: body.suspended, justification: body.justification },
+          ...trail(request),
+        });
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    if (changed.changed) {
+      await notifyCampaignSuspension(pool, env, id, changed.ownerId, body.suspended).catch(
+        (error: unknown) => {
+          request.log.error({ err: error, where: 'notify:campaign' }, 'best-effort step failed');
+        },
+      );
+    }
+    return { suspended: body.suspended, changed: changed.changed };
   });
 
   app.get('/admin/v1/verifications', async (request) => {
