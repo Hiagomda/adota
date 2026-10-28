@@ -127,7 +127,9 @@ export default function NgoSignupScreen() {
             title="Divulgar uma feira"
             icon="calendar"
             variant="outline"
-            onPress={() => router.push('/feiras/nova')}
+            onPress={() =>
+              router.push({ pathname: '/agenda/novo', params: { categoria: 'adoption_fair' } })
+            }
           />
         </View>
       </Card>
