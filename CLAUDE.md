@@ -158,7 +158,7 @@ download/                     página de download servida pelo container `downlo
 
 ## Armadilhas conhecidas
 
-- O release Android usa a keystore de debug do PC de build. Se ela mudar, quem já instalou não consegue atualizar ("app não instalado").
+- O release Android usa a keystore de debug do PC de build. Se ela mudar, quem já instalou não consegue atualizar ("app não instalado"). Para a troca: o primeiro build com a chave nova leva `"reinstall": true` no `apps/mobile/version.json` (o `--publish` copia para `download/version.json`), e os apps a partir do build 36 mostram "Instale o aplicativo de novo" em vez de baixar por cima. A chave nova e o passo a passo ficaram com o Hiago (fora do repositório).
 - `usesCleartextTraffic` está ligado porque API, MinIO e imgproxy são HTTP. O token Firebase trafega sem TLS até haver domínio com HTTPS.
 - O Traefik do Coolify responde "404 page not found" ou "no available server" quando o container está unhealthy ou parado, não só quando a rota não existe.
 - Typed routes: rotas novas só existem para o `tsc` depois de regenerar `.expo/types`.

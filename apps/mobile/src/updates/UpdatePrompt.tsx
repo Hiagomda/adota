@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, ScrollView, StyleSheet, View } from 'react-native';
-import { AppModal, AppText, Button } from '../components/ui';
+import { ActivityIndicator, AppState, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { AppModal, AppText, Button, Notice } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { spacing, useTheme } from '../theme';
+import { pendingOutboxCount } from '../place/outbox';
 import {
   checkForAppUpdate,
+  downloadPageUrl,
   startStartupUpdateCheck,
   type AppUpdateOffer,
 } from './checkForAppUpdate';
@@ -82,6 +84,10 @@ export function UpdatePrompt() {
     }
   }
 
+  if (prompt.phase === 'ask' && prompt.offer.reinstall) {
+    return <ReinstallPrompt offer={prompt.offer} onClose={dismiss} />;
+  }
+
   const visible = prompt.phase !== 'hidden';
   const offer = prompt.phase === 'hidden' ? null : prompt.offer;
   const busy = prompt.phase === 'downloading';
@@ -146,6 +152,74 @@ export function UpdatePrompt() {
           <Button title="Agora não" variant="ghost" fullWidth onPress={dismiss} />
         </View>
       )}
+    </AppModal>
+  );
+}
+
+/**
+ * Versão assinada com a chave nova. O instalador recusaria por cima ("app não instalado"), então
+ * em vez de baixar aqui o app explica a reinstalação e abre a página de download no navegador.
+ */
+function ReinstallPrompt({ offer, onClose }: { offer: AppUpdateOffer; onClose: () => void }) {
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    pendingOutboxCount()
+      .then((count) => {
+        if (alive) setPending(count);
+      })
+      .catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'update:reinstall-outbox' });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return (
+    <AppModal visible onClose={onClose} title="Instale o aplicativo de novo">
+      <AppText color="textSecondary">
+        {`A versão ${offer.version} veio com uma assinatura nova e mais segura. Desta vez o Android não atualiza por cima: é preciso desinstalar e instalar de novo, uma vez só.`}
+      </AppText>
+      <View style={styles.notes}>
+        <AppText variant="bodyStrong">Como fazer</AppText>
+        <AppText variant="caption" color="textSecondary">
+          1. Toque em “Abrir página de download” e baixe o aplicativo.
+        </AppText>
+        <AppText variant="caption" color="textSecondary">
+          2. Desinstale o Égua, adota! que está no celular.
+        </AppText>
+        <AppText variant="caption" color="textSecondary">
+          3. Abra o arquivo baixado e entre com a mesma conta.
+        </AppText>
+      </View>
+      <AppText variant="caption" color="textSecondary">
+        Sua conta, seus resgates e suas conversas ficam guardados no servidor.
+      </AppText>
+      {pending > 0 ? (
+        <Notice
+          tone="warning"
+          message={
+            pending === 1
+              ? 'Tem 1 resgate esperando internet neste celular. Espere ele ser enviado antes de desinstalar, senão ele se perde.'
+              : `Tem ${pending} resgates esperando internet neste celular. Espere eles serem enviados antes de desinstalar, senão eles se perdem.`
+          }
+        />
+      ) : null}
+      <View style={styles.actions}>
+        <Button
+          title="Abrir página de download"
+          variant="secondary"
+          fullWidth
+          onPress={() => {
+            void Linking.openURL(downloadPageUrl).catch((error: unknown) => {
+              reportError(error, { source: 'handled', where: 'update:reinstall-open' });
+            });
+          }}
+        />
+        <Button title="Agora não" variant="ghost" fullWidth onPress={onClose} />
+      </View>
     </AppModal>
   );
 }
