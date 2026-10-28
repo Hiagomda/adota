@@ -1,5 +1,5 @@
 FROM nginx:1.27-alpine
-ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-35/egua-adota.apk
+ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-36/egua-adota.apk
 # Vira /etc/nginx/conf.d/default.conf no entrypoint, com o host público do MinIO preenchido.
 COPY docker/download-nginx.conf /etc/nginx/templates/default.conf.template
 COPY docker/download-security-headers.conf /etc/nginx/snippets/security-headers.conf
