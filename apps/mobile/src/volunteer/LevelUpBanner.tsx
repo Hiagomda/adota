@@ -48,11 +48,13 @@ function Ribbon({ index, color }: { index: number; color: string }) {
 
 export interface LevelUpBannerProps {
   levelName: string;
+  /** Nomes do que o nível novo liberou no armário do Cupu. */
+  unlocks?: string[];
   onClose: () => void;
 }
 
 /** Shown once on "Sua rede" when the person reached a new level since the last visit. */
-export function LevelUpBanner({ levelName, onClose }: LevelUpBannerProps) {
+export function LevelUpBanner({ levelName, unlocks = [], onClose }: LevelUpBannerProps) {
   const { colors } = useTheme();
   const duration = useMotionDuration();
   // Starts at 1 so the burst plays as soon as the banner appears.
@@ -81,6 +83,11 @@ export function LevelUpBanner({ levelName, onClose }: LevelUpBannerProps) {
           <View style={styles.text}>
             <AppText variant="h3">Subiu de nível!</AppText>
             <AppText color="textSecondary">Agora você é {levelName}. Égua, que orgulho!</AppText>
+            {unlocks.length > 0 ? (
+              <AppText variant="bodySmall" color="textSecondary">
+                Liberou pro Cupu: {unlocks.join(', ')}.
+              </AppText>
+            ) : null}
             <Button title="Valeu!" variant="ghost" onPress={onClose} style={styles.close} />
           </View>
         </View>

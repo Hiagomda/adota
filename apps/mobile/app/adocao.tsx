@@ -32,6 +32,7 @@ import {
 import { ageBandOf, ageBands, careKeys, careQuestion, type CareKey } from '../src/post/care';
 import { animalHeadline, placeOf } from '../src/animalLabels';
 import { waitingShort } from '../src/post/waiting';
+import { CupuTip } from '../src/cupu/CupuTip';
 import { useSession } from '../src/session';
 import { screenColumn, size, spacing, useTheme } from '../src/theme';
 import type { Post } from '../src/types';
@@ -261,20 +262,19 @@ export default function AdoptionScreen() {
             }}
             onEndReachedThreshold={0.6}
             ListHeaderComponent={
-              showHero || waitingRow ? (
-                <>
-                  {showHero ? (
-                    <View style={styles.hero}>
-                      <HeroCarousel
-                        slides={heroSlides}
-                        actionLabel="Quero conhecer"
-                        onOpen={(id) => router.push(`/post/${id}`)}
-                      />
-                    </View>
-                  ) : null}
-                  {waitingRow}
-                </>
-              ) : null
+              <>
+                <CupuTip context="adoption" style={styles.tip} />
+                {showHero ? (
+                  <View style={styles.hero}>
+                    <HeroCarousel
+                      slides={heroSlides}
+                      actionLabel="Quero conhecer"
+                      onOpen={(id) => router.push(`/post/${id}`)}
+                    />
+                  </View>
+                ) : null}
+                {waitingRow}
+              </>
             }
             ListEmptyComponent={
               <EmptyState
@@ -386,6 +386,7 @@ const styles = StyleSheet.create({
   column: { flex: 1, ...screenColumn },
   shelf: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  tip: { paddingHorizontal: spacing.xs, paddingBottom: spacing.md },
   // Uma rolagem horizontal numa coluna cresce até ocupar tudo, a menos que se diga o contrário.
   chipRow: { flexGrow: 0 },
   chips: {

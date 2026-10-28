@@ -126,6 +126,7 @@ apps/api/src/adoptionChat.ts  conversa de adoção
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
+apps/api/src/cupu.ts          armário do Cupu: pose, cenário e enfeite liberados por XP, nível e selos (catálogo em packages/shared/src/cupu.ts)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)
@@ -133,6 +134,7 @@ apps/mobile/src/theme/        tokens de cor, espaçamento, tipografia, claro/esc
 apps/mobile/src/map/          MapCanvas + cameraPolicy (testada)
 apps/mobile/src/place/        GPS, PlacePicker, upload e fila offline de publicação
 apps/mobile/src/crash/        reporter, ErrorBoundary, tela de erro
+apps/mobile/src/cupu/         mascote interativo (Cupu.tsx), cenários/enfeites em SVG, dicas, comemorações e apresentação
 download/                     página de download servida pelo container `download`
 ```
 

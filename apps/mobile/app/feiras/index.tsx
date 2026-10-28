@@ -17,6 +17,7 @@ import {
 import { FairCard } from '../../src/events/FairCard';
 import type { AdoptionFair } from '../../src/events/fairs';
 import { useFairs } from '../../src/events/useFairs';
+import { CupuTip } from '../../src/cupu/CupuTip';
 import { useSession } from '../../src/session';
 import { screenColumn, spacing, useTheme } from '../../src/theme';
 
@@ -61,6 +62,7 @@ export default function FairsScreen() {
             Encontros para conhecer os animais pessoalmente. Quem divulga é ONG ou protetor com
             perfil verificado, e a adoção é sempre gratuita.
           </AppText>
+          <CupuTip context="fairs" style={styles.tip} />
           {fairs.data?.canCreate ? (
             <View style={styles.create}>
               <Button
@@ -126,6 +128,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,
   intro: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  tip: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   create: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   list: { paddingHorizontal: spacing.lg, gap: spacing.md },
 });

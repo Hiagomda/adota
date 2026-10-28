@@ -8,6 +8,7 @@ import { reportError } from '../src/crash/reporter';
 import {
   AppText,
   Badge,
+  Button,
   Card,
   Chip,
   Header,
@@ -18,6 +19,10 @@ import {
   Skeleton,
   Switch,
 } from '../src/components/ui';
+import { levelUnlocks } from '../src/cupu/catalog';
+import { Cupu } from '../src/cupu/Cupu';
+import { CupuTip } from '../src/cupu/CupuTip';
+import { useCupuStatus, type CupuStatus } from '../src/cupu/useCupu';
 import { useSession } from '../src/session';
 import { radius, screenColumn, size, spacing, useTheme } from '../src/theme';
 import { useVolunteerAvailability } from '../src/volunteer/availability';
@@ -38,6 +43,7 @@ const dayChoices = [3, 7, 15, 30];
 // Three seals per row, leaving room for the gaps.
 const SEAL_COLUMN_WIDTH = '29%';
 const SEAL_SKELETON = 80;
+const CUPU_CARD = 96;
 /** The ranking moves slowly: once every few minutes is enough. */
 const RANKING_STALE_MS = 5 * 60 * 1000;
 
@@ -60,7 +66,8 @@ export default function VolunteerScreen() {
     sync(status.data.settings.isFosterAvailable);
   }, [status.data, sync]);
 
-  const [newLevel, setNewLevel] = useState<string | null>(null);
+  const [newLevel, setNewLevel] = useState<{ name: string; unlocks: string[] } | null>(null);
+  const cupu = useCupuStatus();
   const levelFloor = status.data?.level.floor;
   const levelName = status.data?.level.name;
   useEffect(() => {
@@ -70,7 +77,12 @@ export default function VolunteerScreen() {
       .then(async (seen) => {
         // Leaving before this point keeps the old floor, so the party waits for the next visit.
         if (!active) return;
-        if (leveledUp(seen, levelFloor)) setNewLevel(levelName);
+        if (seen !== null && leveledUp(seen, levelFloor)) {
+          // O que o novo nível liberou no armário do Cupu (os selos aparecem na grade abaixo).
+          await client.invalidateQueries({ queryKey: ['cupu'] });
+          const items = client.getQueryData<CupuStatus>(['cupu', token])?.items ?? [];
+          setNewLevel({ name: levelName, unlocks: levelUnlocks(items, seen, levelFloor) });
+        }
         await writeSeenFloor(levelFloor);
       })
       .catch((error: unknown) => {
@@ -79,7 +91,7 @@ export default function VolunteerScreen() {
     return () => {
       active = false;
     };
-  }, [levelFloor, levelName]);
+  }, [client, levelFloor, levelName, token]);
 
   const ranking = useQuery({
     queryKey: ['neighborhoods'],
@@ -157,6 +169,7 @@ export default function VolunteerScreen() {
             <AppText color="textSecondary">
               Cada ajuda na rua fica marcada aqui. Sem pressa, no seu ritmo.
             </AppText>
+            <CupuTip context="network" />
             {!token ? (
               <Notice message="Entre na sua conta para guardar o que você já fez." />
             ) : null}
@@ -168,7 +181,11 @@ export default function VolunteerScreen() {
               />
             ) : null}
             {newLevel ? (
-              <LevelUpBanner levelName={newLevel} onClose={() => setNewLevel(null)} />
+              <LevelUpBanner
+                levelName={newLevel.name}
+                unlocks={newLevel.unlocks}
+                onClose={() => setNewLevel(null)}
+              />
             ) : null}
             <Card elevation="md">
               {status.isLoading ? (
@@ -189,6 +206,27 @@ export default function VolunteerScreen() {
                 </View>
               )}
             </Card>
+            {token ? (
+              <Card>
+                <View style={styles.row}>
+                  <Cupu size={CUPU_CARD} interactive />
+                  <View style={styles.cupuText}>
+                    <AppText variant="h3">Armário do Cupu</AppText>
+                    <AppText variant="bodySmall" color="textSecondary">
+                      {cupu.data
+                        ? `${cupu.data.items.filter((item) => item.unlocked).length} de ${cupu.data.items.length} poses, cenários e enfeites liberados.`
+                        : 'Poses, cenários e enfeites que você libera ajudando.'}
+                    </AppText>
+                    <Button
+                      title="Arrumar o Cupu"
+                      icon="smile"
+                      variant="outline"
+                      onPress={() => router.push('/cupu')}
+                    />
+                  </View>
+                </View>
+              </Card>
+            ) : null}
             <Card>
               <View style={styles.row}>
                 <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
@@ -337,6 +375,7 @@ const styles = StyleSheet.create({
   levelBox: { gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowText: { flex: 1 },
+  cupuText: { flex: 1, gap: spacing.sm, alignItems: 'flex-start' },
   rowIcon: {
     width: size.avatar.lg,
     height: size.avatar.lg,

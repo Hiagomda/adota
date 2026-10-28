@@ -300,6 +300,7 @@ const personalTables = [
   'volunteer_profiles',
   'user_xp_history',
   'user_badges',
+  'cupu_styles',
   'post_follows',
   'sightings',
   'likes',
