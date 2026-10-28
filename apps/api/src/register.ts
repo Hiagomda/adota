@@ -54,6 +54,7 @@ import {
 import { assertOwnedMedia } from './mediaPolicy.js';
 import {
   enqueueHelperCheck,
+  enqueueHelperExpiry,
   enqueueRescueAlert,
   notifyComment,
   notifyDiaryNote,
@@ -426,6 +427,7 @@ export async function registerRoutes(
     await addResponse(pool, id, user, body.kind, body.note);
     if (body.kind === 'will_help') {
       await enqueueHelperCheck(queue, id, user.id).catch(bestEffort(request, 'queue:help-check'));
+      await enqueueHelperExpiry(queue, id, user.id).catch(bestEffort(request, 'queue:help-expire'));
     }
     return reply.code(201).send({ ok: true });
   });

@@ -224,7 +224,7 @@ export default function PostScreen() {
       setHelpOpen(false);
       setHelpBurst((count) => count + 1);
       setNote(
-        'Combinado. O ponto exato deste resgate fica visível para você. O WhatsApp só aparece se a pessoa autorizou.',
+        'Combinado. O ponto exato deste resgate fica visível para você. Sem notícia sua em 12 horas, ele volta a aparecer para outras pessoas.',
       );
     } catch (error) {
       setHelpOpen(false);
