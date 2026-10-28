@@ -126,6 +126,7 @@ apps/api/src/adoptionChat.ts  conversa de adoção
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
+apps/api/src/events.ts        agenda de eventos e mutirões (as feiras são a categoria adoption_fair); lembretes em eventReminders.ts
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)
@@ -142,6 +143,7 @@ download/                     página de download servida pelo container `downlo
 - Sem Cloudflare, CDN, proxy ou R2. As fotos ficam no MinIO da VPS e são servidas pelo imgproxy. Variáveis `R2_*` que sobraram são ignoradas.
 - Identidade "calor de casa paraense": turquesa `#1F7A7A`, coral `#F26B4E`, caramelo `#D98A3D`, fundo creme `#FFF8EE`, Baloo 2 nos títulos e Nunito no corpo. Mascote: vira-lata caramelo com coleira turquesa e plaquinha de patinha coral. Textura de fundo com ossinho e peixinho (`PetPattern`); o Hiago tirou o marajoara quadriculado. Detalhes de Belém (fitinha do Círio, mangueira). Use sempre os tokens de `src/theme`, nunca hex solto. Branco sobre coral não passa contraste, então superfície coral usa texto escuro.
 - Mapa: a câmera centraliza na pessoa uma única vez e depois é dela. Nada recentraliza sozinho e não existe modo seguir (ele ficava ligado e puxava o mapa). "Minha localização" centraliza uma vez por toque; qualquer toque no mapa entrega a câmera à pessoa. Não existe botão "Buscar nesta área": quando o mapa para (movimento do app ou gesto da pessoa), a área visível carrega sozinha. O Hiago removeu o botão; não traga de volta.
+- Agenda: tudo no fuso `America/Belem`. Vagas e fila de espera são decididas no servidor com o evento travado (`FOR UPDATE`). Lembretes saem de uma varredura a cada 10 min (fila BullMQ `event-reminders`), não de um job por evento; `event_reminders` impede lembrete repetido. Evento de quem não tem selo espera a equipe (painel do AdotaSite, tela Eventos); feira e arrecadação só com selo. `/adoption-events` continua para APKs antigos e mostra só feiras publicadas.
 - Admin do dono: o e-mail em `OWNER_EMAILS` vira admin só com `email_verified` do Firebase.
 
 ## Regras
