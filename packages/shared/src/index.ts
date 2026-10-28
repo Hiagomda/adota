@@ -79,3 +79,16 @@ export {
   type HealthRecordInput,
   type HealthVisibility,
 } from './passport.js';
+export {
+  fosterHomeSettingsSchema,
+  fosterOfferSchema,
+  fosterRequestSchema,
+  fosterSizeSchema,
+  fosterStayActionSchema,
+  fosterStayTransition,
+  freeSlots,
+  type FosterHomeSettingsInput,
+  type FosterRequestInput,
+  type FosterStayAction,
+  type FosterStayStatus,
+} from './fosterHome.js';

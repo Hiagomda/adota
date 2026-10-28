@@ -273,6 +273,20 @@ export async function anonymizeUser(pool: Pool, userId: string): Promise<string 
     for (const table of personalTables) {
       await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
     }
+    // Acolhimentos abertos terminam junto com a conta; o recado escrito por ela sai.
+    await client.query(
+      `UPDATE foster_stays SET status = 'cancelled', ended_at = now(), closed_by = $1
+       WHERE (foster_id = $1 OR requested_by = $1) AND status IN ('requested', 'approved')`,
+      [userId],
+    );
+    await client.query(
+      `UPDATE foster_stays SET message = 'Mensagem apagada.' WHERE requested_by = $1`,
+      [userId],
+    );
+    await client.query(
+      `UPDATE animal_custody SET ended_at = now() WHERE user_id = $1 AND ended_at IS NULL`,
+      [userId],
+    );
     await client.query(`DELETE FROM follows WHERE follower_id = $1 OR followed_id = $1`, [userId]);
     await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
     await client.query(`UPDATE posts SET hidden = true WHERE author_id = $1`, [userId]);

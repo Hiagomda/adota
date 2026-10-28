@@ -54,6 +54,7 @@ import { journeyOf } from '../../src/post/journey';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
+import { FosterHomesSection } from '../../src/fosterHome/FosterHomesSection';
 import { postLinkFor, sharePost } from '../../src/post/sharePost';
 import { PostEditor } from '../../src/post/PostEditor';
 import { AdoptionInterestSheet } from '../../src/post/AdoptionInterestSheet';
@@ -144,13 +145,6 @@ export default function PostScreen() {
     queryKey: ['comments', id],
     queryFn: () => api<{ comments: Comment[] }>(`/posts/${id}/comments`, { token }),
     enabled: Boolean(id),
-  });
-  const fosters = useQuery({
-    // The server lists Casas Amigas only to the author, the team and who said "vou ajudar",
-    // without address or distance: the meeting is arranged on WhatsApp.
-    queryKey: ['foster-homes', id, token],
-    queryFn: () => api<{ homes: FosterHome[] }>(`/posts/${id}/foster-homes`, { token }),
-    enabled: Boolean(id && token),
   });
   const whatsapp = useWhatsAppContact(token, setNote);
   const sightings = useQuery({
@@ -295,7 +289,6 @@ export default function PostScreen() {
   const interestList = interests.data?.interests ?? [];
   const sightingList = sightings.data?.sightings ?? [];
   const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
-  const fosterList = fosters.data?.homes ?? [];
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
   const speciesName = speciesLabel[item.animal.species] ?? 'bichinho';
   const animalLines = [
@@ -490,7 +483,7 @@ export default function PostScreen() {
     );
   }
 
-  function talkToFosterHome(home: FosterHome) {
+  function talkToFosterHome(home: { id: string; name: string }) {
     if (!item) return;
     const first = home.name.split(' ')[0] ?? home.name;
     void whatsapp.open(
@@ -905,30 +898,14 @@ export default function PostScreen() {
             ) : null}
 
             {/* Casa Amiga serve a quem ainda procura onde o animal fica: não a perdido, que tem
-                família, nem depois que ele já tem lar temporário ou família. */}
-            {fosterList.length > 0 && !lost && (rescueOpen || item.status === 'rescued') ? (
-              <View style={styles.section}>
-                <AppText variant="h2">Casas Amigas</AppText>
-                <AppText color="textSecondary">
-                  Combine pelo WhatsApp. Encontro e endereço vocês acertam por lá.
-                </AppText>
-                <Card padding="none" elevation="md">
-                  {fosterList.map((home, index) => (
-                    <View key={home.id}>
-                      {index > 0 ? <Divider inset /> : null}
-                      <ListItem
-                        title={home.name}
-                        subtitle={
-                          home.maxDays ? `Acolhe por até ${home.maxDays} dias` : 'Lar temporário'
-                        }
-                        icon="home"
-                        showChevron
-                        onPress={() => talkToFosterHome(home)}
-                      />
-                    </View>
-                  ))}
-                </Card>
-              </View>
+                família, nem depois da adoção. O servidor diz se ainda cabe pedido. */}
+            {!lost && item.status !== 'adopted' ? (
+              <FosterHomesSection
+                postId={item.id}
+                token={token}
+                onTalk={talkToFosterHome}
+                onMessage={setNote}
+              />
             ) : null}
 
             {rescueOpen || sightingList.length > 0 ? (
@@ -1552,12 +1529,6 @@ interface Sighting {
   createdAt: string;
   author: { name: string; handle: string };
   location: { latitude: number; longitude: number; exact: boolean };
-}
-
-interface FosterHome {
-  id: string;
-  name: string;
-  maxDays: number | null;
 }
 
 /** "Publicado há 2 horas por Ana", logo abaixo do título. */

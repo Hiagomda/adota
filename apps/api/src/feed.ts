@@ -474,6 +474,7 @@ async function applyStatus(
   animalId: string,
   status: AnimalStatus,
   type?: string,
+  fosterUserId?: string | null,
 ) {
   const before = await db.query<{ status: AnimalStatus }>(
     'SELECT status FROM posts WHERE id = $1',
@@ -483,7 +484,7 @@ async function applyStatus(
   // Perdido que volta para casa não muda de guarda: ele sempre foi do tutor.
   const previous = before.rows[0]?.status;
   if (previous && type !== 'lost') {
-    await recordCustody(db, animalId, postId, userId, previous, status);
+    await recordCustody(db, animalId, postId, userId, previous, status, { fosterUserId });
   }
   await db.query(
     "UPDATE animals SET status = $2, current_owner_id = CASE WHEN $2 = 'adopted' THEN $3 ELSE current_owner_id END WHERE id = $1",
@@ -500,6 +501,49 @@ async function applyStatus(
       status,
     ],
   );
+}
+
+/**
+ * A Casa Amiga aceitou o acolhimento: o resgate vai para "lar temporário" se as regras de status
+ * deixam quem pediu fazer essa mudança. Senão (perdido, já adotado, ou quem pediu só ia ajudar e
+ * o alerta ainda está aberto) o status fica, e só a guarda registra a casa. Roda na transação do
+ * aceite e devolve se o status mudou, para avisar quem acompanha.
+ */
+export async function moveToFosterHome(
+  client: PoolClient,
+  postId: string,
+  requester: Pick<SessionUser, 'id' | 'role'>,
+  fosterUserId: string,
+): Promise<boolean> {
+  const post = await lockRescue(client, postId);
+  const owner = requester.id === post.author_id || isOperator(requester.role);
+  const allowed =
+    post.type !== 'lost' &&
+    canTransitionStatus(post.status, 'fostered') &&
+    (owner || !ownerOnlyStatus(post.status, 'fostered')) &&
+    (owner || (await canChange(client, post.author_id, postId, requester)));
+  if (allowed) {
+    await applyStatus(
+      client,
+      postId,
+      requester.id,
+      post.animal_id,
+      'fostered',
+      post.type,
+      fosterUserId,
+    );
+    return true;
+  }
+  await client.query(
+    `INSERT INTO animal_custody (animal_id, kind, user_id, post_id)
+     SELECT $1, 'foster', $2, $3
+     WHERE NOT EXISTS (
+       SELECT 1 FROM animal_custody
+       WHERE animal_id = $1 AND kind = 'foster' AND user_id = $2 AND ended_at IS NULL
+     )`,
+    [post.animal_id, fosterUserId, postId],
+  );
+  return false;
 }
 
 export async function updatePost(
@@ -928,7 +972,7 @@ async function canChange(
   pool: Pool | PoolClient,
   authorId: string,
   postId: string,
-  user: SessionUser,
+  user: Pick<SessionUser, 'id' | 'role'>,
 ): Promise<boolean> {
   if (isOperator(user.role) || user.id === authorId) return true;
   const help = await pool.query(

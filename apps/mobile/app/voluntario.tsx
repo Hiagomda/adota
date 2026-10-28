@@ -8,6 +8,7 @@ import { reportError } from '../src/crash/reporter';
 import {
   AppText,
   Badge,
+  Button,
   Card,
   Chip,
   Header,
@@ -197,7 +198,7 @@ export default function VolunteerScreen() {
                 <View style={styles.rowText}>
                   <Switch
                     label="Oferecer lar temporário"
-                    description="Um canto em casa por alguns dias. Endereço e encontro você combina pelo WhatsApp."
+                    description="Um canto em casa por alguns dias. Seu endereço nunca aparece: o encontro vocês combinam depois do aceite."
                     value={foster}
                     disabled={!ready}
                     onValueChange={(value) =>
@@ -215,11 +216,18 @@ export default function VolunteerScreen() {
             </Card>
             {foster && me.data && !reachable ? (
               <Notice
-                tone="warning"
-                message="Quem resgata fala com a Casa Amiga pelo WhatsApp. Salve seu número e ligue Mostrar meu WhatsApp em Ajustes."
+                tone="info"
+                message="Os pedidos de acolhimento chegam pelo app. Para também combinar pelo WhatsApp, salve seu número e ligue Mostrar meu WhatsApp em Ajustes."
                 action={{ label: 'Abrir Ajustes', onPress: () => router.push('/settings') }}
               />
             ) : null}
+            <Button
+              title={foster ? 'Vagas, portes e pedidos da Casa Amiga' : 'Abrir minha Casa Amiga'}
+              icon="home"
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/casa-amiga')}
+            />
             {foster ? (
               <>
                 <View style={styles.block}>
