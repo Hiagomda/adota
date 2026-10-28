@@ -150,8 +150,29 @@ services:
     restart: unless-stopped
     mem_limit: 64m
 
+  # Backup diário do banco (14 dias) e cópia das fotos, num volume separado na mesma VPS.
+  # Protege contra apagar algo por engano ou corromper um volume; não protege se a VPS sumir.
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup.Dockerfile
+    environment:
+      PGPASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      BACKUP_KEEP_DAYS: '14'
+      # 6h UTC = 3h em Belém.
+      BACKUP_HOUR_UTC: '6'
+    volumes:
+      - backups:/backups
+      - minio:/minio:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 128m
+
 volumes:
   postgres:
   minio:
   apk:
   imgcache:
+  backups:
