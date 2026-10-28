@@ -2,6 +2,7 @@ import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 import type { Env } from './config.js';
+import { releaseStaleHelper } from './feed.js';
 import { ensureFirebaseApp } from './firebaseAdmin.js';
 import { rowsOf } from './session.js';
 
@@ -17,6 +18,9 @@ interface RescueJob {
 /** How long after "vou ajudar" the app asks how it went. */
 export const HELP_CHECK_DELAY_MS = 3 * 60 * 60 * 1000;
 
+/** Sem notícia de quem ia ajudar depois disso, o resgate volta a aparecer para outras pessoas. */
+export const HELP_EXPIRE_DELAY_MS = 12 * 60 * 60 * 1000;
+
 export function createQueue(redis: Redis): Queue<RescueJob> {
   return new Queue<RescueJob>(queueName, { connection: redis as unknown as ConnectionOptions });
 }
@@ -31,6 +35,10 @@ export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJo
       }
       if (job.name === 'help-check') {
         if (job.data.userId) await remindHelper(pool, env, job.data.postId, job.data.userId);
+        return;
+      }
+      if (job.name === 'help-expire') {
+        if (job.data.userId) await releaseHelper(pool, env, job.data.postId, job.data.userId);
         return;
       }
       await dispatchRescueAlert(pool, env, job.data.postId, job.data.expanded ? 1.5 : 1);
@@ -73,6 +81,94 @@ export async function enqueueHelperCheck(
       removeOnFail: 100,
     },
   );
+}
+
+/**
+ * Agenda a saída automática de quem disse "vou ajudar" e sumiu. O id leva a hora para que dizer
+ * "vou ajudar" de novo agende outro job; o antigo encontra a resposta nova e não faz nada.
+ */
+export async function enqueueHelperExpiry(
+  queue: Queue<RescueJob>,
+  postId: string,
+  userId: string,
+): Promise<void> {
+  await queue.add(
+    'help-expire',
+    { postId, userId },
+    {
+      delay: HELP_EXPIRE_DELAY_MS,
+      jobId: `help-expire-${postId}-${userId}-${Date.now()}`,
+      removeOnComplete: true,
+      removeOnFail: 100,
+    },
+  );
+}
+
+/** Tira quem sumiu do resgate e avisa essa pessoa e quem publicou. */
+export async function releaseHelper(
+  pool: Pool,
+  env: Env,
+  postId: string,
+  userId: string,
+): Promise<boolean> {
+  const result = await releaseStaleHelper(pool, postId, userId, HELP_EXPIRE_DELAY_MS);
+  if (!result.released) return false;
+  const place = result.approxLabel || 'perto de você';
+  await notifyUser(
+    pool,
+    env,
+    userId,
+    'help_released',
+    postId,
+    'Liberamos o resgate',
+    `Como não teve notícia, o resgate em ${place} voltou a aparecer para outras pessoas. Se você ainda está indo, toque em Eu vou ajudar de novo.`,
+  );
+  if (result.reopened && result.authorId && result.authorId !== userId) {
+    await notifyUser(
+      pool,
+      env,
+      result.authorId,
+      'help_released',
+      postId,
+      'Seu resgate está aberto de novo',
+      `Quem ia ajudar em ${place} não deu notícia em 12 horas, então o resgate voltou a aparecer para outras pessoas. Se o animal já está seguro, atualize o status.`,
+    );
+  }
+  return true;
+}
+
+/** Notificação no app e, fora do horário de silêncio, push. */
+async function notifyUser(
+  pool: Pool,
+  env: Env,
+  userId: string,
+  type: string,
+  postId: string,
+  title: string,
+  body: string,
+): Promise<void> {
+  const found = await pool.query<{
+    fcm_tokens: string[];
+    quiet_hours_start: number | null;
+    quiet_hours_end: number | null;
+    notifications_enabled: boolean;
+  }>(
+    `SELECT fcm_tokens, quiet_hours_start, quiet_hours_end, notifications_enabled
+     FROM users WHERE id = $1 AND deleted_at IS NULL`,
+    [userId],
+  );
+  const target = found.rows[0];
+  if (!target) return;
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, payload) VALUES ($1, $2, $3::jsonb)`,
+    [userId, type, JSON.stringify({ postId, title, body })],
+  );
+  if (
+    target.notifications_enabled &&
+    !isQuiet(target.quiet_hours_start, target.quiet_hours_end, belemHour())
+  ) {
+    await sendPush(pool, env, target.fcm_tokens, title, body, postId);
+  }
 }
 
 /**

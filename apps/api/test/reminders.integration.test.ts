@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadEnv } from '../src/config.js';
-import { notifyStatusChange, remindHelper } from '../src/notify.js';
+import { notifyStatusChange, releaseHelper, remindHelper } from '../src/notify.js';
 import { migrate } from '../scripts/migrate.js';
 import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
@@ -78,6 +78,43 @@ describe('reminders', () => {
   afterAll(async () => {
     await app.close();
     await pool.end();
+  });
+
+  it('libera o resgate quando quem ia ajudar sumiu por 12 horas', async () => {
+    const { postId, helperId } = await rescueWithHelper();
+    await pool.query(
+      `UPDATE responses SET created_at = now() - interval '13 hours' WHERE post_id = $1`,
+      [postId],
+    );
+    expect(await releaseHelper(pool, env, postId, helperId)).toBe(true);
+    const post = await pool.query<{ status: string }>('SELECT status FROM posts WHERE id = $1', [
+      postId,
+    ]);
+    expect(post.rows[0]?.status).toBe('open');
+    const helpers = await pool.query(
+      `SELECT 1 FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
+      [postId],
+    );
+    expect(helpers.rowCount).toBe(0);
+    expect(await notices(helperId, 'help_released')).toHaveLength(1);
+    const author = await pool.query<{ author_id: string }>(
+      'SELECT author_id FROM posts WHERE id = $1',
+      [postId],
+    );
+    const authorNotices = await notices(author.rows[0]?.author_id ?? '', 'help_released');
+    expect(authorNotices[0]?.payload.title).toBe('Seu resgate está aberto de novo');
+  });
+
+  it('não tira quem disse "vou ajudar" há pouco nem resgate que já andou', async () => {
+    const { postId, helperId } = await rescueWithHelper();
+    expect(await releaseHelper(pool, env, postId, helperId)).toBe(false);
+    await pool.query(
+      `UPDATE responses SET created_at = now() - interval '13 hours' WHERE post_id = $1`,
+      [postId],
+    );
+    await pool.query(`UPDATE posts SET status = 'rescued' WHERE id = $1`, [postId]);
+    expect(await releaseHelper(pool, env, postId, helperId)).toBe(false);
+    expect(await notices(helperId, 'help_released')).toHaveLength(0);
   });
 
   it('asks a helper still on the way how it went', async () => {

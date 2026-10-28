@@ -669,6 +669,77 @@ export async function leaveHelp(
   }
 }
 
+/**
+ * Quem disse "vou ajudar" e não deu notícia depois de `maxAgeMs` sai do resgate. Se era a última
+ * pessoa a caminho, o resgate volta para aberto e aparece de novo para quem pode ir.
+ * Não faz nada se o resgate já andou, se a pessoa já saiu ou se ela disse "vou ajudar" de novo há
+ * pouco (o job antigo não pode tirar quem acabou de voltar).
+ */
+export async function releaseStaleHelper(
+  pool: Pool,
+  postId: string,
+  userId: string,
+  maxAgeMs: number,
+): Promise<{ released: boolean; reopened: boolean; authorId: string | null; approxLabel: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query<{
+      status: AnimalStatus;
+      animal_id: string;
+      author_id: string;
+      approx_label: string;
+    }>(
+      `SELECT status, animal_id, author_id, approx_label FROM posts
+       WHERE id = $1 AND parent_post_id IS NULL AND hidden = false
+       FOR UPDATE`,
+      [postId],
+    );
+    const post = current.rows[0];
+    const nothing = {
+      released: false,
+      reopened: false,
+      authorId: null,
+      approxLabel: post?.approx_label ?? '',
+    };
+    if (!post || post.status !== 'on_the_way') {
+      await client.query('ROLLBACK');
+      return nothing;
+    }
+    const mine = await client.query(
+      `DELETE FROM responses
+       WHERE post_id = $1 AND user_id = $2 AND kind = 'will_help'
+         AND created_at <= now() - make_interval(secs => $3::double precision)
+       RETURNING id`,
+      [postId, userId, maxAgeMs / 1000],
+    );
+    if ((mine.rowCount ?? 0) === 0) {
+      await client.query('ROLLBACK');
+      return nothing;
+    }
+    const left = await client.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
+      [postId],
+    );
+    const next = statusAfterLeavingHelp(post.status, 'could_not', left.rows[0]?.count ?? 0);
+    if (next && canTransitionStatus(post.status, next)) {
+      await applyStatus(client, postId, userId, post.animal_id, next);
+    }
+    await client.query('COMMIT');
+    return {
+      released: true,
+      reopened: next !== null,
+      authorId: post.author_id,
+      approxLabel: post.approx_label,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function addResponse(
   pool: Pool,
   postId: string,
