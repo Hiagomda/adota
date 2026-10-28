@@ -60,9 +60,15 @@ interface SightingRow {
 
 export function registerSightingRoutes(
   app: FastifyInstance,
-  deps: { env: Env; pool: Pool; writeLimit: { config: object } },
+  deps: {
+    env: Env;
+    pool: Pool;
+    writeLimit: { config: object };
+    /** Avisado depois de cada avistamento salvo (busca de perdidos). */
+    onSighting?: (postId: string) => Promise<void>;
+  },
 ): void {
-  const { env, pool, writeLimit } = deps;
+  const { env, pool, writeLimit, onSighting } = deps;
 
   app.post('/posts/:id/sightings', writeLimit, async (request, reply) => {
     const user = requireUser(request.user);
@@ -107,6 +113,9 @@ export function registerSightingRoutes(
     );
     await notifySighting(pool, env, id, user.id, label, note).catch((error: unknown) => {
       request.log.warn({ err: error }, 'sightings: notification failed');
+    });
+    await onSighting?.(id).catch((error: unknown) => {
+      request.log.warn({ err: error }, 'sightings: lost-match queue failed');
     });
     return reply.code(201).send({ id: inserted.rows[0]?.id });
   });

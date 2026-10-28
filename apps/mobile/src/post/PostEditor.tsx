@@ -6,6 +6,7 @@ import { uploadProfilePhoto } from '../place/publish';
 import { permissionOutcome } from '../permissions';
 import { radius, size, spacing } from '../theme';
 import { AppText, BottomSheet, Button, Chip, IconButton, Input } from '../components/ui';
+import { furColors, toggleFurColor, type FurColor } from '../lost/lostMatch';
 import { ageBandOf, ageBands, careKeys, careQuestion, type AgeBand, type AnimalCare } from './care';
 
 const MAX_PHOTOS = 5;
@@ -23,6 +24,8 @@ interface PostEditorProps {
   urgency: 'low' | 'medium' | 'high';
   ageEstimate: string | null;
   care: AnimalCare | undefined;
+  /** Cores do pelo. Undefined quando a API não mandou: aí o editor não mexe nelas. */
+  colors: string[] | undefined;
   photos: EditPhoto[];
   onClose: () => void;
   onSave: (body: {
@@ -31,6 +34,7 @@ interface PostEditorProps {
     urgency: 'low' | 'medium' | 'high';
     ageEstimate?: AgeBand;
     care: AnimalCare;
+    colors?: FurColor[];
     media: { url: string }[];
   }) => Promise<void>;
 }
@@ -49,6 +53,7 @@ export function PostEditor({
   urgency,
   ageEstimate,
   care,
+  colors,
   photos,
   onClose,
   onSave,
@@ -58,6 +63,9 @@ export function PostEditor({
   const [level, setLevel] = useState(urgency);
   const [age, setAge] = useState<AgeBand | null>(ageBandOf(ageEstimate));
   const [facts, setFacts] = useState<AnimalCare>(care ?? {});
+  const [furs, setFurs] = useState<FurColor[]>(() =>
+    furColors.map((item) => item.value).filter((value) => colors?.includes(value)),
+  );
   const [pictures, setPictures] = useState(photos);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,6 +116,7 @@ export function PostEditor({
         urgency: level,
         ...(age ? { ageEstimate: age } : {}),
         care: facts,
+        ...(colors !== undefined ? { colors: furs } : {}),
         media: pictures.map((photo) => ({ url: photo.key })),
       });
     } catch (caught) {
@@ -156,6 +165,24 @@ export function PostEditor({
             />
           ))}
         </View>
+        {colors !== undefined ? (
+          <>
+            <AppText variant="bodyStrong">Cores do pelo (até 3)</AppText>
+            <View style={styles.chips}>
+              {furColors.map((option) => (
+                <Chip
+                  key={option.value}
+                  label={option.label}
+                  selected={furs.includes(option.value)}
+                  onPress={() => setFurs((current) => toggleFurColor(current, option.value))}
+                />
+              ))}
+            </View>
+            <AppText variant="caption" color="textSecondary">
+              Ajuda a busca de perdidos a achar animais parecidos.
+            </AppText>
+          </>
+        ) : null}
         <AppText variant="bodyStrong">O que você já sabe</AppText>
         <View style={styles.chips}>
           {careKeys.map((key) => (

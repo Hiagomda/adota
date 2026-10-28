@@ -12,6 +12,11 @@ export const createFormSchema = z.object({
   kind: z.enum(['rescue_alert', 'lost', 'adoption']),
   species: z.enum(['dog', 'cat', 'other']),
   size: z.enum(['small', 'medium', 'large']),
+  /** Cores do pelo. Rascunhos antigos não têm: viram lista vazia. */
+  colors: z
+    .array(z.enum(['black', 'white', 'gray', 'brown', 'caramel', 'ginger', 'cream', 'brindle']))
+    .max(3)
+    .default([]),
   sex: z.enum(['male', 'female', 'unknown']),
   name: z.string().max(80),
   age: z.enum(['filhote', 'adulto', 'idoso']).nullable(),

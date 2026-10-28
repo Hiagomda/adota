@@ -16,7 +16,7 @@ export function postIdFromPush(data: unknown): string | null {
 }
 
 /** Telas que um aviso pode abrir além do resgate. Qualquer outra coisa é ignorada. */
-const routeWithId = /^\/(animal|post|campanha|evento)\/([^/?#]+)$/;
+const routeWithId = /^\/(animal|post|campanha|evento|lost-matches)\/([^/?#]+)$/;
 const plainRoutes = new Set(['/casa-amiga', '/central', '/agenda', '/campanhas']);
 
 /**

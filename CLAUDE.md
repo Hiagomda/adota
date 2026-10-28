@@ -126,6 +126,7 @@ apps/api/src/adoptionChat.ts  conversa de adoção
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
+apps/api/src/lostMatch.ts     busca de perdidos: sugestões perdido × encontrado (nota em packages/shared/src/lostMatch.ts), paleta das fotos pelo imgproxy, /lost-search e cartaz (/posts/:id/poster)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)

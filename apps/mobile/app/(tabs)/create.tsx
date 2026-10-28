@@ -42,6 +42,7 @@ import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, statusLabel, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
+import { furColors, toggleFurColor, type FurColor } from '../../src/lost/lostMatch';
 import { ageBands, careKeys, careQuestion, type AgeBand, type CareKey } from '../../src/post/care';
 import {
   clearCreateDraft,
@@ -164,6 +165,7 @@ export default function CreateScreen() {
   const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>(restored?.species ?? 'dog');
   const [size, setSize] = useState<'small' | 'medium' | 'large'>(restored?.size ?? 'medium');
   const [sex, setSex] = useState<'male' | 'female' | 'unknown'>(restored?.sex ?? 'unknown');
+  const [furs, setFurs] = useState<FurColor[]>(restored?.colors ?? []);
   const [age, setAge] = useState<AgeBand | null>(restored?.age ?? null);
   const [care, setCare] = useState<Partial<Record<CareKey, true>>>(restored?.care ?? {});
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>(
@@ -217,6 +219,7 @@ export default function CreateScreen() {
         kind,
         species,
         size,
+        colors: furs,
         sex,
         name: animalName,
         age,
@@ -235,6 +238,7 @@ export default function CreateScreen() {
     kind,
     species,
     size,
+    furs,
     sex,
     animalName,
     age,
@@ -254,6 +258,7 @@ export default function CreateScreen() {
     setReference('');
     setAge(null);
     setCare({});
+    setFurs([]);
     setSex('unknown');
     setManual(null);
     setMoved(false);
@@ -346,6 +351,7 @@ export default function CreateScreen() {
       kind,
       species,
       size,
+      colors: furs,
       sex,
       name: animalName.trim(),
       ...(age ? { ageEstimate: age } : {}),
@@ -753,6 +759,19 @@ export default function CreateScreen() {
                         label={option.label}
                         selected={size === option.value}
                         onPress={() => setSize(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.group}>
+                  <AppText variant="bodyStrong">Cores do pelo (até 3)</AppText>
+                  <View style={styles.chips}>
+                    {furColors.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={furs.includes(option.value)}
+                        onPress={() => setFurs((current) => toggleFurColor(current, option.value))}
                       />
                     ))}
                   </View>

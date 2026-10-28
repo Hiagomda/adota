@@ -19,6 +19,7 @@ import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
 import { registerContactRoutes } from './contact.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
+import { registerLostMatchRoutes } from './lostMatch.js';
 import { registerPassportRoutes } from './passport.js';
 import { registerSightingRoutes } from './sightings.js';
 import {
@@ -56,6 +57,7 @@ import { assertOwnedMedia } from './mediaPolicy.js';
 import {
   enqueueHelperCheck,
   enqueueHelperExpiry,
+  enqueueLostMatch,
   enqueueRescueAlert,
   notifyComment,
   notifyDiaryNote,
@@ -118,6 +120,8 @@ const strictLimit = perAccount(5);
 const publishLimit = perAccount(20);
 /** Endereço pelo ponto do mapa: chama um serviço de fora a cada pedido. */
 const lookupLimit = perAccount(30);
+/** Posts que entram na busca de perdidos: o perdido e os animais encontrados. */
+const matchableTypes = new Set(['lost', 'rescue_alert', 'adoption']);
 /** Asking for someone's WhatsApp: enough to talk to a few people, too few to harvest numbers. */
 const contactLimit = perAccount(10);
 
@@ -361,6 +365,13 @@ export async function registerRoutes(
         bestEffort(request, 'queue:rescue-alert'),
       );
     }
+    if (
+      !body.parentPostId &&
+      created.reviewStatus === 'published' &&
+      matchableTypes.has(body.type)
+    ) {
+      await enqueueLostMatch(queue, created.id).catch(bestEffort(request, 'queue:lost-match'));
+    }
     if (body.parentPostId && created.reviewStatus === 'published') {
       await notifyDiaryNote(
         pool,
@@ -380,6 +391,8 @@ export async function registerRoutes(
     await updatePost(pool, id, user, body, (urls) =>
       verifyUploadedImages(env, storage, user.id, urls),
     );
+    // Cores ou fotos novas mudam as sugestões da busca de perdidos.
+    await enqueueLostMatch(queue, id).catch(bestEffort(request, 'queue:lost-match'));
     return { ok: true };
   });
 
@@ -848,7 +861,14 @@ export async function registerRoutes(
   registerAdoptionChat(app, { env, pool });
   registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
   registerContactRoutes(app, { pool, contactLimit });
-  registerSightingRoutes(app, { env, pool, writeLimit });
+  registerSightingRoutes(app, {
+    env,
+    pool,
+    writeLimit,
+    // Avistamento novo muda a distância das sugestões do animal.
+    onSighting: (postId) => enqueueLostMatch(queue, postId),
+  });
+  registerLostMatchRoutes(app, { env, pool, writeLimit, strictLimit, lookupLimit });
   registerNeighborhoodRoutes(app, { pool });
   registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   await registerStaffRoutes(app, { env, pool, queue });
