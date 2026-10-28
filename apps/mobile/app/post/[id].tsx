@@ -577,6 +577,10 @@ export default function PostScreen() {
           <View style={styles.column}>
             <View style={styles.titleBlock}>
               <AppText variant="display">{animalHeadline(item.animal)}</AppText>
+              {/* Num resgate, há quanto tempo foi o aviso decide se ainda vale ir. */}
+              <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                {publishedLine(item.createdAt, item.author.name)}
+              </AppText>
               <View style={styles.pills}>
                 {journeyOf(item.type, item.status) ? null : (
                   <StatusPill status={item.status} type={item.type} />
@@ -1545,6 +1549,14 @@ interface FosterHome {
   id: string;
   name: string;
   maxDays: number | null;
+}
+
+/** "Publicado há 2 horas por Ana", logo abaixo do título. */
+function publishedLine(createdAt: string, authorName: string): string {
+  const when = formatWhen(createdAt);
+  const first = authorName.split(' ')[0] || authorName;
+  const prefix = when === 'agora' || when.startsWith('há') ? 'Publicado' : 'Publicado em';
+  return `${prefix} ${when} por ${first}`;
 }
 
 const styles = StyleSheet.create({
