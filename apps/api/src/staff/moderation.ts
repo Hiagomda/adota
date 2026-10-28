@@ -77,6 +77,58 @@ function trail(request: FastifyRequest) {
  * Moderação pelo painel da equipe. Usa a sessão do painel (TOTP) e grava cada decisão na
  * auditoria. As rotas antigas `/admin/*` com o token do app continuam iguais.
  */
+/** Status em que o animal já saiu da rua. */
+const SAFE_STATUSES = ['rescued', 'fostered', 'for_adoption', 'adopted'];
+
+/**
+ * Como terminaram os avisos de resgate dos últimos 30 dias: quantos foram publicados, quantos
+ * chegaram a um lugar seguro e em quanto tempo (mediana, do aviso ao primeiro status seguro).
+ */
+export async function rescueOutcomes(pool: Pool): Promise<{
+  created: number;
+  safe: number;
+  stillOpen: number;
+  notFound: number;
+  medianHoursToSafe: number | null;
+}> {
+  const result = await pool.query<{
+    created: number;
+    safe: number;
+    still_open: number;
+    not_found: number;
+    median_seconds: number | null;
+  }>(
+    `WITH recent AS (
+       SELECT p.id, p.status, p.created_at,
+         (SELECT min(u.created_at) FROM posts u
+           WHERE u.parent_post_id = p.id AND u.type = 'update'
+             AND u.status = ANY($1::text[])) AS safe_at
+       FROM posts p
+       WHERE p.type = 'rescue_alert' AND p.parent_post_id IS NULL AND p.hidden = false
+         AND p.created_at > now() - interval '30 days'
+     )
+     SELECT
+       count(*)::int AS created,
+       count(*) FILTER (WHERE status = ANY($1::text[]))::int AS safe,
+       count(*) FILTER (WHERE status IN ('open', 'on_the_way'))::int AS still_open,
+       count(*) FILTER (WHERE status = 'not_found')::int AS not_found,
+       (percentile_cont(0.5) WITHIN GROUP (
+         ORDER BY EXTRACT(EPOCH FROM (safe_at - created_at))
+       ) FILTER (WHERE safe_at IS NOT NULL))::float AS median_seconds
+     FROM recent`,
+    [SAFE_STATUSES],
+  );
+  const row = result.rows[0];
+  const median = row?.median_seconds ?? null;
+  return {
+    created: row?.created ?? 0,
+    safe: row?.safe ?? 0,
+    stillOpen: row?.still_open ?? 0,
+    notFound: row?.not_found ?? 0,
+    medianHoursToSafe: median === null ? null : Math.round((median / 3600) * 10) / 10,
+  };
+}
+
 export function registerModerationRoutes(
   app: FastifyInstance,
   deps: { env: Env; pool: Pool; queue: RescueQueue },
@@ -121,6 +173,7 @@ export function registerModerationRoutes(
        JOIN responses r ON r.post_id = p.id AND r.kind = 'will_help'
        WHERE p.type = 'rescue_alert' AND p.created_at > now() - interval '30 days'`,
     );
+    const rescues = await rescueOutcomes(pool);
     const row = result.rows[0];
     return {
       usersTotal: row?.users_total ?? 0,
@@ -133,6 +186,7 @@ export function registerModerationRoutes(
       openReports: row?.open_reports ?? 0,
       pendingVerifications: row?.pending_verifications ?? 0,
       meanSecondsToResponse: responseTime.rows[0]?.seconds ?? null,
+      rescues30d: rescues,
     };
   });
 
