@@ -63,6 +63,11 @@ export async function enqueueAlert(draft: AlertDraft): Promise<void> {
   await writeAll([...drafts.filter((item) => item.id !== draft.id), { ...draft, attempts: 0 }]);
 }
 
+/** Quantos resgates esperam internet neste aparelho. Some se o app for desinstalado. */
+export async function pendingOutboxCount(): Promise<number> {
+  return (await readAll()).length;
+}
+
 let inFlight: Promise<number> | null = null;
 
 /**
