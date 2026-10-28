@@ -55,6 +55,7 @@ import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
 import { FosterHomesSection } from '../../src/fosterHome/FosterHomesSection';
+import { HelpOffers } from '../../src/central/HelpOffers';
 import { postLinkFor, sharePost } from '../../src/post/sharePost';
 import { PostEditor } from '../../src/post/PostEditor';
 import { AdoptionInterestSheet } from '../../src/post/AdoptionInterestSheet';
@@ -694,6 +695,8 @@ export default function PostScreen() {
                 />
               </Card>
             </View>
+
+            {item.type === 'rescue_alert' ? <HelpOffers postId={item.id} token={token} /> : null}
 
             <View style={styles.section}>
               <AppText variant="h2">Quem publicou</AppText>

@@ -316,6 +316,7 @@ const personalTables = [
   'user_badges',
   'post_follows',
   'sightings',
+  'rescue_help_offers',
   'likes',
   'saves',
   'story_views',

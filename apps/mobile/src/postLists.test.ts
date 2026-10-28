@@ -31,3 +31,13 @@ test('leitura, curtida, salvar, story e outras rotas não recarregam nada', () =
   assert.deepEqual(listsAfterWrite('PATCH', '/me'), []);
   assert.deepEqual(listsAfterWrite('POST', '/postsx'), []);
 });
+
+test('oferecer ou responder ajuda recarrega a central e as ofertas', () => {
+  const offered = names(listsAfterWrite('POST', `/posts/${id}/help-offers`));
+  assert.ok(offered.includes('central'));
+  assert.ok(offered.includes('help-offers'));
+  assert.deepEqual(names(listsAfterWrite('POST', `/help-offers/${id}/accept`)), [
+    'central',
+    'help-offers',
+  ]);
+});

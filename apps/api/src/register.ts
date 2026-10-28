@@ -20,6 +20,7 @@ import { registerAdoptionRoutes } from './adoption.js';
 import { registerContactRoutes } from './contact.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
 import { registerFosterHomeRoutes } from './fosterHomes.js';
+import { registerCentralRoutes } from './central.js';
 import { registerPassportRoutes } from './passport.js';
 import { registerSightingRoutes } from './sightings.js';
 import {
@@ -853,6 +854,7 @@ export async function registerRoutes(
   registerNeighborhoodRoutes(app, { pool });
   registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   registerFosterHomeRoutes(app, { env, pool, writeLimit, publishLimit, contactLimit });
+  registerCentralRoutes(app, { env, pool, writeLimit, publishLimit });
   await registerStaffRoutes(app, { env, pool, queue });
 }
 

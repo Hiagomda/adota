@@ -8,6 +8,7 @@ const postLists = [
   ['home-adoption'],
   ['stories'],
   ['similar'],
+  ['central'],
 ] as const;
 
 /**
@@ -17,6 +18,8 @@ const postLists = [
 export function listsAfterWrite(method: string, path: string): (readonly string[])[] {
   if (method.toUpperCase() === 'GET') return [];
   const clean = path.split('?')[0] ?? '';
+  // Responder uma oferta muda a central e a lista de ofertas do resgate.
+  if (/^\/help-offers\//.test(clean)) return [['central'], ['help-offers']];
   if (!/^\/posts(\/|$)/.test(clean)) return [];
   if (/\/(like|save|story-view)$/.test(clean)) return [];
   const lists: (readonly string[])[] = [...postLists];
@@ -24,5 +27,6 @@ export function listsAfterWrite(method: string, path: string): (readonly string[
   if (clean === '/posts' || /\/(status|responses|help\/leave)$/.test(clean)) {
     lists.push(['volunteer']);
   }
+  if (/\/help-offers$/.test(clean)) lists.push(['help-offers']);
   return lists;
 }
