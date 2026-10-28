@@ -1,0 +1,67 @@
+name: Vigia da VPS
+
+# Confere a cada 15 minutos se a API, as fotos e a página de download respondem. Quando algo cai,
+# abre uma issue "VPS fora do ar" para o Hiago (o GitHub avisa por e-mail e no app). Quando tudo
+# volta, comenta e fecha a mesma issue. Uma queda só conta depois de 3 tentativas seguidas.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: vigia
+  cancel-in-progress: false
+
+jobs:
+  vigiar:
+    name: Conferir os serviços
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITULO: 'VPS fora do ar'
+    steps:
+      - name: Conferir
+        id: conferir
+        run: |
+          set -u
+          host=fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+          servicos="API|http://api-$host/health
+          Fotos|http://imgproxy-$host/health
+          Página de download|https://download-$host/version.json"
+          falhas=""
+          while IFS='|' read -r nome url; do
+            ok=0
+            for tentativa in 1 2 3; do
+              codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url" || true)
+              if [ "$codigo" = "200" ]; then ok=1; break; fi
+              sleep 20
+            done
+            if [ "$ok" = 1 ]; then
+              echo "ok   $nome"
+            else
+              echo "erro $nome (último código: $codigo)"
+              falhas="$falhas- $nome não respondeu (último código HTTP: $codigo)\n"
+            fi
+          done <<< "$servicos"
+          printf '%b' "$falhas" > "$RUNNER_TEMP/falhas.md"
+
+      - name: Abrir ou fechar a issue
+        run: |
+          set -eu
+          aberta=$(gh issue list --state open --search "in:title \"$TITULO\"" --json number --jq '.[0].number // empty')
+          if [ -s "$RUNNER_TEMP/falhas.md" ]; then
+            corpo=$(printf 'A conferência de %s achou:\n\n%s\nVeja o Coolify. Esta issue fecha sozinha quando tudo voltar.\n\n[Execução](%s)' \
+              "$(date -u '+%d/%m %H:%M UTC')" "$(cat "$RUNNER_TEMP/falhas.md")" \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+            if [ -z "$aberta" ]; then
+              gh issue create --title "$TITULO" --body "$corpo" --assignee "$GITHUB_REPOSITORY_OWNER"
+            fi
+          elif [ -n "$aberta" ]; then
+            gh issue close "$aberta" --comment "Tudo respondendo de novo em $(date -u '+%d/%m %H:%M UTC')."
+          fi
