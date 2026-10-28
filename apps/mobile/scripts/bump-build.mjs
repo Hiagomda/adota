@@ -52,6 +52,8 @@ if (args.has('--publish')) {
     ? release.notes.filter((item) => typeof item === 'string' && item.trim() !== '')
     : [];
   const published = { version: release.version, androidVersionCode: release.build, notes };
+  // Troca da chave de assinatura: o app avisa para desinstalar e instalar de novo.
+  if (release.reinstall === true) published.reinstall = true;
   writeFileSync(publishedFile, `${JSON.stringify(published, null, 2)}\n`);
   console.log(`download/version.json -> ${published.version} / ${published.androidVersionCode}`);
 }

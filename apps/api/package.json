@@ -19,6 +19,7 @@
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
     "@patinha/shared": "workspace:*",
+    "@sentry/node": "^10.77.1",
     "bullmq": "^5.61.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.4",

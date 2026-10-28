@@ -45,6 +45,10 @@ const envSchema = z.object({
   OWNER_EMAILS: z.preprocess(blankAsUnset, z.string().min(3).optional()),
   /** How many reverse proxies sit in front of the API. 1 is Caddy or Coolify. */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+  /** DSN do projeto da API no Sentry. Vazio desliga o envio de erros. */
+  SENTRY_DSN: z.preprocess(blankAsUnset, z.string().url().optional()),
+  /** Versão que aparece no Sentry, por exemplo o commit do deploy. */
+  SENTRY_RELEASE: z.preprocess(blankAsUnset, z.string().min(1).optional()),
 });
 
 export type Env = z.infer<typeof envSchema> & { authDevMode: boolean };

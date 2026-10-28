@@ -23,7 +23,13 @@ export const downloadPageUrl =
   fallbackDownloadPage;
 
 /** A newer APK on the download page of the VPS. That page is the only update source. */
-export type AppUpdateOffer = { apkUrl: string; version: string; notes: string[] };
+export type AppUpdateOffer = {
+  apkUrl: string;
+  version: string;
+  notes: string[];
+  /** Precisa desinstalar antes: a atualização por cima falharia com "app não instalado". */
+  reinstall: boolean;
+};
 
 export function apkDownloadUrl(page: string): string {
   return `${page.replace(/\/$/, '')}/egua-adota.apk`;
@@ -44,7 +50,12 @@ async function checkNativeRelease(): Promise<AppUpdateOffer | null> {
     published,
   );
   if (!newer) return null;
-  return { apkUrl: apkDownloadUrl(page), version: published.version, notes: published.notes };
+  return {
+    apkUrl: apkDownloadUrl(page),
+    version: published.version,
+    notes: published.notes,
+    reinstall: published.reinstall,
+  };
 }
 
 /** Never rejects and never takes longer than the timeout: a dead VPS only means no offer. */

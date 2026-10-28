@@ -64,6 +64,7 @@ import {
 } from './notify.js';
 import { fosterDistanceKm } from './privacy.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
+import { captureServerError } from './monitoring.js';
 import { registerStaffRoutes } from './staff/routes.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
 import { stripControls } from './text.js';
@@ -886,6 +887,7 @@ const MAX_PUSH_TOKENS = 10;
 function bestEffort(request: FastifyRequest, where: string) {
   return (error: unknown) => {
     request.log.error({ err: error, where }, 'best-effort step failed');
+    captureServerError(error, { where, requestId: request.id, userId: request.user?.id });
   };
 }
 

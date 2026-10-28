@@ -2,6 +2,11 @@ export type PublishedNativeApp = {
   version: string;
   androidVersionCode: number | null;
   notes: string[];
+  /**
+   * A versão nova vem assinada com outra chave: o Android recusa instalar por cima, então a
+   * pessoa precisa desinstalar e instalar de novo. Campo opcional do `version.json`.
+   */
+  reinstall: boolean;
 };
 
 export function parsePublishedNativeApp(value: unknown): PublishedNativeApp | null {
@@ -18,6 +23,7 @@ export function parsePublishedNativeApp(value: unknown): PublishedNativeApp | nu
     version: record.version.trim(),
     androidVersionCode: typeof code === 'number' && Number.isFinite(code) ? code : null,
     notes,
+    reinstall: record.reinstall === true,
   };
 }
 

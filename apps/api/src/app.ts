@@ -9,6 +9,7 @@ import { loadEnv, type Env } from './config.js';
 import { getHealth, type DatabaseClient, type RedisClient } from './health.js';
 import { HttpError } from './http.js';
 import { createStorage } from './media.js';
+import { captureServerError } from './monitoring.js';
 import { createQueue } from './notify.js';
 import { registerRoutes } from './register.js';
 
@@ -99,6 +100,11 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
       return reply.code(statusCode).send({ message });
     }
     request.log.error(error);
+    captureServerError(error, {
+      where: `${request.method} ${request.routeOptions.url ?? 'rota desconhecida'}`,
+      requestId: request.id,
+      userId: request.user?.id,
+    });
     return reply.code(500).send({ message: 'Algo deu errado. Tente de novo.' });
   });
 
