@@ -6,6 +6,7 @@ import { loadFeed, messageFrom } from '../src/api';
 import { placeOf } from '../src/animalLabels';
 import {
   AppText,
+  Button,
   CampaignCard,
   EmptyState,
   ErrorState,
@@ -46,6 +47,15 @@ export default function NeedsScreen() {
             Pedidos de ONGs e protetores verificados. A doação vai direto para eles pelo Pix do
             pedido: o app não recebe nem repassa dinheiro.
           </AppText>
+          <View style={styles.intro}>
+            <Button
+              title="Ver campanhas com prestação de contas"
+              icon="heart"
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/campanhas')}
+            />
+          </View>
           {needs.isLoading ? (
             <View style={styles.list}>
               <SkeletonRows />

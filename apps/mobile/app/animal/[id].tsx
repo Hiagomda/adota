@@ -3,7 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, messageFrom } from '../../src/api';
+import { api, loadMe, messageFrom } from '../../src/api';
+import type { CampaignSummary } from '../../src/campaign/campaign';
+import { CampaignTile } from '../../src/campaign/CampaignTile';
 import { sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
   AppText,
@@ -36,7 +38,7 @@ import {
   healthKindLabel,
   type Passport,
 } from '../../src/passport/passport';
-import { useSession } from '../../src/session';
+import { isTeamRole, useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 
 const timelineIcons: Record<Passport['timeline'][number]['kind'], IconName> = {
@@ -68,6 +70,22 @@ export default function PassportScreen() {
     enabled: Boolean(id),
   });
   const data = passport.data;
+  const campaigns = useQuery({
+    queryKey: ['campaigns', 'animal', data?.id, token],
+    queryFn: () =>
+      api<{ campaigns: CampaignSummary[] }>(`/campaigns?status=open&animalId=${data?.id ?? ''}`, {
+        token,
+      }),
+    enabled: Boolean(data?.id),
+  });
+  const me = useQuery({
+    queryKey: ['me', token],
+    queryFn: () => loadMe(token ?? ''),
+    enabled: Boolean(token),
+  });
+  const canOpenCampaign = Boolean(
+    data?.permissions.caretaker && me.data && (me.data.verified || isTeamRole(me.data.role)),
+  );
 
   async function refresh() {
     await client.invalidateQueries({ queryKey: ['passport'] });
@@ -300,6 +318,33 @@ export default function PassportScreen() {
                   />
                 ) : null}
               </View>
+
+              {(campaigns.data?.campaigns.length ?? 0) > 0 || canOpenCampaign ? (
+                <View style={styles.section}>
+                  <AppText variant="h2">Campanhas</AppText>
+                  {campaigns.data?.campaigns.map((campaign) => (
+                    <CampaignTile
+                      key={campaign.id}
+                      campaign={campaign}
+                      onPress={() => router.push(`/campanha/${campaign.id}`)}
+                    />
+                  ))}
+                  {canOpenCampaign ? (
+                    <Button
+                      title="Abrir campanha para este animal"
+                      icon="heart"
+                      variant="outline"
+                      fullWidth
+                      onPress={() =>
+                        router.push({
+                          pathname: '/campanha/nova',
+                          params: { animalId: data.id, nome: data.name ?? '' },
+                        })
+                      }
+                    />
+                  ) : null}
+                </View>
+              ) : null}
 
               {data.custody.length > 0 ? (
                 <View style={styles.section}>
