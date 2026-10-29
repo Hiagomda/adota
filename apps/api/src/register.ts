@@ -23,6 +23,7 @@ import {
   setCampaignSuspended,
 } from './campaigns.js';
 import { registerContactRoutes } from './contact.js';
+import { registerEventRoutes } from './events.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
 import { registerFosterHomeRoutes } from './fosterHomes.js';
 import { registerCentralRoutes } from './central.js';
@@ -907,6 +908,7 @@ export async function registerRoutes(
   });
   registerLostMatchRoutes(app, { env, pool, writeLimit, strictLimit, lookupLimit });
   registerNeighborhoodRoutes(app, { pool });
+  registerEventRoutes(app, { env, pool, writeLimit, strictLimit });
   registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   registerFosterHomeRoutes(app, { env, pool, writeLimit, publishLimit, contactLimit });
   registerCentralRoutes(app, { env, pool, writeLimit, publishLimit });

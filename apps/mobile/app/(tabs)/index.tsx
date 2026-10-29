@@ -520,7 +520,7 @@ export default function HomeScreen() {
           icon="smile"
           onPress={() => router.push({ pathname: '/adocao', params: { aba: 'adotados' } })}
         />
-        <Chip label="Feiras" icon="calendar" onPress={() => router.push('/feiras')} />
+        <Chip label="Agenda" icon="calendar" onPress={() => router.push('/agenda')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
         <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
         <Chip label="Campanhas" icon="heart" onPress={() => router.push('/campanhas')} />
@@ -549,7 +549,9 @@ export default function HomeScreen() {
                 title="Feira de adoção"
                 subtitle="Conheça os animais pessoalmente"
                 actionLabel={fairCount > 1 ? `Ver as ${fairCount}` : 'Ver feiras'}
-                onAction={() => router.push('/feiras')}
+                onAction={() =>
+                  router.push({ pathname: '/agenda', params: { categoria: 'adoption_fair' } })
+                }
               />
               <View style={styles.fairCard}>
                 <FairCard
