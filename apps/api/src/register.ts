@@ -17,6 +17,11 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
+import {
+  notifyCampaignSuspension,
+  registerCampaignRoutes,
+  setCampaignSuspended,
+} from './campaigns.js';
 import { registerContactRoutes } from './contact.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
 import { registerFosterHomeRoutes } from './fosterHomes.js';
@@ -83,7 +88,7 @@ const commentSchema = z.object({
   parentCommentId: z.string().uuid().optional(),
 });
 const reportSchema = z.object({
-  targetType: z.enum(['post', 'comment', 'user']),
+  targetType: z.enum(['post', 'comment', 'user', 'campaign']),
   targetId: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
 });
@@ -757,6 +762,9 @@ export async function registerRoutes(
       if (target.target_type === 'user') {
         await pool.query(`UPDATE users SET suspended = true WHERE id = $1`, [target.target_id]);
       }
+      if (target.target_type === 'campaign') {
+        await suspendReportedCampaign(request, target.target_id);
+      }
     }
     await pool.query(`UPDATE reports SET status = $2 WHERE id = $1`, [
       id,
@@ -767,6 +775,33 @@ export async function registerRoutes(
     );
     return { status: body.action === 'hide' ? 'hidden' : 'dismissed' };
   });
+
+  /** Denúncia aceita numa campanha: suspende, tira o Pix do ar e avisa o responsável. */
+  async function suspendReportedCampaign(request: FastifyRequest, campaignId: string) {
+    const actor = requireAdmin(request.user);
+    const client = await pool.connect();
+    let result: Awaited<ReturnType<typeof setCampaignSuspended>> = null;
+    try {
+      await client.query('BEGIN');
+      result = await setCampaignSuspended(client, {
+        campaignId,
+        actorId: actor.id,
+        suspended: true,
+        reason: 'Denúncia aceita pela equipe.',
+      });
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    if (result?.changed) {
+      await notifyCampaignSuspension(pool, env, campaignId, result.ownerId, true).catch(
+        bestEffort(request, 'notify:campaign-suspended'),
+      );
+    }
+  }
 
   app.get('/admin/verifications', async (request) => {
     requireAdmin(request.user);
@@ -875,6 +910,7 @@ export async function registerRoutes(
   registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   registerFosterHomeRoutes(app, { env, pool, writeLimit, publishLimit, contactLimit });
   registerCentralRoutes(app, { env, pool, writeLimit, publishLimit });
+  registerCampaignRoutes(app, { env, pool, storage, writeLimit, publishLimit });
   await registerStaffRoutes(app, { env, pool, queue });
 }
 

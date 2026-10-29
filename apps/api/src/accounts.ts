@@ -3,6 +3,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { updateMeSchema } from '@patinha/shared';
 import type { z } from 'zod';
+import { closeCampaignsOf } from './campaigns.js';
 import type { Env } from './config.js';
 import { users } from './db/schema.js';
 import { HttpError } from './http.js';
@@ -243,6 +244,7 @@ export async function updateProfile(
  * profile, home location, Casa Amiga, volunteer data, follows, likes, notifications, their
  * rescues and comments (hidden) and the text of their chat messages. The row itself stays,
  * renamed, so other people's rescue history and moderation reports keep their links.
+ * Campanhas: o livro-caixa fica (é prestação de contas), mas o nome de quem doou sai.
  * Returns the Firebase uid so the caller can also remove the sign-in account.
  */
 export async function anonymizeUser(pool: Pool, userId: string): Promise<string | null> {
@@ -298,6 +300,7 @@ export async function anonymizeUser(pool: Pool, userId: string): Promise<string 
       `UPDATE adoption_messages SET body = 'Mensagem apagada.' WHERE sender_id = $1`,
       [userId],
     );
+    await closeCampaignsOf(client, userId);
     await client.query('COMMIT');
     return firebaseUid && !firebaseUid.startsWith('deleted:') ? firebaseUid : null;
   } catch (error) {

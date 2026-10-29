@@ -18,7 +18,7 @@ export const healthKindSchema = z.enum([
 export const healthVisibilitySchema = z.enum(['public', 'caretakers']);
 
 /** AAAA-MM-DD, um dia do calendário. Sem hora: ninguém lembra a hora da vacina. */
-const calendarDay = z
+export const calendarDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((value) => {

@@ -523,6 +523,7 @@ export default function HomeScreen() {
         <Chip label="Feiras" icon="calendar" onPress={() => router.push('/feiras')} />
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
         <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
+        <Chip label="Campanhas" icon="heart" onPress={() => router.push('/campanhas')} />
       </ScrollView>
 
       {searching ? null : (

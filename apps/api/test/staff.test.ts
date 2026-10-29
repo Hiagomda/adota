@@ -26,7 +26,13 @@ describe('staff permissions', () => {
     expect(permissionsFor('ong_reviewer')).not.toContain('reports.manage');
     expect(permissionsFor('support')).toContain('users.read');
     expect(permissionsFor('support')).not.toContain('users.suspend');
-    expect(permissionsFor('finance_reviewer')).toEqual(['session.revoke_own', 'overview.read']);
+    expect(permissionsFor('finance_reviewer')).toEqual([
+      'session.revoke_own',
+      'overview.read',
+      'campaigns.review',
+    ]);
+    expect(permissionsFor('moderator')).not.toContain('campaigns.review');
+    expect(permissionsFor('admin')).toContain('campaigns.review');
     for (const role of ['admin', 'superadmin']) {
       expect(permissionsFor(role)).toEqual(
         expect.arrayContaining([
