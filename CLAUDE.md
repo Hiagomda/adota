@@ -114,7 +114,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 - Domínios de teste (sslip): API/MinIO/imgproxy em HTTP; download em HTTPS. Mudar host quebra APKs já instalados.
 - `docker/download-entrypoint.sh` copia `/opt/egua-adota.apk` e `/opt/version.json` sobre o volume a cada start — cópia só no volume some no restart. Caminho durável = release GitHub + `APK_URL` no Dockerfile + redeploy.
 - `docker-compose.prod.yml` + `deploy.yml` (Caddy em `/opt/patinha`) **não** estão em uso.
-- Serviço `backup` (`docker/backup-loop.sh`): dump diário do Postgres às 3h de Belém (guarda 14 dias) e cópia das fotos por rsync, no volume `backups` da mesma VPS. Não é cópia fora da VPS.
+- Serviço `backup` (`docker/backup-loop.sh`): dump diário do Postgres às 3h de Belém (guarda 14 dias) e cópia das fotos (sem rsync nem apt-get: a imagem do PostGIS é Debian 11, fora dos espelhos), no volume `backups` da mesma VPS. Não é cópia fora da VPS.
 - `publish-download.yml` espelha o APK do release `apk-<version>-<build>` lendo `download/version.json`.
 
 ## Estrutura

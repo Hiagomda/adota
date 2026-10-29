@@ -1,8 +1,8 @@
 #!/bin/sh
 # Roda para sempre: um backup ao subir e depois um por dia no horário BACKUP_HOUR_UTC.
 #   /backups/banco  dumps do Postgres (formato custom), os de mais de BACKUP_KEEP_DAYS dias somem
-#   /backups/fotos  cópia do volume do MinIO, atualizada por rsync (foto apagada no app some aqui
-#                   também, por causa do "Excluir conta")
+#   /backups/fotos  cópia do volume do MinIO, refeita inteira a cada backup (foto apagada no app
+#                   some aqui também, por causa do "Excluir conta")
 # Restaurar o banco: pg_restore --clean --if-exists -d patinha <arquivo>. Restaurar as fotos: parar
 # o MinIO e copiar /backups/fotos de volta para o volume dele.
 set -eu
@@ -24,9 +24,14 @@ run_backup() {
     echo "backup: ERRO no dump do banco" >&2
   fi
   find "$dir/banco" -name 'patinha-*.dump' -mtime +"$keep_days" -delete
-  if rsync -a --delete "$minio/" "$dir/fotos/"; then
+  # Sem rsync na imagem: copia para uma pasta nova e só troca quando a cópia termina.
+  rm -rf "$dir/fotos.tmp"
+  if mkdir -p "$dir/fotos.tmp" && cp -a "$minio/." "$dir/fotos.tmp/"; then
+    rm -rf "$dir/fotos"
+    mv "$dir/fotos.tmp" "$dir/fotos"
     echo "backup: fotos ok ($(du -sh "$dir/fotos" | cut -f1))"
   else
+    rm -rf "$dir/fotos.tmp"
     echo "backup: ERRO na cópia das fotos" >&2
   fi
   date -u +%Y-%m-%dT%H:%M:%SZ > "$dir/ultimo-backup.txt"
