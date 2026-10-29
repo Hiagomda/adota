@@ -13,6 +13,7 @@ import { neighborhoodFromLabel } from './neighborhoods.js';
 const ACTIVITY_SIZE = 12;
 const CARDS_SIZE = 6;
 const EVENTS_SIZE = 3;
+const MAP_SIZE = 12;
 const ACTIVITY_DAYS = 60;
 
 export type LiveKind =
@@ -49,6 +50,8 @@ export function liveKind(row: {
   }
 }
 
+const grid = (value: number) => Math.round(value * 1000) / 1000;
+
 /** Só o bairro sai do rótulo do lugar. Sem bairro, fica a cidade. */
 export function liveNeighborhood(label: string): string {
   return neighborhoodFromLabel(label) ?? 'Belém';
@@ -83,7 +86,7 @@ export function registerLiveRoutes(app: FastifyInstance, deps: { env: Env; pool:
   });
 
   app.get('/stats/live', async (_request, reply) => {
-    const [counts, activity, adoption, lost, events] = await Promise.all([
+    const [counts, activity, adoption, lost, events, pins] = await Promise.all([
       pool.query<{
         for_adoption: number;
         lost_now: number;
@@ -167,6 +170,25 @@ export function registerLiveRoutes(app: FastifyInstance, deps: { env: Env; pool:
          ORDER BY e.starts_at ASC LIMIT $1`,
         [EVENTS_SIZE],
       ),
+      // Patas do celular do site: o que ainda precisa de alguém. O ponto vai na mesma grade de
+      // ~500 m do feed público, nunca o exato.
+      pool.query<
+        AnimalRow & { type: string; status: string; urgency: string; lat: number; lng: number }
+      >(
+        `SELECT p.id, p.type, p.status, p.urgency, a.species, a.name AS animal_name, p.approx_label,
+                ${firstPhoto} AS photo, p.created_at AS at,
+                ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS lat,
+                ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS lng
+         FROM posts p JOIN animals a ON a.id = p.animal_id
+         WHERE p.parent_post_id IS NULL AND ${visible}
+           AND (
+             (p.type IN ('rescue_alert', 'lost') AND p.status IN ('open', 'on_the_way', 'not_found'))
+             OR p.status = 'for_adoption'
+           )
+           AND p.created_at > now() - make_interval(days => $2)
+         ORDER BY p.created_at DESC LIMIT $1`,
+        [MAP_SIZE, ACTIVITY_DAYS],
+      ),
     ]);
 
     const recent = [];
@@ -199,6 +221,14 @@ export function registerLiveRoutes(app: FastifyInstance, deps: { env: Env; pool:
         category: row.category,
         neighborhood: row.neighborhood ?? liveNeighborhood(row.place_label),
         startsAt: row.starts_at.toISOString(),
+      })),
+      map: pins.rows.map((row) => ({
+        ...animal(row),
+        kind:
+          row.status === 'for_adoption' ? 'for_adoption' : row.type === 'lost' ? 'lost' : 'alert',
+        urgency: row.urgency,
+        // A grade é de 0,005°: três casas bastam e tiram o ruído do ponto flutuante.
+        location: { latitude: grid(row.lat), longitude: grid(row.lng) },
       })),
     };
   });

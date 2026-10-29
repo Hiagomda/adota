@@ -103,12 +103,23 @@ describe('site ao vivo', () => {
     expect(live.lost[0].photo).toMatch(/^https?:\/\//);
     expect(live.forAdoption[0]).toMatchObject({ name: 'Mimi', species: 'cat' });
 
+    // O alerta já saiu da rua: no mapa ficam o perdido e o de adoção, no ponto aproximado.
+    expect(live.map.map((pin: { kind: string }) => pin.kind).sort()).toEqual([
+      'for_adoption',
+      'lost',
+    ]);
+    const lostPin = live.map.find((pin: { kind: string }) => pin.kind === 'lost');
+    expect(lostPin.location.latitude).toBeCloseTo(-1.45, 5);
+    expect(lostPin.location.longitude).toBeCloseTo(-48.485, 5);
+
     const text = response.body;
     expect(text).not.toContain('Autora');
     expect(text).not.toContain('autora');
     expect(text).not.toContain('99999');
     expect(text).not.toContain('Quintino');
-    expect(text).not.toContain('-48.48');
+    // Só o ponto na grade de ~500 m, nunca o exato.
+    expect(text).not.toContain('-48.48321');
+    expect(text).not.toContain('-1.45234');
     expect(text).not.toContain('Escondido');
   });
 });
