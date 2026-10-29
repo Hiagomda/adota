@@ -10,6 +10,7 @@ const form: CreateForm = {
   kind: 'rescue_alert',
   species: 'dog',
   size: 'medium',
+  colors: ['caramel', 'white'],
   sex: 'unknown',
   name: '',
   age: null,
@@ -21,6 +22,11 @@ const form: CreateForm = {
 
 test('reads back what was saved', () => {
   assert.deepEqual(parseCreateForm(JSON.stringify(form)), form);
+});
+
+test('rascunho de antes das cores volta com a lista vazia', () => {
+  const { colors: _colors, ...older } = form;
+  assert.deepEqual(parseCreateForm(JSON.stringify(older))?.colors, []);
 });
 
 test('drops an empty, broken or older draft', () => {

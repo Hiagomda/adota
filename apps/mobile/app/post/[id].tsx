@@ -57,6 +57,8 @@ import { RescueJourney } from '../../src/post/RescueJourney';
 import { FosterHomesSection } from '../../src/fosterHome/FosterHomesSection';
 import { HelpOffers } from '../../src/central/HelpOffers';
 import { postLinkFor, sharePost } from '../../src/post/sharePost';
+import { furColorsText } from '../../src/lost/lostMatch';
+import { sharePoster } from '../../src/lost/sharePoster';
 import { PostEditor } from '../../src/post/PostEditor';
 import { AdoptionInterestSheet } from '../../src/post/AdoptionInterestSheet';
 import {
@@ -292,7 +294,12 @@ export default function PostScreen() {
   const footerHeight = measuredFooter || spacing.lg + SHARE_BUTTON + footerPad;
   const similarPosts = (similar.data?.posts ?? []).filter((other) => other.id !== item.id);
   const speciesName = speciesLabel[item.animal.species] ?? 'bichinho';
+  const furText = furColorsText(item.animal.colors);
+  // Busca de perdidos: o perdido procura entre os encontrados; resgate e adoção, entre os perdidos.
+  const matchable = ['lost', 'rescue_alert', 'adoption'].includes(item.type);
+  const posterReady = lostOpen || (item.type === 'rescue_alert' && rescueOpen);
   const animalLines = [
+    furText ? { icon: 'droplet' as const, text: `Cor: ${furText}` } : null,
     item.animal.healthNotes ? { icon: 'activity' as const, text: item.animal.healthNotes } : null,
     item.animal.temperament ? { icon: 'smile' as const, text: item.animal.temperament } : null,
   ].filter((line) => line !== null);
@@ -956,6 +963,42 @@ export default function PostScreen() {
               </View>
             ) : null}
 
+            {(matchable && canOwn) || posterReady ? (
+              <View style={styles.section}>
+                <AppText variant="h2">{lost ? 'Ajuda para achar' : 'É de alguém?'}</AppText>
+                <Card padding="none" elevation="md">
+                  {matchable && canOwn ? (
+                    <ListItem
+                      title={lost ? 'Possíveis encontros' : 'Perdidos parecidos'}
+                      subtitle={
+                        lost
+                          ? 'Animais encontrados ou vistos que parecem com o seu'
+                          : 'Tutores que podem estar procurando este animal'
+                      }
+                      icon="search"
+                      showChevron
+                      onPress={() => router.push(`/lost-matches/${item.id}`)}
+                    />
+                  ) : null}
+                  {matchable && canOwn && posterReady ? <Divider inset /> : null}
+                  {posterReady ? (
+                    <ListItem
+                      title="Cartaz para compartilhar"
+                      subtitle="Abre no WhatsApp e dá para imprimir ou salvar em PDF"
+                      icon="printer"
+                      showChevron
+                      onPress={() => {
+                        sharePoster(item).catch((error: unknown) => {
+                          reportError(error, { source: 'handled', where: 'post:poster' });
+                          setNote('Não consegui abrir o compartilhamento. Tente de novo.');
+                        });
+                      }}
+                    />
+                  ) : null}
+                </Card>
+              </View>
+            ) : null}
+
             <AnimalDiary
               post={item}
               canWrite={Boolean(token) && (userId === item.author.id || item.viewerWillHelp)}
@@ -1218,6 +1261,7 @@ export default function PostScreen() {
         urgency={item.urgency}
         ageEstimate={item.animal.ageEstimate}
         care={item.animal.care}
+        colors={item.animal.colors}
         photos={item.media.flatMap((photo) =>
           photo.storageKey ? [{ key: photo.storageKey, preview: photo.thumbUrl }] : [],
         )}

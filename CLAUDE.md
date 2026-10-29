@@ -128,6 +128,7 @@ apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
 apps/api/src/fosterHomes.ts   Casa Amiga: vagas, pedidos de acolhimento e encerramento com XP
 apps/api/src/central.ts       central de resgates (GET /central, por urgência) e ofertas de ajuda sem transporte
+apps/api/src/lostMatch.ts     busca de perdidos: sugestões perdido × encontrado (nota em packages/shared/src/lostMatch.ts), paleta das fotos pelo imgproxy, /lost-search e cartaz (/posts/:id/poster)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)

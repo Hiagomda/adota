@@ -51,6 +51,7 @@ interface PostRow {
   vaccinated: boolean | null;
   good_with_kids: boolean | null;
   good_with_animals: boolean | null;
+  animal_colors: string[] | null;
   animal_id: string;
   approx_lat: number;
   approx_lng: number;
@@ -295,9 +296,9 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     const animal = await client.query<{ id: string }>(
       `INSERT INTO animals (
          species, size, sex, age_estimate, health_notes, temperament, status, name,
-         neutered, vaccinated, good_with_kids, good_with_animals
+         neutered, vaccinated, good_with_kids, good_with_animals, colors
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
       [
         input.species,
         input.size,
@@ -311,6 +312,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.care?.vaccinated ?? null,
         input.care?.goodWithKids ?? null,
         input.care?.goodWithAnimals ?? null,
+        input.colors ?? [],
       ],
     );
     const animalId = animal.rows[0]?.id;
@@ -608,6 +610,13 @@ export async function updatePost(
         [postId, input.ageEstimate],
       );
     }
+    if (input.colors !== undefined) {
+      await client.query(
+        `UPDATE animals SET colors = $2
+         WHERE id = (SELECT animal_id FROM posts WHERE id = $1)`,
+        [postId, input.colors],
+      );
+    }
     if (input.care) {
       // Only the facts sent change; leaving one out keeps what was there.
       const care = input.care;
@@ -855,7 +864,7 @@ function postColumns(viewerParam: string): string {
     u.id AS author_id, u.name AS author_name, u.handle AS author_handle, u.avatar_url AS author_avatar,
     u.role AS author_role, u.verified AS author_verified, u.phone AS author_phone, u.whatsapp_opt_in AS author_whatsapp,
     a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.sex, a.age_estimate, a.health_notes, a.temperament,
-    a.neutered, a.vaccinated, a.good_with_kids, a.good_with_animals,
+    a.neutered, a.vaccinated, a.good_with_kids, a.good_with_animals, a.colors AS animal_colors,
     ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
     ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
     ST_Y(p.location::geometry) AS exact_lat,
@@ -930,6 +939,8 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
           goodWithKids: row.good_with_kids,
           goodWithAnimals: row.good_with_animals,
         },
+        // Cores do pelo (busca de perdidos). APKs antigos ignoram.
+        colors: row.animal_colors ?? [],
       },
       location: exact
         ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }

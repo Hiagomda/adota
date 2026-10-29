@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { animalColorsSchema } from './lostMatch.js';
 import { normalizeWhatsApp } from './phone.js';
 
 export const roleSchema = z.enum(['user', 'protector', 'ngo', 'moderator', 'admin']);
@@ -128,6 +129,8 @@ export const createPostSchema = z.object({
   healthNotes: z.string().max(500).optional(),
   temperament: z.string().max(200).optional(),
   care: animalCareSchema.optional(),
+  /** Cores do pelo, para a busca de perdidos. APKs antigos não mandam. */
+  colors: animalColorsSchema.optional(),
   urgency: urgencySchema,
   description: z.string().trim().min(1).max(2000),
   latitude: z.number().gte(-90).lte(90),
@@ -193,6 +196,7 @@ export const updatePostSchema = z
     name: z.string().trim().max(80).optional(),
     ageEstimate: ageBandSchema.optional(),
     care: animalCareSchema.optional(),
+    colors: animalColorsSchema.optional(),
     media: z
       .array(
         z.object({

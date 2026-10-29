@@ -13,6 +13,11 @@ export const alertDraftSchema = z.object({
   kind: z.enum(['rescue_alert', 'lost', 'adoption', 'help_request']),
   species: z.enum(['dog', 'cat', 'other']),
   size: z.enum(['small', 'medium', 'large']).default('medium'),
+  // Rascunhos da fila offline gravados antes das cores não têm o campo.
+  colors: z
+    .array(z.enum(['black', 'white', 'gray', 'brown', 'caramel', 'ginger', 'cream', 'brindle']))
+    .max(3)
+    .optional(),
   sex: z.enum(['male', 'female', 'unknown']).default('unknown'),
   name: z.string().trim().max(80).optional().default(''),
   ageEstimate: z.enum(['filhote', 'adulto', 'idoso']).optional(),
@@ -156,6 +161,7 @@ export async function publishAlert(
       ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
       ...(draft.ageEstimate ? { ageEstimate: draft.ageEstimate } : {}),
       ...(draft.care && Object.keys(draft.care).length > 0 ? { care: draft.care } : {}),
+      ...(draft.colors && draft.colors.length > 0 ? { colors: draft.colors } : {}),
       ...(draft.helpRequest
         ? {
             helpRequest: {

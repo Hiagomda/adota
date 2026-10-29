@@ -84,6 +84,15 @@ export default function LostScreen() {
         <AppText color="textSecondary" style={styles.intro}>
           Se o seu sumiu, a gente te ajuda a procurar.
         </AppText>
+        <View style={styles.found}>
+          <Button
+            title="Encontrei um animal: é de alguém?"
+            icon="search"
+            variant="outline"
+            fullWidth
+            onPress={() => router.push('/lost-search')}
+          />
+        </View>
         {feed.isLoading ? (
           <SkeletonCard />
         ) : feed.isError ? (
@@ -137,6 +146,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   column: { flex: 1, ...screenColumn },
   intro: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  found: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   publish: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
 });
 

@@ -46,6 +46,8 @@ export interface Post {
     /** Older API builds did not send it. */
     care?: AnimalCare;
     temperament: string | null;
+    /** Cores do pelo. APIs mais antigas não mandavam. */
+    colors?: string[];
   };
   location: { latitude: number; longitude: number; exact: boolean };
   accuracyM: number | null;

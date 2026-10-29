@@ -60,6 +60,7 @@ export const postSchema: Schema<Post> = z.object({
       })
       .optional(),
     temperament: nullableString,
+    colors: z.array(z.string()).optional(),
   }),
   location: z.object({
     latitude: z.number().gte(-90).lte(90),

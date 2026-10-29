@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import type { Env } from './config.js';
 import { releaseStaleHelper } from './feed.js';
 import { ensureFirebaseApp } from './firebaseAdmin.js';
+import { processPostForMatches } from './lostMatch.js';
 import { captureServerError } from './monitoring.js';
 import { rowsOf } from './session.js';
 
@@ -38,6 +39,12 @@ export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJo
         if (job.data.userId) await remindHelper(pool, env, job.data.postId, job.data.userId);
         return;
       }
+      if (job.name === 'lost-match') {
+        await processPostForMatches(pool, env, job.data.postId, (error, where) => {
+          captureServerError(error, { where });
+        });
+        return;
+      }
       if (job.name === 'help-expire') {
         if (job.data.userId) await releaseHelper(pool, env, job.data.postId, job.data.userId);
         return;
@@ -67,6 +74,24 @@ export async function enqueueRescueAlert(
     'expand',
     { postId, expanded: true },
     { delay: 45 * 60 * 1000, jobId: `expand-${postId}` },
+  );
+}
+
+/**
+ * Cruza o post com os perdidos (ou o perdido com os encontrados) fora da requisição. O id junta
+ * pedidos repetidos do mesmo minuto num só, como várias fotos ou avistamentos seguidos.
+ */
+export async function enqueueLostMatch(queue: Queue<RescueJob>, postId: string): Promise<void> {
+  const minute = Math.floor(Date.now() / 60_000);
+  await queue.add(
+    'lost-match',
+    { postId },
+    {
+      jobId: `lost-match-${postId}-${minute}`,
+      delay: 5_000,
+      removeOnComplete: true,
+      removeOnFail: 100,
+    },
   );
 }
 
