@@ -9,6 +9,7 @@ import {
   responseKindSchema,
   updateMeSchema,
   volunteerSettingsSchema,
+  cupuStyleSchema,
 } from '@patinha/shared';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
@@ -78,6 +79,7 @@ import { fosterDistanceKm } from './privacy.js';
 import { publicUser, rowsOf, type SessionUser } from './session.js';
 import { captureServerError } from './monitoring.js';
 import { registerStaffRoutes } from './staff/routes.js';
+import { cupuStatus, saveCupuStyle } from './cupu.js';
 import { claimVolunteerXp, saveVolunteerSettings, volunteerStatus } from './volunteers.js';
 import { stripControls } from './text.js';
 
@@ -177,6 +179,16 @@ export async function registerRoutes(
   app.post('/volunteers/actions/claim-xp', strictLimit, async (request) => {
     const user = requireUser(request.user);
     return claimVolunteerXp(pool, user.id, parse(claimVolunteerXpSchema, request.body));
+  });
+
+  app.get('/volunteers/me/cupu', async (request) => {
+    const user = requireUser(request.user);
+    return cupuStatus(pool, user.id);
+  });
+
+  app.put('/volunteers/me/cupu', writeLimit, async (request) => {
+    const user = requireUser(request.user);
+    return saveCupuStyle(pool, user.id, parse(cupuStyleSchema, request.body));
   });
 
   app.patch('/me', writeLimit, async (request) => {

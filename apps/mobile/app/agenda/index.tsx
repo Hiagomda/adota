@@ -38,6 +38,7 @@ import {
   type EventList,
   type EventPeriod,
 } from '../../src/events/agenda';
+import { CupuTip } from '../../src/cupu/CupuTip';
 import { EventCard } from '../../src/events/EventCard';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
@@ -354,6 +355,7 @@ export default function AgendaScreen() {
             Feiras de adoção, vacinação, castração, arrecadações e mutirões em Belém. Horários de
             Belém.
           </AppText>
+          <CupuTip context="fairs" style={styles.padded} />
           <View style={styles.padded}>
             <Segmented
               options={viewOptions}

@@ -52,6 +52,7 @@ export {
   type ClaimVolunteerXpInput,
   type VolunteerAction,
   type VolunteerBadgeCode,
+  type VolunteerLevelCode,
   type VolunteerSettingsInput,
 } from './volunteer.js';
 export { insideServiceArea } from './serviceArea.js';
@@ -197,3 +198,29 @@ export {
   type EventResultInput,
   type EventUpdateInput,
 } from './events.js';
+export {
+  cupuAccessorySchema,
+  cupuCatalog,
+  cupuItemUnlocked,
+  cupuLevelName,
+  cupuLevelOrder,
+  cupuPoseSchema,
+  cupuRequirementLabel,
+  cupuSceneSchema,
+  cupuSlots,
+  cupuStyleSchema,
+  defaultCupuStyle,
+  findCupuItem,
+  lockedCupuItems,
+  newlyUnlockedCupuItems,
+  resolveCupuStyle,
+  type CupuAccessoryCode,
+  type CupuCatalogItem,
+  type CupuItem,
+  type CupuPoseCode,
+  type CupuProgress,
+  type CupuRequirement,
+  type CupuSceneCode,
+  type CupuSlot,
+  type CupuStyle,
+} from './cupu.js';

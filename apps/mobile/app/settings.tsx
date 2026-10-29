@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../src/api';
@@ -25,6 +25,8 @@ import { VersionMark } from '../src/diagnostics/VersionMark';
 import { AvatarCropper } from '../src/profile/AvatarCropper';
 import { permissionOutcome } from '../src/permissions';
 import { uploadProfilePhoto } from '../src/place/publish';
+import { useCupuTips } from '../src/cupu/tipStorage';
+import { logBestEffort } from '../src/crash/bestEffort';
 import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 
@@ -41,6 +43,13 @@ export default function SettingsScreen() {
     queryFn: () => loadMe(token ?? ''),
     enabled: Boolean(token),
   });
+  const tipsEnabled = useCupuTips((state) => state.enabled);
+  const tipsLoaded = useCupuTips((state) => state.loaded);
+  const loadTips = useCupuTips((state) => state.load);
+  const setTipsEnabled = useCupuTips((state) => state.setEnabled);
+  useEffect(() => {
+    loadTips().catch(logBestEffort('settings:cupu-tips'));
+  }, [loadTips]);
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [phone, setPhone] = useState('');
@@ -260,6 +269,13 @@ export default function SettingsScreen() {
                         value ? 'Silêncio das 22h às 7h.' : 'Avisos voltam a qualquer hora.',
                       )
                     }
+                  />
+                  <Switch
+                    label="Dicas do Cupu"
+                    description="Dicas curtas sobre adoção e cuidados em telas calmas. Nunca no meio de um resgate."
+                    value={tipsEnabled}
+                    disabled={!tipsLoaded}
+                    onValueChange={setTipsEnabled}
                   />
                   <Input
                     label="Seu WhatsApp"

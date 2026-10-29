@@ -81,8 +81,10 @@ export const volunteerBadgeCatalog = [
 
 export type VolunteerBadgeCode = (typeof volunteerBadgeCatalog)[number]['code'];
 
+export type VolunteerLevelCode = 'scout' | 'local_guardian' | 'active_protector' | 'guardian_angel';
+
 export function levelForXp(xp: number): {
-  code: 'scout' | 'local_guardian' | 'active_protector' | 'guardian_angel';
+  code: VolunteerLevelCode;
   name: string;
   floor: number;
   ceiling: number | null;

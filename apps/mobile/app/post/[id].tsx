@@ -44,6 +44,8 @@ import {
   type Tone,
 } from '../../src/components/ui';
 import { toneColors } from '../../src/components/ui/tones';
+import { celebrationFor, type CupuCelebrationMoment } from '../../src/cupu/celebration';
+import { CupuCelebration } from '../../src/cupu/CupuCelebration';
 import { AnimalDiary } from '../../src/diary';
 import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
 import { formatWhatsApp } from '../../src/contact/whatsapp';
@@ -122,6 +124,7 @@ export default function PostScreen() {
   const [troubleOpen, setTroubleOpen] = useState(false);
   const [marking, setMarking] = useState(false);
   const [adoptedOpen, setAdoptedOpen] = useState(false);
+  const [celebration, setCelebration] = useState<CupuCelebrationMoment | null>(null);
   // Caminho + método da ação que está indo ao servidor. Um segundo toque não manda de novo.
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const inFlight = useRef(new Set<string>());
@@ -352,6 +355,7 @@ export default function PostScreen() {
         logBestEffort('post:found-haptic'),
       );
       setHelpBurst((count) => count + 1);
+      setCelebration(celebrationFor(choice.status, type));
     }
     setNote(choiceNote(choice, from, type));
   }
@@ -365,6 +369,7 @@ export default function PostScreen() {
       logBestEffort('post:adopted-haptic'),
     );
     setHelpBurst((count) => count + 1);
+    setCelebration(celebrationFor('adopted', item?.type));
     setNote('Égua, que alegria! Ele achou um lar. Conte no diário como foi a chegada.');
   }
 
@@ -1228,6 +1233,7 @@ export default function PostScreen() {
               onPress={cta.onPress}
             />
             <PawBurst trigger={helpBurst} />
+            <CupuCelebration moment={celebration} onClose={() => setCelebration(null)} />
           </View>
         </View>
         {helpingNow ? (

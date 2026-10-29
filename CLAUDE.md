@@ -131,6 +131,7 @@ apps/api/src/central.ts       central de resgates (GET /central, por urgência) 
 apps/api/src/lostMatch.ts     busca de perdidos: sugestões perdido × encontrado (nota em packages/shared/src/lostMatch.ts), paleta das fotos pelo imgproxy, /lost-search e cartaz (/posts/:id/poster)
 apps/api/src/campaigns.ts     campanhas: livro-caixa com comprovante, avisos de doação, histórico só de inclusão
 apps/api/src/events.ts        agenda de eventos e mutirões (as feiras são a categoria adoption_fair); lembretes em eventReminders.ts
+apps/api/src/cupu.ts          armário do Cupu: pose, cenário e enfeite liberados por XP, nível e selos (catálogo em packages/shared/src/cupu.ts)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
 apps/mobile/src/components/ui design system (Button, Card, StateLayout, Skeleton...)
@@ -138,6 +139,7 @@ apps/mobile/src/theme/        tokens de cor, espaçamento, tipografia, claro/esc
 apps/mobile/src/map/          MapCanvas + cameraPolicy (testada)
 apps/mobile/src/place/        GPS, PlacePicker, upload e fila offline de publicação
 apps/mobile/src/crash/        reporter, ErrorBoundary, tela de erro
+apps/mobile/src/cupu/         mascote interativo (Cupu.tsx), cenários/enfeites em SVG, dicas, comemorações e apresentação
 download/                     página de download servida pelo container `download`
 ```
 

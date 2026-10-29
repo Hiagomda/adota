@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Mascot, type MascotPose } from '../../mascot';
+import { Cupu } from '../../cupu/Cupu';
+import type { MascotPose } from '../../mascot';
 import { motion, radius, size, spacing, useMotionDuration, useTheme } from '../../theme';
 import { AppText } from './AppText';
 
@@ -37,7 +38,13 @@ export function StateLayout({
       <View style={[shadows.sm, styles.shadow, { backgroundColor: colors.surfaceRaised }]}>
         <View style={styles.panel}>
           <View style={compact ? styles.compactBody : styles.body}>
-            <Mascot pose={pose} size={compact ? COMPACT_MASCOT : size.mascot} />
+            {/* Sem cenário: o painel já é o fundo. O enfeite que a pessoa escolheu vem junto. */}
+            <Cupu
+              pose={pose}
+              size={compact ? COMPACT_MASCOT : size.mascot}
+              scene={null}
+              interactive
+            />
             <View style={compact ? styles.compactText : styles.text}>
               <AppText variant={compact ? 'h3' : 'h2'} style={compact ? undefined : styles.center}>
                 {title}
