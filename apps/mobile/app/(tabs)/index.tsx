@@ -36,6 +36,8 @@ import { ageBandOf, ageBands } from '../../src/post/care';
 import { onFeedRefresh } from '../../src/feedRefresh';
 import { distanceKmBetween, distanceLabel } from '../../src/format';
 import { useViewerLocation, type DeviceFix } from '../../src/place/deviceLocation';
+import { PartnerSpotlight } from '../../src/partners/PartnerSpotlight';
+import { spotlightSlot } from '../../src/partners/partners';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 import { canChooseScheme, toggleColorScheme } from '../../src/theme/schemeChoice';
@@ -436,12 +438,20 @@ export default function HomeScreen() {
   }, [router]);
 
   const renderPost = useCallback(
-    ({ item }: { item: Post }) => (
-      <View style={styles.column}>
-        <PostCard post={item} onOpen={openPost} onLike={like} />
-      </View>
-    ),
-    [like, openPost],
+    ({ item, index }: { item: Post; index: number }) => {
+      const slot = searching ? null : spotlightSlot(index);
+      return (
+        <View style={styles.column}>
+          <PostCard post={item} onOpen={openPost} onLike={like} />
+          {slot !== null ? (
+            <View style={styles.spotlight}>
+              <PartnerSpotlight slot={slot} />
+            </View>
+          ) : null}
+        </View>
+      );
+    },
+    [like, openPost, searching],
   );
 
   const header = (
@@ -647,6 +657,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   column: screenColumn,
+  spotlight: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   mast: {
     ...screenColumn,
     gap: spacing.md,
