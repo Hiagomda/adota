@@ -6,7 +6,7 @@ import {
   animalsOf,
   averageWaitDays,
   greeting,
-  interestLabel,
+  panelHighlight,
   waitShort,
   type PanelAnimal,
 } from './panel.ts';
@@ -70,17 +70,13 @@ describe('painel da ONG', () => {
     assert.equal(averageWaitDays([animal('c', 'adopted', 0)], now), null);
   });
 
-  it('escreve a espera e as fichas em pouco espaço', () => {
+  it('escreve a espera em pouco espaço', () => {
     assert.equal(waitShort(null), '–');
     assert.equal(waitShort(1), '1 dia');
     assert.equal(waitShort(12), '12 dias');
     assert.equal(waitShort(21), '3 sem');
     assert.equal(waitShort(45), '6 sem');
     assert.equal(waitShort(70), '2 meses');
-    assert.equal(interestLabel(0, 0), null);
-    assert.equal(interestLabel(1, 0), '1 ficha');
-    assert.equal(interestLabel(3, 1), '3 fichas · 1 nova');
-    assert.equal(interestLabel(4, 2), '4 fichas · 2 novas');
   });
 
   it('cumprimenta pelo relógio de Belém', () => {
@@ -88,5 +84,65 @@ describe('painel da ONG', () => {
     assert.equal(greeting(new Date('2026-10-31T18:00:00Z')), 'Boa tarde');
     assert.equal(greeting(new Date('2026-10-31T23:30:00Z')), 'Boa noite');
     assert.equal(greeting(new Date('2026-11-01T02:00:00Z')), 'Boa noite');
+  });
+});
+
+describe('recado do Cupu no painel', () => {
+  const base = {
+    org: {
+      name: 'Patas',
+      handle: 'patas',
+      avatarUrl: null,
+      role: 'ngo',
+      instagram: null,
+      neighborhood: null,
+    },
+    theme: { accent: 'turquoise' as const, tagline: null },
+    stats: {
+      rescue: 0,
+      care: 0,
+      forAdoption: 0,
+      adoptedTotal: 0,
+      adoptedThisMonth: 0,
+      newInterests: 0,
+    },
+    animals: [] as PanelAnimal[],
+    recentInterests: [],
+  };
+  const named = (item: PanelAnimal, name: string) => {
+    item.post.animal = { name } as Post['animal'];
+    return item;
+  };
+
+  it('chama atenção para ficha nova antes de tudo', () => {
+    const tip = panelHighlight(
+      { ...base, stats: { ...base.stats, newInterests: 3, adoptedThisMonth: 2 } },
+      now,
+    );
+    assert.equal(tip.pose, 'party');
+    assert.equal(tip.title, '3 fichas novas esta semana!');
+  });
+
+  it('lembra de quem espera há mais de um mês', () => {
+    const tip = panelHighlight(
+      {
+        ...base,
+        animals: [
+          named(animal('a', 'for_adoption', 10), 'Mel'),
+          named(animal('b', 'for_adoption', 45), 'Nina'),
+        ],
+      },
+      now,
+    );
+    assert.equal(tip.pose, 'search');
+    assert.equal(tip.title, 'Nina espera há 6 semanas');
+  });
+
+  it('comemora as adoções do mês e, sem nada, sugere o próximo passo', () => {
+    assert.equal(
+      panelHighlight({ ...base, stats: { ...base.stats, adoptedThisMonth: 1 } }, now).title,
+      '1 adoção este mês!',
+    );
+    assert.equal(panelHighlight(base, now).pose, 'wave');
   });
 });

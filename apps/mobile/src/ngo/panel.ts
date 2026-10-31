@@ -114,18 +114,64 @@ export function waitShort(days: number | null): string {
   return months === 1 ? '1 mês' : `${months} meses`;
 }
 
-/** "1 ficha", "3 fichas · 1 nova". Vazio quando ninguém mandou ficha. */
-export function interestLabel(total: number, fresh: number): string | null {
-  if (total === 0) return null;
-  const base = total === 1 ? '1 ficha' : `${total} fichas`;
-  if (fresh === 0) return base;
-  return `${base} · ${fresh === 1 ? '1 nova' : `${fresh} novas`}`;
-}
-
 /** Bom dia, boa tarde ou boa noite no relógio de Belém (UTC-3, sem horário de verão). */
 export function greeting(now: Date = new Date()): string {
   const hour = (now.getUTCHours() + 21) % 24;
   if (hour >= 5 && hour < 12) return 'Bom dia';
   if (hour >= 12 && hour < 18) return 'Boa tarde';
   return 'Boa noite';
+}
+
+export type HighlightPose = 'party' | 'search' | 'home' | 'wave';
+
+export interface PanelHighlight {
+  pose: HighlightPose;
+  title: string;
+  body: string;
+}
+
+/** Quanto tempo de espera já merece um empurrão (compartilhar de novo, levar à feira). */
+export const LONG_WAIT_DAYS = 30;
+
+/**
+ * O recado do Cupu no topo do painel: a coisa mais importante para a ONG fazer agora. Fichas novas
+ * vêm primeiro, porque quem mandou ficha está esperando resposta.
+ */
+export function panelHighlight(panel: NgoPanel, now: Date = new Date()): PanelHighlight {
+  const fresh = panel.stats.newInterests;
+  if (fresh > 0) {
+    return {
+      pose: 'party',
+      title: fresh === 1 ? '1 ficha nova esta semana!' : `${fresh} fichas novas esta semana!`,
+      body: 'Responda logo: quem manda ficha já está pensando em buscar.',
+    };
+  }
+  const longest = animalsOf(panel.animals, 'adoption').reduce<PanelAnimal | null>(
+    (oldest, item) => (oldest === null || sinceOf(item) < sinceOf(oldest) ? item : oldest),
+    null,
+  );
+  if (longest) {
+    const days = Math.floor((now.getTime() - sinceOf(longest)) / 86_400_000);
+    if (days >= LONG_WAIT_DAYS) {
+      const name = longest.post.animal.name?.trim() || 'Um dos seus animais';
+      return {
+        pose: 'search',
+        title: `${name} espera há ${Math.floor(days / 7)} semanas`,
+        body: 'Que tal compartilhar de novo ou levar para a próxima feira?',
+      };
+    }
+  }
+  const adopted = panel.stats.adoptedThisMonth;
+  if (adopted > 0) {
+    return {
+      pose: 'home',
+      title: adopted === 1 ? '1 adoção este mês!' : `${adopted} adoções este mês!`,
+      body: 'Cada final feliz abre vaga para outro resgate.',
+    };
+  }
+  return {
+    pose: 'wave',
+    title: 'Tudo em dia por aqui',
+    body: 'Publique um animal para adoção ou marque uma feira para movimentar.',
+  };
 }

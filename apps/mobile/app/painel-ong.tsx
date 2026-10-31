@@ -1,63 +1,61 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../src/api';
-import { animalHeadline, placeOf, speciesLabel } from '../src/animalLabels';
+import { animalHeadline, placeOf } from '../src/animalLabels';
 import { CampaignTile } from '../src/campaign/CampaignTile';
 import type { CampaignSummary } from '../src/campaign/campaign';
 import {
-  ActionCard,
+  AnimalCard,
   AppText,
-  Avatar,
-  Badge,
-  Button,
   Card,
   EmptyState,
   ErrorState,
   Header,
-  IconButton,
-  PetPattern,
-  Photo,
+  Icon,
   SectionHeader,
   Segmented,
   SkeletonRows,
-  StatCard,
-  StatusPill,
+  Touchable,
+  type IconName,
 } from '../src/components/ui';
 import { toneColors } from '../src/components/ui/tones';
+import { Cupu } from '../src/cupu/Cupu';
 import { EventCard } from '../src/events/EventCard';
 import type { EventList } from '../src/events/agenda';
-import { formatWhen } from '../src/format';
+import { INTEREST_CARD_WIDTH, InterestCard } from '../src/ngo/InterestCard';
 import {
   accentTone,
   animalsOf,
   averageWaitDays,
   greeting,
-  interestLabel,
+  panelHighlight,
   waitShort,
   type AnimalGroup,
   type NgoPanel,
-  type PanelAnimal,
-  type PanelInterest,
 } from '../src/ngo/panel';
+import { PanelHero } from '../src/ngo/PanelHero';
 import { ThemeSheet } from '../src/ngo/ThemeSheet';
-import { answerLines } from '../src/post/adoptionInterest';
 import { waitingShort } from '../src/post/waiting';
 import { useSession } from '../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../src/theme';
 
 const MAX_EVENTS = 3;
 const MAX_CAMPAIGNS = 3;
+const CUPU_SIZE = 96;
+/** Quanto o cartão de números sobe sobre a onda da capa. */
+const STATS_LIFT = spacing.xxxl + spacing.lg;
 
 /**
- * Painel da ONG: a casa da ONG verificada dentro do app. Mostra quem mandou ficha, os animais por
- * fase, as campanhas e a agenda, na cor que a ONG escolheu.
+ * Painel da ONG: a casa da ONG verificada dentro do app. Capa na cor que ela escolheu, o recado do
+ * Cupu com o que fazer agora, as fichas de adoção, os animais por fase, as campanhas e a agenda.
  */
 export default function NgoPanelScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
+  const insets = useSafeAreaInsets();
   const client = useQueryClient();
   const token = useSession((state) => state.token);
   const [group, setGroup] = useState<AnimalGroup>('adoption');
@@ -98,167 +96,176 @@ export default function NgoPanelScreen() {
   }
 
   const data = panel.data;
-  const tone = toneColors(colors, accentTone(data?.theme.accent));
   const openPost = (id: string) => router.push(`/post/${id}`);
 
-  let body;
-  if (!token) {
-    body = (
-      <EmptyState
-        pose="wave"
-        title="Entre para ver o painel"
-        body="O painel da ONG fica ligado à conta verificada."
-        actionLabel="Entrar"
-        onAction={() => router.push('/login')}
-      />
-    );
-  } else if (me.isLoading) {
-    body = <SkeletonRows />;
-  } else if (!allowed) {
-    body = (
-      <EmptyState
-        pose="sit"
-        title="O painel é das ONGs verificadas"
-        body="Com o selo, você acompanha os animais, as fichas de adoção, as campanhas e a agenda numa tela só."
-        actionLabel="Pedir o selo"
-        onAction={() => router.push('/ong')}
-      />
-    );
-  } else if (panel.isLoading) {
-    body = <SkeletonRows />;
-  } else if (panel.isError || !data) {
-    body = (
-      <ErrorState
-        title="Não consegui abrir o painel"
-        body={messageFrom(panel.error)}
-        onRetry={() => void panel.refetch()}
-      />
-    );
-  } else {
-    const wait = averageWaitDays(data.animals);
-    const shown = animalsOf(data.animals, group);
-    const counts = {
-      adoption: animalsOf(data.animals, 'adoption').length,
-      care: animalsOf(data.animals, 'care').length,
-      adopted: animalsOf(data.animals, 'adopted').length,
-    };
-    const statTone = accentTone(data.theme.accent);
-    const myCampaigns = (campaigns.data?.campaigns ?? [])
-      .filter((item) => item.phase === 'active')
-      .slice(0, MAX_CAMPAIGNS);
-    const myEvents = (events.data?.events ?? [])
-      .filter((item) => item.state === 'scheduled' || item.state === 'happening')
-      .slice(0, MAX_EVENTS);
-
-    body = (
-      <View style={styles.sections}>
-        {/* Capa na cor da ONG, com a textura de ossinho e peixinho do app. */}
-        <View style={[styles.hero, { backgroundColor: tone.background }]}>
-          <PetPattern color={tone.foreground} opacity={0.08} />
-          <View style={styles.heroTop}>
-            <View style={[styles.avatarRing, { backgroundColor: colors.surface }]}>
-              <Avatar name={data.org.name} uri={data.org.avatarUrl} size="xl" verified />
-            </View>
-            <View style={styles.heroText}>
-              <AppText variant="caption" style={{ color: tone.foreground }}>
-                {data.org.role === 'ngo' ? 'ONG VERIFICADA' : 'PROTETOR VERIFICADO'}
-              </AppText>
-              <AppText variant="h2" style={{ color: tone.foreground }} numberOfLines={2}>
-                {data.org.name}
-              </AppText>
-              <AppText variant="bodySmall" style={{ color: tone.foreground }} numberOfLines={1}>
-                @{data.org.handle}
-                {data.org.neighborhood ? ` · ${data.org.neighborhood}` : ''}
-              </AppText>
-            </View>
-          </View>
-          {data.theme.tagline ? (
-            <AppText style={[styles.tagline, { color: tone.foreground }]}>
-              “{data.theme.tagline}”
-            </AppText>
-          ) : null}
-          <View style={styles.heroActions}>
-            <Button
-              title="Ver perfil"
-              icon="user"
-              variant="outline"
-              onPress={() => router.push(`/user/${data.org.handle}`)}
-              style={styles.grow}
-            />
-            {data.org.instagram ? (
-              <Button
-                title="Instagram"
-                icon="instagram"
-                variant="outline"
-                onPress={() =>
-                  void Linking.openURL(`https://www.instagram.com/${data.org.instagram}`)
-                }
-                style={styles.grow}
-              />
-            ) : null}
-          </View>
+  // Antes de ter o painel, a tela usa o cabeçalho comum do app.
+  if (!data) {
+    let state;
+    if (!token) {
+      state = (
+        <EmptyState
+          pose="wave"
+          title="Entre para ver o painel"
+          body="O painel da ONG fica ligado à conta verificada."
+          actionLabel="Entrar"
+          onAction={() => router.push('/login')}
+        />
+      );
+    } else if (me.isLoading || (allowed && panel.isLoading)) {
+      state = <SkeletonRows />;
+    } else if (!allowed) {
+      state = (
+        <EmptyState
+          pose="sit"
+          title="O painel é das ONGs verificadas"
+          body="Com o selo, você acompanha os animais, as fichas de adoção, as campanhas e a agenda numa tela só."
+          actionLabel="Pedir o selo"
+          onAction={() => router.push('/ong')}
+        />
+      );
+    } else {
+      state = (
+        <ErrorState
+          title="Não consegui abrir o painel"
+          body={messageFrom(panel.error)}
+          onRetry={() => void panel.refetch()}
+        />
+      );
+    }
+    return (
+      <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={styles.column}>
+          <Header title="Painel da ONG" large onBack={() => router.back()} />
+          {state}
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        <View style={styles.grid}>
-          <View style={styles.cell}>
-            <StatCard
-              value={data.stats.newInterests}
-              label="Fichas novas na semana"
-              icon="inbox"
-              tone={statTone}
-            />
-          </View>
-          <View style={styles.cell}>
-            <StatCard
-              value={data.stats.forAdoption}
-              label="Esperando família"
-              icon="home"
-              tone={statTone}
-            />
-          </View>
-          <View style={styles.cell}>
-            <StatCard
-              value={data.stats.adoptedThisMonth}
-              label="Adotados este mês"
-              icon="heart"
-              tone={statTone}
-            />
-          </View>
-          <View style={styles.cell}>
-            <StatCard value={waitShort(wait)} label="Espera média" icon="clock" tone={statTone} />
-          </View>
-        </View>
-        <AppText variant="bodySmall" color="textSecondary" style={styles.totals}>
-          {data.stats.rescue} em resgate · {data.stats.care} em cuidado ·{' '}
-          {data.stats.adoptedTotal === 1 ? '1 adotado' : `${data.stats.adoptedTotal} adotados`}{' '}
-          desde o começo
-        </AppText>
+  const accent = toneColors(colors, accentTone(data.theme.accent));
+  const highlight = panelHighlight(data);
+  const wait = averageWaitDays(data.animals);
+  const shown = animalsOf(data.animals, group);
+  const counts = {
+    adoption: animalsOf(data.animals, 'adoption').length,
+    care: animalsOf(data.animals, 'care').length,
+    adopted: animalsOf(data.animals, 'adopted').length,
+  };
+  const myCampaigns = (campaigns.data?.campaigns ?? [])
+    .filter((item) => item.phase === 'active')
+    .slice(0, MAX_CAMPAIGNS);
+  const myEvents = (events.data?.events ?? [])
+    .filter((item) => item.state === 'scheduled' || item.state === 'happening')
+    .slice(0, MAX_EVENTS);
+  const stats = [
+    { value: String(data.stats.newInterests), label: 'fichas novas' },
+    { value: String(data.stats.forAdoption), label: 'esperando' },
+    { value: String(data.stats.adoptedThisMonth), label: 'adotados no mês' },
+    { value: waitShort(wait), label: 'espera média' },
+  ];
+  const shortcuts: { title: string; icon: IconName; href: Href }[] = [
+    { title: 'Publicar animal', icon: 'plus-circle', href: '/create' },
+    { title: 'Abrir campanha', icon: 'heart', href: '/campanha/nova' },
+    { title: 'Marcar evento', icon: 'calendar', href: '/agenda/novo' },
+    { title: 'Achar Casa Amiga', icon: 'home', href: '/casa-amiga' },
+  ];
 
-        <View>
-          <SectionHeader title="Fichas de adoção" subtitle="Quem quer adotar seus animais" />
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={() => void refresh()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        <PanelHero
+          topInset={insets.top}
+          panel={data}
+          greeting={`${greeting()}! Este é o seu painel.`}
+          onBack={() => router.back()}
+          onTheme={() => setThemeOpen(true)}
+          onProfile={() => router.push(`/user/${data.org.handle}`)}
+        />
+
+        <View style={styles.column}>
+          {/* Os números sobem por cima da onda da capa. */}
+          <View style={[styles.stats, shadows.lg, { backgroundColor: colors.surface }]}>
+            {stats.map((stat, index) => (
+              <View
+                key={stat.label}
+                accessible
+                accessibilityLabel={`${stat.label}: ${stat.value}`}
+                style={[
+                  styles.stat,
+                  index > 0 ? { borderLeftWidth: 1, borderLeftColor: colors.border } : null,
+                ]}
+              >
+                <AppText variant="h2" style={{ color: accent.foreground }} numberOfLines={1}>
+                  {stat.value}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  color="textSecondary"
+                  style={styles.statLabel}
+                  numberOfLines={2}
+                >
+                  {stat.label}
+                </AppText>
+              </View>
+            ))}
+          </View>
+          <AppText variant="caption" color="textSecondary" style={styles.totals}>
+            {data.stats.rescue} em resgate · {data.stats.care} em cuidado ·{' '}
+            {data.stats.adoptedTotal === 1 ? '1 adotado' : `${data.stats.adoptedTotal} adotados`}{' '}
+            desde o começo
+          </AppText>
+
+          {/* O recado do Cupu: a coisa mais importante para fazer agora. */}
+          <View style={[styles.highlight, { backgroundColor: accent.background }]}>
+            <Cupu size={CUPU_SIZE} pose={highlight.pose} scene={null} />
+            <View style={styles.highlightText}>
+              <AppText variant="h3" style={{ color: accent.foreground }}>
+                {highlight.title}
+              </AppText>
+              <AppText variant="bodySmall" style={{ color: accent.foreground }}>
+                {highlight.body}
+              </AppText>
+            </View>
+          </View>
+
+          <SectionHeader title="Fichas de adoção" subtitle="Toque para ver todas as respostas" />
           {data.recentInterests.length === 0 ? (
             <View style={styles.pad}>
-              <Card elevation="none" style={{ backgroundColor: colors.surfaceMuted }}>
-                <AppText color="textSecondary">
-                  Ainda não chegou ficha. Quando alguém tocar em “Quero adotar”, as respostas
-                  aparecem aqui.
+              <View style={[styles.emptyBox, { borderColor: colors.borderStrong }]}>
+                <Icon name="inbox" size="lg" color={colors.textSecondary} />
+                <AppText color="textSecondary" style={styles.emptyText}>
+                  Ainda não chegou ficha. Quando alguém tocar em “Quero adotar”, ela aparece aqui.
                 </AppText>
-              </Card>
+              </View>
             </View>
           ) : (
-            <View style={styles.list}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={INTEREST_CARD_WIDTH + spacing.md}
+              decelerationRate="fast"
+              contentContainerStyle={styles.rail}
+            >
               {data.recentInterests.map((interest) => (
-                <InterestRow
+                <InterestCard
                   key={`${interest.postId}:${interest.person.id}`}
                   interest={interest}
                   onPress={() => openPost(interest.postId)}
                 />
               ))}
-            </View>
+            </ScrollView>
           )}
-        </View>
 
-        <View>
           <SectionHeader title="Seus animais" />
           <View style={styles.pad}>
             <Segmented
@@ -266,32 +273,72 @@ export default function NgoPanelScreen() {
               value={group}
               onChange={setGroup}
               options={[
-                { value: 'adoption', label: `Adoção ${counts.adoption}` },
-                { value: 'care', label: `Cuidado ${counts.care}` },
-                { value: 'adopted', label: `Adotados ${counts.adopted}` },
+                { value: 'adoption', label: `Adoção · ${counts.adoption}` },
+                { value: 'care', label: `Cuidado · ${counts.care}` },
+                { value: 'adopted', label: `Adotados · ${counts.adopted}` },
               ]}
             />
           </View>
           {shown.length === 0 ? (
             <View style={styles.pad}>
-              <AppText color="textSecondary" style={styles.emptyLine}>
-                {group === 'adoption'
-                  ? 'Nenhum animal para adoção agora.'
-                  : group === 'care'
-                    ? 'Nenhum animal em resgate ou em cuidado.'
-                    : 'Os adotados aparecem aqui.'}
-              </AppText>
+              <View style={[styles.emptyBox, { borderColor: colors.borderStrong }]}>
+                <Icon name="feather" size="lg" color={colors.textSecondary} />
+                <AppText color="textSecondary" style={styles.emptyText}>
+                  {group === 'adoption'
+                    ? 'Nenhum animal para adoção agora.'
+                    : group === 'care'
+                      ? 'Nenhum animal em resgate ou em cuidado.'
+                      : 'Os finais felizes aparecem aqui.'}
+                </AppText>
+              </View>
             </View>
           ) : (
-            <View style={styles.list}>
-              {shown.map((item) => (
-                <AnimalRow key={item.post.id} item={item} onPress={() => openPost(item.post.id)} />
+            <View style={styles.grid}>
+              {shown.map((item, index) => (
+                <AnimalCard
+                  key={item.post.id}
+                  variant="compact"
+                  index={index}
+                  photoUri={item.post.media[0]?.thumbUrl}
+                  title={animalHeadline(item.post.animal)}
+                  subtitle={
+                    item.newInterests > 0
+                      ? item.newInterests === 1
+                        ? '1 ficha nova'
+                        : `${item.newInterests} fichas novas`
+                      : ((item.post.status === 'for_adoption'
+                          ? waitingShort(item.post.adoptionSince)
+                          : null) ?? placeOf(item.post.approxLabel))
+                  }
+                  status={item.post.status}
+                  onPress={() => openPost(item.post.id)}
+                />
               ))}
             </View>
           )}
-        </View>
 
-        <View>
+          <SectionHeader title="Fazer agora" />
+          <View style={styles.tiles}>
+            {shortcuts.map((shortcut) => (
+              <Touchable
+                key={shortcut.title}
+                accessibilityRole="button"
+                accessibilityLabel={shortcut.title}
+                haptic="light"
+                pressedScale={0.97}
+                onPress={() => router.push(shortcut.href)}
+                style={[styles.tile, { backgroundColor: accent.background }]}
+              >
+                <View style={[styles.tileIcon, { backgroundColor: colors.surface }]}>
+                  <Icon name={shortcut.icon} size="lg" color={accent.foreground} />
+                </View>
+                <AppText variant="bodySmallStrong" style={{ color: accent.foreground }}>
+                  {shortcut.title}
+                </AppText>
+              </Touchable>
+            ))}
+          </View>
+
           <SectionHeader
             title="Campanhas"
             actionLabel="Ver todas"
@@ -306,12 +353,15 @@ export default function NgoPanelScreen() {
               />
             ))}
             {campaigns.isSuccess && myCampaigns.length === 0 ? (
-              <AppText color="textSecondary">Nenhuma campanha aberta.</AppText>
+              <Card elevation="none" style={{ backgroundColor: colors.surfaceMuted }}>
+                <AppText color="textSecondary">
+                  Nenhuma campanha aberta. Ração, castração ou veterinário: o extrato fica aberto
+                  para quem doa.
+                </AppText>
+              </Card>
             ) : null}
           </View>
-        </View>
 
-        <View>
           <SectionHeader
             title="Agenda"
             actionLabel="Ver agenda"
@@ -326,215 +376,104 @@ export default function NgoPanelScreen() {
               />
             ))}
             {events.isSuccess && myEvents.length === 0 ? (
-              <AppText color="textSecondary">Nenhum evento marcado.</AppText>
+              <Card elevation="none" style={{ backgroundColor: colors.surfaceMuted }}>
+                <AppText color="textSecondary">
+                  Nenhum evento marcado. Uma feira de adoção costuma render várias fichas.
+                </AppText>
+              </Card>
             ) : null}
           </View>
-        </View>
-
-        <View>
-          <SectionHeader title="Fazer agora" />
-          <View style={styles.list}>
-            <ActionCard
-              title="Publicar um animal"
-              description="Resgate ou animal para adoção"
-              icon="plus-circle"
-              tone={statTone}
-              onPress={() => router.push('/create')}
-            />
-            <ActionCard
-              title="Abrir uma campanha"
-              description="Ração, castração ou veterinário, com extrato aberto"
-              icon="heart"
-              tone={statTone}
-              onPress={() => router.push('/campanha/nova')}
-            />
-            <ActionCard
-              title="Marcar um evento"
-              description="Feira de adoção, mutirão ou bazar"
-              icon="calendar"
-              tone={statTone}
-              onPress={() => router.push('/agenda/novo')}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        refreshControl={
-          allowed ? (
-            <RefreshControl
-              refreshing={pulling}
-              onRefresh={() => void refresh()}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          ) : undefined
-        }
-      >
-        <View style={styles.column}>
-          <Header
-            title="Painel da ONG"
-            subtitle={data ? `${greeting()}! Veja o que mudou.` : undefined}
-            large
-            onBack={() => router.back()}
-            right={
-              data ? (
-                <IconButton
-                  icon="droplet"
-                  accessibilityLabel="Mudar a cor e a frase do painel"
-                  onPress={() => setThemeOpen(true)}
-                />
-              ) : null
-            }
-          />
-          {body}
         </View>
       </ScrollView>
-      {data ? (
-        <ThemeSheet
-          visible={themeOpen}
-          token={token}
-          accent={data.theme.accent}
-          tagline={data.theme.tagline}
-          onClose={() => setThemeOpen(false)}
-          onSaved={() => {
-            setThemeOpen(false);
-            void client.invalidateQueries({ queryKey: ['ngo-panel'] });
-          }}
-        />
-      ) : null}
-    </SafeAreaView>
+      <ThemeSheet
+        visible={themeOpen}
+        token={token}
+        accent={data.theme.accent}
+        tagline={data.theme.tagline}
+        onClose={() => setThemeOpen(false)}
+        onSaved={() => {
+          setThemeOpen(false);
+          void client.invalidateQueries({ queryKey: ['ngo-panel'] });
+        }}
+      />
+    </View>
   );
 }
 
-/** Uma ficha: quem mandou, para qual animal, quando e as duas primeiras respostas. */
-function InterestRow({ interest, onPress }: { interest: PanelInterest; onPress: () => void }) {
-  const lines = answerLines(interest.answers, interest.animal.species).slice(0, 2);
-  const animal =
-    interest.animal.name ??
-    `o ${(speciesLabel[interest.animal.species] ?? 'bichinho').toLowerCase()}`;
-  return (
-    <Card
-      elevation="sm"
-      padding="md"
-      onPress={onPress}
-      accessibilityLabel={`${interest.person.name} quer adotar ${animal}. ${lines.join('. ')}.`}
-    >
-      <View style={styles.row}>
-        <Avatar
-          name={interest.person.name}
-          uri={interest.person.avatarUrl}
-          size="md"
-          verified={interest.person.verified}
-        />
-        <View style={styles.rowText}>
-          <AppText variant="bodyStrong" numberOfLines={2}>
-            {interest.person.name} quer adotar {animal}
-          </AppText>
-          <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
-            {lines.join(' · ')}
-          </AppText>
-          <AppText variant="caption" color="textSecondary">
-            {formatWhen(interest.updatedAt)}
-          </AppText>
-        </View>
-        <Photo
-          uri={interest.animal.photoUrl}
-          style={styles.thumb}
-          accessibilityLabel=""
-          iconSize="sm"
-        />
-      </View>
-      {interest.note ? (
-        <AppText variant="bodySmall" style={styles.note} numberOfLines={3}>
-          “{interest.note}”
-        </AppText>
-      ) : null}
-    </Card>
-  );
-}
-
-/** Um animal da ONG: foto, nome, fase, há quanto tempo espera e as fichas. */
-function AnimalRow({ item, onPress }: { item: PanelAnimal; onPress: () => void }) {
-  const { post } = item;
-  const name = animalHeadline(post.animal);
-  const waiting = post.status === 'for_adoption' ? waitingShort(post.adoptionSince) : null;
-  const interests = interestLabel(item.interests, item.newInterests);
-  return (
-    <Card
-      elevation="sm"
-      padding="md"
-      onPress={onPress}
-      accessibilityLabel={[name, waiting, interests].filter(Boolean).join('. ')}
-    >
-      <View style={styles.row}>
-        <Photo uri={post.media[0]?.thumbUrl} style={styles.photo} accessibilityLabel="" />
-        <View style={styles.rowText}>
-          <AppText variant="bodyStrong" numberOfLines={1}>
-            {name}
-          </AppText>
-          <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-            {[placeOf(post.approxLabel), waiting].filter(Boolean).join(' · ')}
-          </AppText>
-          <View style={styles.pills}>
-            <StatusPill status={post.status} />
-            {interests ? (
-              <Badge
-                kind="label"
-                label={interests}
-                tone={item.newInterests > 0 ? 'secondary' : 'neutral'}
-              />
-            ) : null}
-          </View>
-        </View>
-      </View>
-    </Card>
-  );
-}
-
-const PHOTO = 72;
-const THUMB = 44;
+const TILE_ICON = 48;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,
-  sections: { gap: spacing.lg },
-  hero: {
+  stats: {
+    flexDirection: 'row',
     marginHorizontal: spacing.lg,
+    marginTop: -STATS_LIFT,
     borderRadius: radius.xl,
-    overflow: 'hidden',
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingVertical: spacing.lg,
   },
-  avatarRing: { borderRadius: radius.pill, padding: spacing.xs },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  heroText: { flex: 1, gap: spacing.xs },
-  tagline: { fontStyle: 'italic' },
-  heroActions: { flexDirection: 'row', gap: spacing.sm },
-  grow: { flex: 1 },
+  stat: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xs, gap: 2 },
+  statLabel: { textAlign: 'center' },
+  totals: { textAlign: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  highlight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    paddingRight: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
+    borderRadius: radius.xl,
+  },
+  highlightText: { flex: 1, gap: spacing.xs },
+  pad: { paddingHorizontal: spacing.lg },
+  rail: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'flex-start',
+  },
   grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  emptyBox: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.lg,
+    marginTop: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  emptyText: { textAlign: 'center' },
+  tiles: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
-  cell: { flexBasis: '47%', flexGrow: 1 },
-  totals: { paddingHorizontal: spacing.lg, marginTop: -spacing.sm },
-  pad: { paddingHorizontal: spacing.lg },
+  tile: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  tileIcon: {
+    width: TILE_ICON,
+    height: TILE_ICON,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   list: { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  emptyLine: { paddingTop: spacing.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  rowText: { flex: 1, gap: spacing.xs },
-  thumb: { width: THUMB, height: THUMB, borderRadius: radius.md },
-  photo: { width: PHOTO, height: PHOTO, borderRadius: radius.md },
-  note: { marginTop: spacing.sm },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, alignItems: 'center' },
 });
 
 // Uma tela quebrada não pode derrubar o app inteiro.

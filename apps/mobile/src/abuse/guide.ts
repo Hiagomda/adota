@@ -4,6 +4,8 @@
  * Agência Pará (2023) e d'O Liberal (2022); confira de novo antes de mudar um número.
  */
 
+import type { IconName } from '../components/ui/Icon';
+
 export type ChannelAction = { kind: 'call'; number: string } | { kind: 'link'; url: string };
 
 export interface Channel {
@@ -46,13 +48,13 @@ export const channels: Channel[] = [
 ];
 
 /** O que costuma ser maus-tratos. A lista ajuda a reconhecer; quem decide é a autoridade. */
-export const signs = [
-  'Bater, ferir, envenenar ou mutilar',
-  'Abandonar na rua ou em casa vazia',
-  'Deixar sem água, comida ou sombra',
-  'Manter preso em corrente curta ou lugar apertado e sujo',
-  'Não levar ao veterinário quando está ferido ou doente',
-  'Usar em briga de animais',
+export const signs: { label: string; icon: IconName }[] = [
+  { label: 'Bater, ferir, envenenar ou mutilar', icon: 'alert-octagon' },
+  { label: 'Abandonar na rua ou em casa vazia', icon: 'log-out' },
+  { label: 'Deixar sem água, comida ou sombra', icon: 'droplet' },
+  { label: 'Prender em corrente curta ou lugar sujo', icon: 'link' },
+  { label: 'Não levar ao veterinário quando precisa', icon: 'activity' },
+  { label: 'Usar em briga de animais', icon: 'zap' },
 ];
 
 export const evidenceSteps = [
