@@ -18,6 +18,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
+import { registerNgoPanelRoutes } from './ngoPanel.js';
 import {
   notifyCampaignSuspension,
   registerCampaignRoutes,
@@ -910,6 +911,7 @@ export async function registerRoutes(
 
   registerAdoptionChat(app, { env, pool });
   registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
+  registerNgoPanelRoutes(app, { env, pool, writeLimit });
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, {
     env,

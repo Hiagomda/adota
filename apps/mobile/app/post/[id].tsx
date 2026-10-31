@@ -1390,6 +1390,17 @@ export default function PostScreen() {
             }}
           />
         ))}
+        {/* A denúncia daqui vai para a equipe do app; crime vai para a polícia. */}
+        <ListItem
+          title="Viu maus-tratos? Avise a polícia"
+          subtitle="190, 181 e a Delegacia Virtual, com o relato pronto."
+          icon="shield"
+          showChevron
+          onPress={() => {
+            setReportOpen(false);
+            router.push('/maus-tratos');
+          }}
+        />
       </BottomSheet>
 
       <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} title="Você vai ajudar?">

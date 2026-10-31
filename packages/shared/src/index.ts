@@ -61,9 +61,13 @@ export {
   adoptionEventSchema,
   adoptionInterestSchema,
   daysWaiting,
+  ngoAccents,
+  ngoThemeSchema,
   verificationRequestSchema,
   type AdoptionEventInput,
   type AdoptionInterestInput,
+  type NgoAccent,
+  type NgoThemeInput,
   type VerificationRequestInput,
 } from './adoption.js';
 export {

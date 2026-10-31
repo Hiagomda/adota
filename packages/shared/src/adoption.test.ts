@@ -3,6 +3,7 @@ import {
   adoptionEventSchema,
   adoptionInterestSchema,
   daysWaiting,
+  ngoThemeSchema,
   verificationRequestSchema,
 } from './adoption.js';
 
@@ -106,5 +107,18 @@ describe('days waiting', () => {
     const now = new Date('2026-10-19T12:00:00Z');
     expect(daysWaiting(new Date('2026-09-19T13:00:00Z'), now)).toBe(29);
     expect(daysWaiting(new Date('2026-10-20T12:00:00Z'), now)).toBe(0);
+  });
+});
+
+describe('tema do painel da ONG', () => {
+  it('aceita só as cores da paleta e corta a frase longa', () => {
+    expect(ngoThemeSchema.parse({ accent: 'coral', tagline: '  Patas de Belém  ' })).toEqual({
+      accent: 'coral',
+      tagline: 'Patas de Belém',
+    });
+    expect(ngoThemeSchema.safeParse({ accent: '#ff0000' }).success).toBe(false);
+    expect(ngoThemeSchema.safeParse({ accent: 'blue', tagline: 'x'.repeat(121) }).success).toBe(
+      false,
+    );
   });
 });
