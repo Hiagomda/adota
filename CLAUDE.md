@@ -131,6 +131,7 @@ apps/api/src/central.ts       central de resgates (GET /central, por urgência) 
 apps/api/src/lostMatch.ts     busca de perdidos: sugestões perdido × encontrado (nota em packages/shared/src/lostMatch.ts), paleta das fotos pelo imgproxy, /lost-search e cartaz (/posts/:id/poster)
 apps/api/src/campaigns.ts     campanhas: livro-caixa com comprovante, avisos de doação, histórico só de inclusão
 apps/api/src/events.ts        agenda de eventos e mutirões (as feiras são a categoria adoption_fair); lembretes em eventReminders.ts
+apps/api/src/partners.ts      Parceiros do Cupu: petshops, clínicas e lojas no mapa e no feed ("Anuncie aqui"); revisão em staff/partners.ts
 apps/api/src/cupu.ts          armário do Cupu: pose, cenário e enfeite liberados por XP, nível e selos (catálogo em packages/shared/src/cupu.ts)
 apps/api/db/migrations        SQL numerado; db/down tem o reverso
 apps/mobile/app/              telas (Expo Router)
@@ -152,6 +153,8 @@ download/                     página de download servida pelo container `downlo
 - Agenda: tudo no fuso `America/Belem`. Vagas e fila de espera são decididas no servidor com o evento travado (`FOR UPDATE`). Lembretes saem de uma varredura a cada 10 min (fila BullMQ `event-reminders`), não de um job por evento; `event_reminders` impede lembrete repetido. Evento de quem não tem selo espera a equipe (painel do AdotaSite, tela Eventos); feira e arrecadação só com selo. `/adoption-events` continua para APKs antigos e mostra só feiras publicadas.
 - Admin do dono: o e-mail em `OWNER_EMAILS` vira admin só com `email_verified` do Firebase.
 - Campanhas (`/campanhas`, `campaigns.ts`): só perfil verificado (ou a equipe) abre. O app não recebe dinheiro e não existe gateway nem webhook: o Pix é do responsável e o progresso soma só lançamentos `confirmed`, que sempre têm comprovante. O "fiz um Pix" de quem doou fica `pending` e nunca soma até o responsável confirmar. Nada é apagado: correção é anular com motivo, e `campaign_events` tem gatilho que bloqueia UPDATE/DELETE. Comprovante de despesa é público; o de doação só responsável, equipe (admin, superadmin, `finance_reviewer`) e quem doou. Denúncia usa `reports` com `target_type = 'campaign'`; aceitar suspende (Pix sai do ar). Painel: `GET /admin/v1/campaigns` e `POST /admin/v1/campaigns/:id/status` com a permissão `campaigns.review`.
+
+- Parceiros do Cupu (`partners.ts`, telas `/parceiros` e `/parceiro/:id`): o app não cobra nem recebe dinheiro; o parceiro entra de graça oferecendo uma vantagem a quem adota ou resgata. Todo cadastro e toda edição passam pela equipe (`/admin/v1/partners`, permissão `posts.moderate`). Loja é lugar público, então o ponto aparece exato. O convite (popup no mapa) aparece no máximo a cada 21 dias, nunca nos 3 primeiros dias nem para quem já é parceiro. As contagens (`partner_daily_stats`) são só números por dia, sem saber quem tocou.
 
 ## Regras
 

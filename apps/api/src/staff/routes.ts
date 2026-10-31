@@ -8,6 +8,7 @@ import type { createQueue } from '../notify.js';
 import { rowsOf } from '../session.js';
 import { registerEventModerationRoutes } from './events.js';
 import { registerModerationRoutes } from './moderation.js';
+import { registerPartnerModerationRoutes } from './partners.js';
 import { decoyHash, verifyPassword } from './password.js';
 import {
   assignableRoles,
@@ -480,6 +481,7 @@ export async function registerStaffRoutes(
 
   registerModerationRoutes(app, { env, pool, queue });
   registerEventModerationRoutes(app, { env, pool });
+  registerPartnerModerationRoutes(app, { env, pool });
 }
 
 export type StaffPermissionName = Permission;

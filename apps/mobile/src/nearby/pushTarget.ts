@@ -16,8 +16,8 @@ export function postIdFromPush(data: unknown): string | null {
 }
 
 /** Telas que um aviso pode abrir além do resgate. Qualquer outra coisa é ignorada. */
-const routeWithId = /^\/(animal|post|campanha|evento|lost-matches)\/([^/?#]+)$/;
-const plainRoutes = new Set(['/casa-amiga', '/central', '/agenda', '/campanhas']);
+const routeWithId = /^\/(animal|post|campanha|evento|lost-matches|parceiro)\/([^/?#]+)$/;
+const plainRoutes = new Set(['/casa-amiga', '/central', '/agenda', '/campanhas', '/parceiros']);
 
 /**
  * A tela que um aviso abre: `route` (avisos novos), senão o resgate de `postId`/`url`. Nunca

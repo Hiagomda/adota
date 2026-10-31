@@ -23,6 +23,7 @@ test('ignora push sem resgate ou com dado estranho', () => {
 test('abre a tela do aviso novo quando ela está na lista', () => {
   assert.equal(routeFromPush({ route: `/animal/${id}` }), `/animal/${id}`);
   assert.equal(routeFromPush({ route: '/casa-amiga' }), '/casa-amiga');
+  assert.equal(routeFromPush({ route: '/parceiros' }), '/parceiros');
   assert.equal(routeFromPush({ route: `/lost-matches/${id}` }), `/lost-matches/${id}`);
   assert.equal(routeFromPush({ postId: id }), `/post/${id}`);
 });

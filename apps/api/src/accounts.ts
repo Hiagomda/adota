@@ -321,6 +321,7 @@ const personalTables = [
   'post_follows',
   'sightings',
   'rescue_help_offers',
+  'partners',
   'likes',
   'saves',
   'story_views',
