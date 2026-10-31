@@ -11,37 +11,69 @@ import {
   Card,
   ConfirmDialog,
   ErrorState,
-  Header,
+  HeroSurface,
   Icon,
   IconButton,
   Notice,
+  PetPattern,
   SkeletonRows,
   useToast,
   type IconName,
+  type Tone,
 } from '../../src/components/ui';
+import { toneColors } from '../../src/components/ui/tones';
 import { Mascot } from '../../src/mascot';
 import { loadMyPartners } from '../../src/partners/api';
-import { statusLabels, type OwnPartner, type PartnerStatus } from '../../src/partners/partners';
+import { PartnerBanner, PartnerPin, PerkTicket } from '../../src/partners/PartnerArt';
+import { PartnerDetails } from '../../src/partners/PartnerDetails';
+import {
+  statusLabels,
+  type OwnPartner,
+  type Partner,
+  type PartnerStatus,
+} from '../../src/partners/partners';
 import { useSession } from '../../src/session';
-import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
+import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 
 const steps: { icon: IconName; title: string; body: string }[] = [
   {
     icon: 'edit-3',
     title: 'Cadastre sua loja',
-    body: 'Nome, endereço no mapa, WhatsApp e horário. Leva dois minutos.',
+    body: 'Nome, ponto no mapa, WhatsApp e horário. Leva dois minutos.',
   },
   {
     icon: 'gift',
     title: 'Ofereça uma vantagem',
-    body: 'Um desconto ou mimo para quem adota ou resgata. É isso que paga o anúncio: aqui ninguém cobra nada.',
+    body: 'Um desconto ou mimo para quem adota ou resgata. É isso que paga o anúncio.',
   },
   {
     icon: 'check-circle',
     title: 'A equipe confere',
-    body: 'Depois de aprovada, sua loja aparece no mapa com a casinha dos parceiros.',
+    body: 'Aprovou, a casinha da sua loja aparece no mapa e você recebe um aviso.',
   },
 ];
+
+const highlights: { icon: IconName; label: string }[] = [
+  { icon: 'map-pin', label: 'No mapa' },
+  { icon: 'message-circle', label: 'Direto no WhatsApp' },
+  { icon: 'heart', label: 'R$ 0 por mês' },
+];
+
+/** Exemplo de como o cartão aparece no mapa. */
+const sample: Partner = {
+  id: 'exemplo',
+  name: 'Petshop da Dona Bené',
+  kind: 'petshop',
+  kindLabel: 'Petshop',
+  about: null,
+  perk: '10% de desconto em ração para quem adotar pelo app',
+  hours: 'Seg a sáb, 8h às 19h',
+  addressText: 'Tv. Padre Eutíquio, 1200 · Batista Campos',
+  location: { latitude: -1.4602, longitude: -48.4931 },
+  whatsapp: '5591988887777',
+  instagram: null,
+  featured: false,
+};
 
 const statusTone: Record<PartnerStatus, 'warning' | 'success' | 'error' | 'neutral'> = {
   pending: 'warning',
@@ -74,7 +106,7 @@ export default function PartnersScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -88,36 +120,89 @@ export default function PartnersScreen() {
           ) : undefined
         }
       >
-        <View style={styles.column}>
-          <Header title="Parceiros do Cupu" onBack={() => router.back()} />
-          <View style={styles.body}>
-            <Card elevation="md">
-              <View style={styles.hero}>
-                <Mascot pose="wave" size={132} />
-                <AppText variant="h2" style={styles.center}>
-                  Anuncie aqui, de graça
-                </AppText>
-                <AppText variant="body" color="textSecondary" style={styles.center}>
-                  Petshop, veterinário, clínica 24h, banho e tosa ou loja de ração: apareça no mapa
-                  de quem resgata e adota em Belém.
+        <HeroSurface style={styles.hero}>
+          <PetPattern color={colors.onHero} opacity={0.1} />
+          <SafeAreaView edges={['top']} style={styles.heroInner}>
+            <View style={styles.heroTop}>
+              <IconButton
+                icon="arrow-left"
+                variant="hero"
+                accessibilityLabel="Voltar"
+                onPress={() => router.back()}
+              />
+              <View style={[styles.kicker, { backgroundColor: colors.heroGlass }]}>
+                <PartnerPin size={20} />
+                <AppText variant="caption" style={[styles.kickerText, { color: colors.onHero }]}>
+                  PARCEIROS DO CUPU
                 </AppText>
               </View>
-            </Card>
-
-            <AppText variant="h3">Como funciona</AppText>
-            {steps.map((step, index) => (
-              <View key={step.title} style={styles.step}>
-                <View style={[styles.stepIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Icon name={step.icon} color={colors.onPrimarySoft} />
-                </View>
-                <View style={styles.grow}>
-                  <AppText variant="bodyStrong">{`${index + 1}. ${step.title}`}</AppText>
-                  <AppText variant="bodySmall" color="textSecondary">
-                    {step.body}
+            </View>
+            <View style={styles.heroBody}>
+              <View style={styles.heroText}>
+                <AppText variant="display" style={{ color: colors.onHero }}>
+                  Anuncie aqui.
+                </AppText>
+                <AppText variant="h2" style={{ color: colors.heroAccent }}>
+                  De graça, égua!
+                </AppText>
+                <AppText variant="body" style={{ color: colors.onHeroMuted }}>
+                  Petshop, veterinário, clínica 24h, banho e tosa ou ração: apareça no mapa de quem
+                  resgata e adota em Belém.
+                </AppText>
+              </View>
+              <Mascot pose="wave" size={120} />
+            </View>
+            <View style={styles.highlights}>
+              {highlights.map((item) => (
+                <View
+                  key={item.label}
+                  style={[styles.highlight, { backgroundColor: colors.heroGlass }]}
+                >
+                  <Icon name={item.icon} size="sm" color={colors.heroAccent} />
+                  <AppText variant="caption" style={{ color: colors.onHero }}>
+                    {item.label}
                   </AppText>
                 </View>
-              </View>
-            ))}
+              ))}
+            </View>
+          </SafeAreaView>
+        </HeroSurface>
+
+        <View style={styles.column}>
+          <View style={styles.body}>
+            <SectionTitle kicker="PRÉVIA" title="Assim sua loja aparece" />
+            <View style={[styles.previewFrame, { borderColor: colors.primarySoft }]}>
+              <Card elevation="md">
+                <PartnerDetails partner={sample} preview />
+              </Card>
+            </View>
+
+            <SectionTitle kicker="PASSO A PASSO" title="Como funciona" />
+            <View>
+              {steps.map((step, index) => (
+                <View key={step.title} style={styles.step}>
+                  <View style={styles.stepRail}>
+                    <View style={[styles.stepDot, { backgroundColor: colors.secondary }]}>
+                      <AppText variant="bodyStrong" style={{ color: colors.onSecondary }}>
+                        {index + 1}
+                      </AppText>
+                    </View>
+                    {index < steps.length - 1 ? (
+                      <View style={[styles.stepLine, { backgroundColor: colors.border }]} />
+                    ) : null}
+                  </View>
+                  <View style={styles.stepText}>
+                    <View style={styles.stepHead}>
+                      <Icon name={step.icon} size="sm" color={colors.primary} />
+                      <AppText variant="bodyStrong">{step.title}</AppText>
+                    </View>
+                    <AppText variant="bodySmall" color="textSecondary">
+                      {step.body}
+                    </AppText>
+                  </View>
+                </View>
+              ))}
+            </View>
 
             <Button
               title={partners.length > 0 ? 'Cadastrar outra loja' : 'Cadastrar minha loja'}
@@ -127,6 +212,13 @@ export default function PartnersScreen() {
               fullWidth
               onPress={start}
             />
+            <View style={[styles.trust, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="shield" color={colors.onPrimarySoft} />
+              <AppText variant="bodySmall" style={[styles.grow, { color: colors.onPrimarySoft }]}>
+                O Égua, adota! não cobra nem recebe dinheiro dos parceiros. Venda de animais não é
+                permitida.
+              </AppText>
+            </View>
 
             {token ? (
               mine.isLoading ? (
@@ -139,7 +231,7 @@ export default function PartnersScreen() {
                 />
               ) : partners.length > 0 ? (
                 <>
-                  <AppText variant="h3">Seus cadastros</AppText>
+                  <SectionTitle kicker="SUA LOJA" title="Seus cadastros" />
                   {partners.map((partner) => (
                     <OwnPartnerCard key={partner.id} partner={partner} />
                   ))}
@@ -149,7 +241,18 @@ export default function PartnersScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
+  );
+}
+
+function SectionTitle({ kicker, title }: { kicker: string; title: string }) {
+  return (
+    <View style={styles.sectionTitle}>
+      <AppText variant="caption" color="onSecondarySoft" style={styles.kickerText}>
+        {kicker}
+      </AppText>
+      <AppText variant="h2">{title}</AppText>
+    </View>
   );
 }
 
@@ -187,22 +290,29 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
       ? 'Pausado por você'
       : statusLabels[partner.status];
 
+  const live = partner.status === 'approved' && !partner.paused;
+
   return (
-    <Card>
-      <View style={styles.own}>
-        <View style={styles.ownHead}>
-          <AppText variant="bodyStrong" style={styles.grow} numberOfLines={2}>
-            {partner.name}
-          </AppText>
+    <Card padding="none" elevation="md">
+      <PartnerBanner rounded={0} style={styles.ownBanner}>
+        <View style={styles.ownBannerRow}>
+          <PartnerPin size={40} />
+          <View style={styles.grow}>
+            <AppText variant="h3" numberOfLines={2} style={{ color: colors.onHero }}>
+              {partner.name}
+            </AppText>
+            <AppText variant="caption" numberOfLines={1} style={{ color: colors.onHeroMuted }}>
+              {partner.kindLabel} · {partner.addressText}
+            </AppText>
+          </View>
           <Badge
             kind="label"
             label={label}
             tone={partner.paused ? 'neutral' : statusTone[partner.status]}
           />
         </View>
-        <AppText variant="bodySmall" color="textSecondary">
-          {partner.kindLabel} · {partner.addressText}
-        </AppText>
+      </PartnerBanner>
+      <View style={styles.own}>
         {partner.status === 'pending' ? (
           <Notice tone="info" message="A equipe vai conferir e você recebe um aviso aqui no app." />
         ) : null}
@@ -210,17 +320,30 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
           <Notice tone="warning" message={`Recado da equipe: ${partner.reviewNote}`} />
         ) : null}
         {partner.status === 'approved' && partner.stats ? (
-          <View style={[styles.stats, { backgroundColor: colors.surfaceMuted }]}>
-            <Stat value={partner.stats.views} label="abriram" />
-            <Stat value={partner.stats.whatsappTaps} label="no WhatsApp" />
-            <Stat value={partner.stats.routeTaps} label="pediram rota" />
-          </View>
+          <>
+            <View style={styles.stats}>
+              <Stat icon="eye" value={partner.stats.views} label="abriram" tone="primary" />
+              <Stat
+                icon="message-circle"
+                value={partner.stats.whatsappTaps}
+                label="no WhatsApp"
+                tone="success"
+              />
+              <Stat
+                icon="navigation"
+                value={partner.stats.routeTaps}
+                label="pediram rota"
+                tone="caramel"
+              />
+            </View>
+            <AppText variant="caption" color="textSecondary">
+              {live
+                ? `Últimos ${partner.stats.days} dias. Só números, sem saber quem foi.`
+                : 'Sua loja está fora do mapa agora. Os números voltam a subir quando ela voltar.'}
+            </AppText>
+          </>
         ) : null}
-        {partner.status === 'approved' && partner.stats ? (
-          <AppText variant="caption" color="textSecondary">
-            Últimos {partner.stats.days} dias, sem saber quem foi.
-          </AppText>
-        ) : null}
+        <PerkTicket perk={partner.perk} compact />
         <View style={styles.actions}>
           <Button
             title="Editar"
@@ -260,43 +383,95 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: IconName;
+  value: number;
+  label: string;
+  tone: Tone;
+}) {
+  const { colors } = useTheme();
+  const palette = toneColors(colors, tone);
   return (
-    <View style={styles.stat}>
-      <AppText variant="h3">{value}</AppText>
-      <AppText variant="caption" color="textSecondary">
+    <View style={[styles.stat, { backgroundColor: palette.background }]}>
+      <Icon name={icon} size="sm" color={palette.foreground} />
+      <AppText variant="h2" style={{ color: palette.foreground }}>
+        {value}
+      </AppText>
+      <AppText variant="caption" style={{ color: palette.foreground }}>
         {label}
       </AppText>
     </View>
   );
 }
 
-const STEP_ICON = 40;
+const STEP_DOT = 32;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,
-  body: { paddingHorizontal: spacing.lg, gap: spacing.md },
-  hero: { alignItems: 'center', gap: spacing.sm },
-  center: { textAlign: 'center' },
-  step: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  stepIcon: {
-    width: STEP_ICON,
-    height: STEP_ICON,
-    borderRadius: radius.md,
+  hero: { paddingBottom: size.curve + spacing.lg },
+  heroInner: { ...screenColumn, paddingHorizontal: spacing.lg, gap: spacing.md },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  kicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  kickerText: { letterSpacing: 1.2, fontWeight: '700' },
+  heroBody: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  heroText: { flex: 1, gap: spacing.xs },
+  highlights: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  highlight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  body: { paddingHorizontal: spacing.lg, gap: spacing.lg, paddingTop: spacing.md },
+  sectionTitle: { gap: spacing.xs },
+  previewFrame: { borderWidth: 2, borderStyle: 'dashed', borderRadius: radius.xl + 6, padding: 4 },
+  step: { flexDirection: 'row', gap: spacing.md },
+  stepRail: { alignItems: 'center', width: STEP_DOT },
+  stepDot: {
+    width: STEP_DOT,
+    height: STEP_DOT,
+    borderRadius: STEP_DOT / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  grow: { flex: 1 },
-  own: { gap: spacing.sm },
-  ownHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  stats: {
+  stepLine: { width: 2, flex: 1, marginVertical: spacing.xs },
+  stepText: { flex: 1, gap: spacing.xs, paddingBottom: spacing.lg },
+  stepHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  trust: {
     flexDirection: 'row',
-    borderRadius: radius.md,
+    gap: spacing.md,
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  grow: { flex: 1 },
+  ownBanner: { padding: spacing.lg },
+  ownBannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  own: { gap: spacing.md, padding: spacing.lg },
+  stats: { flexDirection: 'row', gap: spacing.sm },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
   },
-  stat: { flex: 1, alignItems: 'center' },
   actions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
 });
 

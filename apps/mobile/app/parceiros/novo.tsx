@@ -1,15 +1,17 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, messageFrom } from '../../src/api';
 import {
   AppText,
   Button,
+  Card,
   Chip,
   ErrorState,
   Header,
+  Icon,
   Input,
   Notice,
   SkeletonRows,
@@ -19,13 +21,17 @@ import {
 import { formatWhatsApp, normalizeWhatsApp } from '../../src/contact/whatsapp';
 import type { MapPoint } from '../../src/map/geo';
 import { insideServiceArea } from '../../src/map/serviceArea';
+import { Mascot } from '../../src/mascot';
 import { loadMyPartners } from '../../src/partners/api';
+import { PartnerBanner, PartnerPin } from '../../src/partners/PartnerArt';
+import { PartnerDetails } from '../../src/partners/PartnerDetails';
 import {
   partnerKindIcons,
   partnerKindLabels,
   partnerKinds,
   perkIdeas,
   type OwnPartner,
+  type Partner,
   type PartnerKind,
 } from '../../src/partners/partners';
 import { placeLabel, useAddress } from '../../src/place/address';
@@ -115,6 +121,21 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
     point !== null &&
     addressText.trim().length >= 3;
 
+  const preview: Partner = {
+    id: initial?.id ?? 'previa',
+    name: name.trim() || 'Nome da sua loja',
+    kind,
+    kindLabel: partnerKindLabels[kind],
+    about: about.trim() || null,
+    perk: perk.trim() || 'A vantagem que você oferece aparece aqui',
+    hours: hours.trim() || null,
+    addressText: addressText.trim() || 'Endereço da loja',
+    location: point ?? { latitude: -1.45, longitude: -48.49 },
+    whatsapp: normalizeWhatsApp(whatsapp) ?? '5591900000000',
+    instagram: instagram.trim().replace(/^@/, '') || null,
+    featured: false,
+  };
+
   async function send() {
     if (!token) {
       setMessage('Entre na sua conta para cadastrar a loja.');
@@ -178,120 +199,149 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
               />
             ) : null}
 
-            <AppText variant="bodyStrong">Tipo</AppText>
-            <View style={styles.wrap}>
-              {partnerKinds.map((option) => (
-                <Chip
-                  key={option}
-                  label={partnerKindLabels[option]}
-                  icon={partnerKindIcons[option] as IconName}
-                  selected={kind === option}
-                  onPress={() => setKind(option)}
-                />
-              ))}
-            </View>
-
-            <Input
-              label="Nome da loja"
-              value={name}
-              onChangeText={setName}
-              placeholder="Ex.: Petshop do Guamá"
-              maxLength={NAME_MAX}
-            />
-
-            <Input
-              label="Vantagem para quem adota ou resgata"
-              value={perk}
-              onChangeText={setPerk}
-              placeholder="Ex.: 10% de desconto em ração para quem adotar pelo app"
-              maxLength={PERK_MAX}
-              multiline
-              helper="É o que aparece em destaque no seu cartão. Aqui ninguém paga pra anunciar: a vantagem é a sua parte."
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.bleed}
-              contentContainerStyle={styles.chipRail}
-            >
-              {perkIdeas.map((idea) => (
-                <Chip key={idea} label={idea} icon="gift" onPress={() => setPerk(idea)} />
-              ))}
-            </ScrollView>
-
-            <Input
-              label="WhatsApp da loja"
-              value={whatsapp}
-              onChangeText={setWhatsapp}
-              keyboardType="phone-pad"
-              placeholder="(91) 98888-7777"
-              error={whatsapp.trim() && !phoneOk ? 'Use DDD e número.' : undefined}
-              helper="Quem tocar em WhatsApp no seu cartão cai direto na conversa com a loja."
-            />
-            <Input
-              label="Instagram (se quiser)"
-              value={instagram}
-              onChangeText={setInstagram}
-              autoCapitalize="none"
-              placeholder="@sualoja"
-              maxLength={31}
-            />
-            <Input
-              label="Horário (se quiser)"
-              value={hours}
-              onChangeText={setHours}
-              placeholder="Ex.: Seg a sáb, 8h às 18h · plantão 24h"
-              maxLength={HOURS_MAX}
-            />
-
-            <AppText variant="bodyStrong">Onde fica</AppText>
-            <AppText variant="bodySmall" color="textSecondary">
-              {manual
-                ? 'Ponto escolhido no mapa.'
-                : located
-                  ? 'O mapa abriu onde você está. Arraste até a porta da loja.'
-                  : 'Arraste o mapa até a porta da loja.'}
-            </AppText>
-            <View style={styles.map}>
-              <PlacePicker
-                focus={editFocus ?? (manual ? null : located)}
-                accuracyM={manual ? null : (located?.accuracy ?? null)}
-                urgency="low"
-                onOutside={() => setMessage('Por enquanto só aparecem parceiros de Belém.')}
-                onChange={(next, fromUser) => {
-                  if (!fromUser || !insideServiceArea(next)) return;
-                  setManual(next);
-                  setMessage(null);
-                }}
-              />
-              {gps.status === 'loading' && !manual ? (
-                <View style={[styles.loading, { backgroundColor: colors.overlay }]}>
-                  <ActivityIndicator color={colors.onMedia} />
-                  <AppText variant="bodyStrong" style={{ color: colors.onMedia }}>
-                    Buscando o GPS...
+            <PartnerBanner style={styles.banner}>
+              <View style={styles.bannerRow}>
+                <View style={styles.grow}>
+                  <AppText variant="h3" style={{ color: colors.onHero }}>
+                    Bora botar tua loja no mapa?
+                  </AppText>
+                  <AppText variant="bodySmall" style={{ color: colors.onHeroMuted }}>
+                    Quatro passos rápidos. A prévia lá embaixo mostra como fica.
                   </AppText>
                 </View>
-              ) : null}
-            </View>
-            <Input
-              label="Endereço"
-              value={addressText}
-              onChangeText={(text) => {
-                setAddressTouched(true);
-                setTyped(text);
-              }}
-              placeholder="Ex.: Rua José Bonifácio, 100 · Guamá"
-              maxLength={ADDRESS_MAX}
-            />
+                <Mascot pose="home" size={88} />
+              </View>
+            </PartnerBanner>
 
-            <Input
-              label="Sobre a loja (se quiser)"
-              value={about}
-              onChangeText={setAbout}
-              placeholder="Ex.: atendemos cães e gatos, fazemos entrega no bairro"
-              maxLength={ABOUT_MAX}
-              multiline
-            />
+            <FormSection step={1} title="Sua loja" icon="shopping-bag">
+              <AppText variant="bodyStrong">Tipo</AppText>
+              <View style={styles.wrap}>
+                {partnerKinds.map((option) => (
+                  <Chip
+                    key={option}
+                    label={partnerKindLabels[option]}
+                    icon={partnerKindIcons[option] as IconName}
+                    selected={kind === option}
+                    onPress={() => setKind(option)}
+                  />
+                ))}
+              </View>
+
+              <Input
+                label="Nome da loja"
+                value={name}
+                onChangeText={setName}
+                placeholder="Ex.: Petshop do Guamá"
+                maxLength={NAME_MAX}
+              />
+            </FormSection>
+
+            <FormSection step={2} title="A vantagem" icon="gift">
+              <Input
+                label="Vantagem para quem adota ou resgata"
+                value={perk}
+                onChangeText={setPerk}
+                placeholder="Ex.: 10% de desconto em ração para quem adotar pelo app"
+                maxLength={PERK_MAX}
+                multiline
+                helper="É o que aparece em destaque no seu cartão. Aqui ninguém paga pra anunciar: a vantagem é a sua parte."
+              />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.bleed}
+                contentContainerStyle={styles.chipRail}
+              >
+                {perkIdeas.map((idea) => (
+                  <Chip key={idea} label={idea} icon="gift" onPress={() => setPerk(idea)} />
+                ))}
+              </ScrollView>
+            </FormSection>
+
+            <FormSection step={3} title="Contato e horário" icon="message-circle">
+              <Input
+                label="WhatsApp da loja"
+                value={whatsapp}
+                onChangeText={setWhatsapp}
+                keyboardType="phone-pad"
+                placeholder="(91) 98888-7777"
+                error={whatsapp.trim() && !phoneOk ? 'Use DDD e número.' : undefined}
+                helper="Quem tocar em WhatsApp no seu cartão cai direto na conversa com a loja."
+              />
+              <Input
+                label="Instagram (se quiser)"
+                value={instagram}
+                onChangeText={setInstagram}
+                autoCapitalize="none"
+                placeholder="@sualoja"
+                maxLength={31}
+              />
+              <Input
+                label="Horário (se quiser)"
+                value={hours}
+                onChangeText={setHours}
+                placeholder="Ex.: Seg a sáb, 8h às 18h · plantão 24h"
+                maxLength={HOURS_MAX}
+              />
+            </FormSection>
+
+            <FormSection step={4} title="Onde fica e sobre a loja" icon="map-pin">
+              <AppText variant="bodySmall" color="textSecondary">
+                {manual
+                  ? 'Ponto escolhido no mapa.'
+                  : located
+                    ? 'O mapa abriu onde você está. Arraste até a porta da loja.'
+                    : 'Arraste o mapa até a porta da loja.'}
+              </AppText>
+              <View style={styles.map}>
+                <PlacePicker
+                  focus={editFocus ?? (manual ? null : located)}
+                  accuracyM={manual ? null : (located?.accuracy ?? null)}
+                  urgency="low"
+                  onOutside={() => setMessage('Por enquanto só aparecem parceiros de Belém.')}
+                  onChange={(next, fromUser) => {
+                    if (!fromUser || !insideServiceArea(next)) return;
+                    setManual(next);
+                    setMessage(null);
+                  }}
+                />
+                {gps.status === 'loading' && !manual ? (
+                  <View style={[styles.loading, { backgroundColor: colors.overlay }]}>
+                    <ActivityIndicator color={colors.onMedia} />
+                    <AppText variant="bodyStrong" style={{ color: colors.onMedia }}>
+                      Buscando o GPS...
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
+              <Input
+                label="Endereço"
+                value={addressText}
+                onChangeText={(text) => {
+                  setAddressTouched(true);
+                  setTyped(text);
+                }}
+                placeholder="Ex.: Rua José Bonifácio, 100 · Guamá"
+                maxLength={ADDRESS_MAX}
+              />
+
+              <Input
+                label="Sobre a loja (se quiser)"
+                value={about}
+                onChangeText={setAbout}
+                placeholder="Ex.: atendemos cães e gatos, fazemos entrega no bairro"
+                maxLength={ABOUT_MAX}
+                multiline
+              />
+            </FormSection>
+
+            <View style={styles.previewHead}>
+              <PartnerPin size={28} />
+              <AppText variant="h3">Prévia do seu cartão</AppText>
+            </View>
+            <Card elevation="md">
+              <PartnerDetails partner={preview} preview />
+            </Card>
 
             {message ? <Notice tone="error" message={message} /> : null}
             <Button
@@ -315,7 +365,54 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
   );
 }
 
+function FormSection({
+  step,
+  title,
+  icon,
+  children,
+}: {
+  step: number;
+  title: string;
+  icon: IconName;
+  children: ReactNode;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Card>
+      <View style={styles.section}>
+        <View style={styles.sectionHead}>
+          <View style={[styles.stepDot, { backgroundColor: colors.secondary }]}>
+            <AppText variant="bodyStrong" style={{ color: colors.onSecondary }}>
+              {step}
+            </AppText>
+          </View>
+          <AppText variant="h3" style={styles.grow}>
+            {title}
+          </AppText>
+          <Icon name={icon} color={colors.primary} />
+        </View>
+        {children}
+      </View>
+    </Card>
+  );
+}
+
+const STEP_DOT = 32;
+
 const styles = StyleSheet.create({
+  banner: { padding: spacing.lg },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  grow: { flex: 1 },
+  section: { gap: spacing.md },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  stepDot: {
+    width: STEP_DOT,
+    height: STEP_DOT,
+    borderRadius: STEP_DOT / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,

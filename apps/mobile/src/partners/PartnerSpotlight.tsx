@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Card, Icon, Touchable, type IconName } from '../components/ui';
+import { AppText, Icon, Touchable, type IconName } from '../components/ui';
 import { useViewerLocation } from '../place/deviceLocation';
 import { radius, spacing, useTheme } from '../theme';
 import { loadSpotlight } from './api';
+import { PartnerBanner, PartnerPin } from './PartnerArt';
 import { partnerKindIcons } from './partners';
 
 /**
@@ -13,7 +14,7 @@ import { partnerKindIcons } from './partners';
  */
 export function PartnerSpotlight({ slot = 0 }: { slot?: number }) {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const here = useViewerLocation();
   // Arredonda a posição: andar uns metros não pede a lista de novo.
   const near = here
@@ -29,53 +30,83 @@ export function PartnerSpotlight({ slot = 0 }: { slot?: number }) {
   if (!partner) return null;
 
   return (
-    <Card padding="md">
-      <Touchable
-        accessibilityRole="button"
-        accessibilityLabel={`Anúncio: ${partner.name}. ${partner.perk}`}
-        pressedScale={0.99}
-        onPress={() => router.push(`/parceiro/${partner.id}`)}
-        style={styles.row}
-      >
-        <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name={partnerKindIcons[partner.kind] as IconName} color={colors.onPrimarySoft} />
+    <Touchable
+      accessibilityRole="button"
+      accessibilityLabel={`Anúncio: ${partner.name}. ${partner.perk}`}
+      pressedScale={0.98}
+      onPress={() => router.push(`/parceiro/${partner.id}`)}
+      style={[styles.card, shadows.md, { backgroundColor: colors.surfaceRaised }]}
+    >
+      <PartnerBanner rounded={0} style={styles.side}>
+        <View style={styles.sideInner}>
+          <PartnerPin size={64} />
+          <AppText variant="caption" style={[styles.sideText, { color: colors.onHero }]}>
+            PARCEIRO{'\n'}DO CUPU
+          </AppText>
         </View>
-        <View style={styles.text}>
-          <AppText variant="caption" color="textSecondary">
-            Anúncio · Parceiro do bem
-          </AppText>
-          <AppText variant="bodyStrong" numberOfLines={1}>
-            {partner.name}
-          </AppText>
-          <View style={styles.perk}>
-            <Icon name="gift" size="sm" color={colors.onSecondarySoft} />
-            <AppText
-              variant="bodySmall"
-              numberOfLines={2}
-              style={[styles.grow, { color: colors.onSecondarySoft }]}
-            >
-              {partner.perk}
+      </PartnerBanner>
+      <View style={styles.text}>
+        <View style={styles.topRow}>
+          <View style={[styles.ad, { borderColor: colors.border }]}>
+            <AppText variant="caption" color="textSecondary">
+              Anúncio
             </AppText>
           </View>
+          <Icon
+            name={partnerKindIcons[partner.kind] as IconName}
+            size="sm"
+            color={colors.textSecondary}
+          />
+          <AppText variant="caption" color="textSecondary" numberOfLines={1} style={styles.grow}>
+            {partner.kindLabel}
+          </AppText>
         </View>
-        <Icon name="chevron-right" color={colors.textSecondary} />
-      </Touchable>
-    </Card>
+        <AppText variant="h3" numberOfLines={1}>
+          {partner.name}
+        </AppText>
+        <View style={[styles.perk, { backgroundColor: colors.secondarySoft }]}>
+          <Icon name="gift" size="sm" color={colors.onSecondarySoft} />
+          <AppText
+            variant="bodySmallStrong"
+            numberOfLines={2}
+            style={[styles.grow, { color: colors.onSecondarySoft }]}
+          >
+            {partner.perk}
+          </AppText>
+        </View>
+        <View style={styles.more}>
+          <AppText variant="bodySmallStrong" color="primary">
+            Ver parceiro
+          </AppText>
+          <Icon name="arrow-right" size="sm" color={colors.primary} />
+        </View>
+      </View>
+    </Touchable>
   );
 }
 
-const ICON = 48;
+const SIDE = 104;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  icon: {
-    width: ICON,
-    height: ICON,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  card: { flexDirection: 'row', borderRadius: radius.xl, overflow: 'hidden' },
+  side: { width: SIDE },
+  sideInner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  sideText: { textAlign: 'center', letterSpacing: 1, fontWeight: '700' },
+  text: { flex: 1, gap: spacing.sm, padding: spacing.md },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  ad: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    marginRight: spacing.xs,
   },
-  text: { flex: 1, gap: spacing.xs },
-  perk: { flexDirection: 'row', gap: spacing.xs, alignItems: 'flex-start' },
+  perk: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'flex-start',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  more: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   grow: { flex: 1 },
 });
