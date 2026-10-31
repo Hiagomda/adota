@@ -350,3 +350,56 @@ export const screenColumn = {
   maxWidth: contentMaxWidth,
   alignSelf: 'center' as const,
 };
+
+/** Capa colorida das telas que mudam de cor (painel da ONG). Texto já com contraste conferido. */
+export interface AccentHero {
+  start: string;
+  end: string;
+  /** Texto e ícones sobre a capa. */
+  text: string;
+  muted: string;
+  /** Pílula translúcida sobre a capa. */
+  glass: string;
+}
+
+export type AccentHeroKey = 'turquoise' | 'coral' | 'caramel' | 'green' | 'blue';
+
+const onDarkHero = { text: '#FFFFFF', muted: 'rgba(255, 255, 255, 0.84)' };
+// Branco sobre coral e caramelo não passa contraste: nessas capas o texto é escuro.
+const onWarmHero = { text: ink, muted: 'rgba(27, 43, 43, 0.78)' };
+
+export const lightAccentHeroes: Record<AccentHeroKey, AccentHero> = {
+  turquoise: {
+    start: scale.turquoise[500],
+    end: scale.turquoise[800],
+    ...onDarkHero,
+    glass: 'rgba(255, 255, 255, 0.18)',
+  },
+  coral: {
+    start: scale.coral[300],
+    end: scale.coral[500],
+    ...onWarmHero,
+    glass: 'rgba(255, 255, 255, 0.38)',
+  },
+  caramel: {
+    start: scale.caramel[100],
+    end: scale.caramel[500],
+    ...onWarmHero,
+    glass: 'rgba(255, 255, 255, 0.4)',
+  },
+  green: { start: '#1E7B52', end: '#0F4A33', ...onDarkHero, glass: 'rgba(255, 255, 255, 0.18)' },
+  blue: { start: '#2A64AE', end: '#16365F', ...onDarkHero, glass: 'rgba(255, 255, 255, 0.18)' },
+};
+
+export const darkAccentHeroes: Record<AccentHeroKey, AccentHero> = {
+  turquoise: {
+    start: '#1D5757',
+    end: '#0B2A2A',
+    ...onDarkHero,
+    glass: 'rgba(255, 255, 255, 0.14)',
+  },
+  coral: { start: '#FF9A84', end: '#F26B4E', ...onWarmHero, glass: 'rgba(255, 255, 255, 0.3)' },
+  caramel: { start: '#F0BD86', end: '#D98A3D', ...onWarmHero, glass: 'rgba(255, 255, 255, 0.3)' },
+  green: { start: '#1B6646', end: '#0C3424', ...onDarkHero, glass: 'rgba(255, 255, 255, 0.14)' },
+  blue: { start: '#24508A', end: '#10284A', ...onDarkHero, glass: 'rgba(255, 255, 255, 0.14)' },
+};

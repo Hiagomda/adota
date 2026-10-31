@@ -524,6 +524,7 @@ export default function HomeScreen() {
         <Chip label="Perdidos" icon="search" onPress={() => router.push('/lost')} />
         <Chip label="Precisa-se" icon="package" onPress={() => router.push('/precisa-se')} />
         <Chip label="Campanhas" icon="heart" onPress={() => router.push('/campanhas')} />
+        <Chip label="Maus-tratos" icon="shield" onPress={() => router.push('/maus-tratos')} />
       </ScrollView>
 
       {searching ? null : (

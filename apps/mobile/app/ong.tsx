@@ -124,6 +124,11 @@ export default function NgoSignupScreen() {
             ajuda e marcar feiras de adoção.
           </AppText>
           <Button
+            title="Abrir o painel da ONG"
+            icon="grid"
+            onPress={() => router.push('/painel-ong')}
+          />
+          <Button
             title="Divulgar uma feira"
             icon="calendar"
             variant="outline"

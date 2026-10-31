@@ -8,6 +8,7 @@ import { neighborhoodOf } from '../../src/animalLabels';
 import { PostGrid } from '../../src/components/profile/PostGrid';
 import { ProfileHeader } from '../../src/components/profile/ProfileHeader';
 import {
+  ActionCard,
   AppText,
   Avatar,
   Button,
@@ -147,6 +148,17 @@ export default function ProfileScreen() {
               </>
             ) : null}
           </ProfileHeader>
+          {me.data?.verified && (me.data.role === 'ngo' || me.data.role === 'protector') ? (
+            <View style={styles.network}>
+              <ActionCard
+                title="Painel da ONG"
+                description="Fichas de adoção, animais, campanhas e agenda"
+                icon="grid"
+                tone="primary"
+                onPress={() => router.push('/painel-ong')}
+              />
+            </View>
+          ) : null}
           {token && level ? (
             <View style={styles.network}>
               <Card elevation="md">

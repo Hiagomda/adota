@@ -214,6 +214,29 @@ export async function listWaitingForAdoption(
   return { posts: await hydrate(pool, env, rowsOf<PostRow>(result), viewer) };
 }
 
+/**
+ * Animais que a pessoa publicou, para o painel da ONG: para adoção primeiro, adotados por último,
+ * do mais novo para o mais antigo. Animal perdido é de família e fica de fora.
+ */
+export async function listOrgAnimals(pool: Pool, env: Env, owner: SessionUser, limit: number) {
+  const result = await pool.query(
+    `SELECT ${postColumns('$1')}
+     FROM posts p
+     JOIN users u ON u.id = p.author_id
+     JOIN animals a ON a.id = p.animal_id
+     WHERE p.author_id = $1
+       AND p.parent_post_id IS NULL
+       AND p.hidden = false
+       AND p.type <> 'lost'
+     ORDER BY CASE p.status WHEN 'for_adoption' THEN 0 WHEN 'adopted' THEN 2 ELSE 1 END ASC,
+              p.created_at DESC,
+              p.id DESC
+     LIMIT $2`,
+    [owner.id, limit],
+  );
+  return hydrate(pool, env, rowsOf<PostRow>(result), owner);
+}
+
 export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionUser | null) {
   const result = await pool.query(
     `SELECT ${postColumns('$2')}
