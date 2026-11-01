@@ -13,6 +13,7 @@ import {
   neighborhoodFromPlace,
   spotsLeft,
   verifiedOnlyCategories,
+  type CommunityEventInput,
   type EventCategory,
   type EventListQuery,
 } from '@patinha/shared';
@@ -471,7 +472,10 @@ export async function listEvents(
   };
 }
 
-function assertCategoryAllowed(user: SessionUser, category: EventCategory): void {
+/** O que a criação de evento precisa saber de quem cria. */
+export type EventAuthor = Pick<SessionUser, 'id' | 'role' | 'verified'>;
+
+function assertCategoryAllowed(user: EventAuthor, category: EventCategory): void {
   if (verifiedOnlyCategories.includes(category) && !canOrganizeEvents(user)) {
     throw new HttpError(
       403,
@@ -486,6 +490,74 @@ function assertNoSale(...texts: (string | null)[]): void {
   if (texts.some((value) => value && looksLikeAnimalSale(value))) {
     throw new HttpError(400, 'Não é permitido vender animais. Evento aqui é sem venda de animal.');
   }
+}
+
+/**
+ * Cria um evento da agenda. Usado pelo app e pelo painel da equipe; quem não tem selo nem é da
+ * equipe fica esperando aprovação.
+ */
+export async function createCommunityEvent(
+  pool: Pool,
+  user: EventAuthor,
+  input: CommunityEventInput,
+): Promise<{ id: string; reviewStatus: string; repeated: boolean }> {
+  assertCategoryAllowed(user, input.category);
+  if (Date.parse(input.endsAt) <= Date.now()) {
+    throw new HttpError(400, 'Esse evento já terminou. Confira o dia e a hora.');
+  }
+  if (!insideServiceArea(input)) {
+    throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
+  }
+  const title = stripControls(input.title).trim();
+  const description = clean(input.description);
+  const needsNote = clean(input.needsNote);
+  const placeLabel = stripControls(input.placeLabel).trim();
+  assertNoSale(title, description, needsNote);
+  const reviewStatus = canOrganizeEvents(user) ? 'published' : 'pending';
+  const created = await inTransaction(pool, async (client) => {
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO adoption_events (
+           user_id, title, description, category, place_label, neighborhood, location,
+           starts_at, ends_at, capacity, needs, needs_note, review_status, client_key
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography,
+           $9, $10, $11, $12::text[], $13, $14, $15
+         )
+         ON CONFLICT (user_id, client_key) WHERE client_key IS NOT NULL DO NOTHING
+         RETURNING id`,
+      [
+        user.id,
+        title,
+        description,
+        input.category,
+        placeLabel,
+        neighborhoodFromPlace(placeLabel),
+        input.longitude,
+        input.latitude,
+        input.startsAt,
+        input.endsAt,
+        input.capacity ?? null,
+        input.needs ?? [],
+        needsNote,
+        reviewStatus,
+        input.clientKey ?? null,
+      ],
+    );
+    const id = inserted.rows[0]?.id;
+    if (!id) {
+      // O mesmo cadastro chegou de novo: devolve o que já existe.
+      const existing = await client.query<{ id: string; review_status: string }>(
+        `SELECT id, review_status FROM adoption_events WHERE user_id = $1 AND client_key = $2`,
+        [user.id, input.clientKey],
+      );
+      const found = existing.rows[0];
+      if (!found) throw new HttpError(409, 'Não consegui salvar. Tente de novo.');
+      return { id: found.id, reviewStatus: found.review_status, repeated: true };
+    }
+    await recordChange(client, id, user.id, 'created', { category: input.category });
+    return { id, reviewStatus, repeated: false };
+  });
+  return created;
 }
 
 export function registerEventRoutes(
@@ -546,62 +618,7 @@ export function registerEventRoutes(
     const user = requireUser(request.user);
     if (user.suspended) throw new HttpError(403, 'Essa conta não pode fazer isso.');
     const input = parse(communityEventSchema, request.body);
-    assertCategoryAllowed(user, input.category);
-    if (Date.parse(input.endsAt) <= Date.now()) {
-      throw new HttpError(400, 'Esse evento já terminou. Confira o dia e a hora.');
-    }
-    if (!insideServiceArea(input)) {
-      throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
-    }
-    const title = stripControls(input.title).trim();
-    const description = clean(input.description);
-    const needsNote = clean(input.needsNote);
-    const placeLabel = stripControls(input.placeLabel).trim();
-    assertNoSale(title, description, needsNote);
-    const reviewStatus = canOrganizeEvents(user) ? 'published' : 'pending';
-    const created = await inTransaction(pool, async (client) => {
-      const inserted = await client.query<{ id: string }>(
-        `INSERT INTO adoption_events (
-           user_id, title, description, category, place_label, neighborhood, location,
-           starts_at, ends_at, capacity, needs, needs_note, review_status, client_key
-         ) VALUES (
-           $1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography,
-           $9, $10, $11, $12::text[], $13, $14, $15
-         )
-         ON CONFLICT (user_id, client_key) WHERE client_key IS NOT NULL DO NOTHING
-         RETURNING id`,
-        [
-          user.id,
-          title,
-          description,
-          input.category,
-          placeLabel,
-          neighborhoodFromPlace(placeLabel),
-          input.longitude,
-          input.latitude,
-          input.startsAt,
-          input.endsAt,
-          input.capacity ?? null,
-          input.needs ?? [],
-          needsNote,
-          reviewStatus,
-          input.clientKey ?? null,
-        ],
-      );
-      const id = inserted.rows[0]?.id;
-      if (!id) {
-        // O mesmo cadastro chegou de novo: devolve o que já existe.
-        const existing = await client.query<{ id: string; review_status: string }>(
-          `SELECT id, review_status FROM adoption_events WHERE user_id = $1 AND client_key = $2`,
-          [user.id, input.clientKey],
-        );
-        const found = existing.rows[0];
-        if (!found) throw new HttpError(409, 'Não consegui salvar. Tente de novo.');
-        return { id: found.id, reviewStatus: found.review_status, repeated: true };
-      }
-      await recordChange(client, id, user.id, 'created', { category: input.category });
-      return { id, reviewStatus, repeated: false };
-    });
+    const created = await createCommunityEvent(pool, user, input);
     return reply
       .code(created.repeated ? 200 : 201)
       .send({ id: created.id, reviewStatus: created.reviewStatus });
