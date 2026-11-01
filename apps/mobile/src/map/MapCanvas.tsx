@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, IconButton } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { ensureDeviceWatch, readDeviceFix } from '../place/deviceLocation';
+import type { Partner } from '../partners/partners';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permissions';
 import type { Post } from '../types';
 import { radius, size, spacing, useTheme } from '../theme';
@@ -54,6 +55,8 @@ const pawImages = {
   pawHigh: require('../../assets/paw-high.png') as number,
   pawMedium: require('../../assets/paw-medium.png') as number,
   pawLow: require('../../assets/paw-low.png') as number,
+  // Casinha dos Parceiros do Cupu (scripts/partner-pin.mjs).
+  partnerPin: require('../../assets/partner-pin.png') as number,
 };
 
 const cameraBounds = {
@@ -108,6 +111,21 @@ const pinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
   iconIgnorePlacement: true,
 };
 
+// Parceiros ficam um pouco menores que as patas: o resgate continua sendo o principal no mapa.
+const partnerHitStyle: ComponentProps<typeof CircleLayer>['style'] = {
+  circleRadius: 26,
+  circleColor: mapColors.hitArea,
+  circleOpacity: 0.01,
+  circleTranslate: [0, -36],
+};
+const partnerPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
+  iconImage: 'partnerPin',
+  iconSize: 0.5,
+  iconAnchor: 'bottom',
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+};
+
 const PUCK_DISTANCE_M = 25;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
@@ -149,6 +167,8 @@ const StableCamera = memo(function StableCamera({
 
 export function MapCanvas({
   posts,
+  partners = [],
+  onSelectPartner,
   selectedId,
   tracking,
   controlsBottom,
@@ -158,6 +178,9 @@ export function MapCanvas({
   focus,
 }: {
   posts: Post[];
+  /** Parceiros do Cupu (casinha turquesa), desenhados por baixo das patas. */
+  partners?: Partner[];
+  onSelectPartner?: (partner: Partner) => void;
   selectedId: string | null;
   tracking: boolean;
   /** Espaço da barra de abas, ou do card do animal selecionado quando ele está aberto. */
@@ -377,6 +400,31 @@ export function MapCanvas({
     [pinKey],
   );
 
+  const partnerKey = partners
+    .map(
+      (partner) =>
+        `${partner.id}:${partner.location.longitude.toFixed(5)}:${partner.location.latitude.toFixed(5)}`,
+    )
+    .sort()
+    .join('|');
+  const partnerShape = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: 'FeatureCollection',
+      features: partners.map((partner) => ({
+        type: 'Feature',
+        id: partner.id,
+        properties: { partnerId: partner.id },
+        geometry: {
+          type: 'Point',
+          coordinates: [partner.location.longitude, partner.location.latitude],
+        },
+      })),
+    }),
+    // O partnerKey já lista todos os campos desenhados no mapa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partnerKey],
+  );
+
   const onRegionDidChange = useCallback<
     NonNullable<ComponentProps<typeof MapView>['onRegionDidChange']>
   >(
@@ -441,6 +489,18 @@ export function MapCanvas({
       onSelect(post);
     },
     [onSelect, posts],
+  );
+
+  const onPartnerPress = useCallback(
+    (event: OnPressEvent) => {
+      const id = event.features[0]?.properties?.partnerId;
+      if (typeof id !== 'string') return;
+      const partner = partners.find((item) => item.id === id);
+      if (!partner || !onSelectPartner) return;
+      pressedPin.current = true;
+      onSelectPartner(partner);
+    },
+    [onSelectPartner, partners],
   );
 
   const onMapPress = useCallback(() => {
@@ -524,6 +584,17 @@ export function MapCanvas({
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         {styleReady ? <Images key={sprite} images={pawImages} /> : null}
+        {pinsReady ? (
+          <ShapeSource
+            key={`partners-${sprite}`}
+            id="partners"
+            shape={partnerShape}
+            onPress={onPartnerPress}
+          >
+            <CircleLayer id="partner-hit" style={partnerHitStyle} />
+            <SymbolLayer id="partner-pins" style={partnerPinStyle} />
+          </ShapeSource>
+        ) : null}
         {pinsReady ? (
           <ShapeSource key={sprite} id="alerts" shape={shape} onPress={onPinPress}>
             <CircleLayer id="pin-hit" style={hitStyle} />

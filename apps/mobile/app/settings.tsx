@@ -334,7 +334,7 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.section}>
-              <AppText variant="h3">ONG ou proteção</AppText>
+              <AppText variant="h3">ONG, proteção e parceiros</AppText>
               <Card padding="none" elevation="none">
                 <ListItem
                   title={me.data?.verified ? 'Perfil verificado' : 'Cadastrar ONG ou protetor'}
@@ -359,6 +359,14 @@ export default function SettingsScreen() {
                     />
                   </>
                 ) : null}
+                <Divider inset />
+                <ListItem
+                  title="Anuncie aqui"
+                  subtitle="Petshop, clínica ou loja de ração? Apareça no mapa como Parceiro do Cupu."
+                  icon="home"
+                  showChevron
+                  onPress={() => router.push('/parceiros')}
+                />
               </Card>
             </View>
 

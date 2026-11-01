@@ -12,8 +12,18 @@ export const pawSource: Record<Urgency, ImageSourcePropType> = {
   low: require('../../assets/paw-low.png'),
 };
 
+/** Casinha dos Parceiros do Cupu (scripts/partner-pin.mjs). */
+export const partnerPinSource: ImageSourcePropType = require('../../assets/partner-pin.png');
+
 export function pawUri(urgency: Urgency): string {
-  const source = pawSource[urgency];
+  return imageUri(pawSource[urgency]);
+}
+
+export function partnerPinUri(): string {
+  return imageUri(partnerPinSource);
+}
+
+function imageUri(source: ImageSourcePropType): string {
   // No web o módulo de imagem já é `{ uri }` e o react-native-web não tem o
   // resolveAssetSource: chamá-lo dava erro no moveend do mapa e nenhuma pata aparecia.
   if (!Array.isArray(source) && typeof source === 'object' && typeof source.uri === 'string') {

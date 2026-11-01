@@ -1,14 +1,39 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+import type { Partner } from '../partners/partners';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
-import { pawUri } from './paw';
+import { partnerPinUri, pawUri } from './paw';
+
+function pinButton(label: string, uri: string, size: number): HTMLButtonElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.setAttribute('aria-label', label);
+  element.style.width = `${size}px`;
+  element.style.height = `${size}px`;
+  element.style.padding = '0';
+  element.style.border = 'none';
+  element.style.background = 'transparent';
+  element.style.cursor = 'pointer';
+  const image = document.createElement('img');
+  image.src = uri;
+  image.alt = '';
+  image.draggable = false;
+  image.width = size;
+  image.height = size;
+  image.style.display = 'block';
+  image.style.pointerEvents = 'none';
+  element.replaceChildren(image);
+  return element;
+}
 
 export function MapCanvas({
   posts,
+  partners = [],
+  onSelectPartner,
   selectedId,
   tracking,
   onSelect,
@@ -17,6 +42,8 @@ export function MapCanvas({
   focus,
 }: {
   posts: Post[];
+  partners?: Partner[];
+  onSelectPartner?: (partner: Partner) => void;
   selectedId: string | null;
   tracking: boolean;
   /** Native map uses this to clear the tab bar. The web preview has no floating locate button. */
@@ -30,6 +57,8 @@ export function MapCanvas({
   const mapRef = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
   const postsRef = useRef(posts);
+  const partnersRef = useRef(partners);
+  const onSelectPartnerRef = useRef(onSelectPartner);
   const selectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const onDismissRef = useRef(onDismiss);
@@ -38,6 +67,8 @@ export function MapCanvas({
 
   useEffect(() => {
     postsRef.current = posts;
+    partnersRef.current = partners;
+    onSelectPartnerRef.current = onSelectPartner;
     selectedRef.current = selectedId;
     onSelectRef.current = onSelect;
     onDismissRef.current = onDismiss;
@@ -79,27 +110,20 @@ export function MapCanvas({
     const draw = () => {
       if (!map.isStyleLoaded()) return;
       markers.current.forEach((marker) => marker.remove());
-      markers.current = postsRef.current.map((post) => {
+      // Parceiros primeiro, para as patas ficarem por cima.
+      const partnerMarkers = partnersRef.current.map((partner) => {
+        const element = pinButton(partner.name, partnerPinUri(), 52);
+        element.onclick = (event) => {
+          event.stopPropagation();
+          onSelectPartnerRef.current?.(partner);
+        };
+        return new maplibregl.Marker({ element, anchor: 'bottom' })
+          .setLngLat([partner.location.longitude, partner.location.latitude])
+          .addTo(map);
+      });
+      const postMarkers = postsRef.current.map((post) => {
         const selected = post.id === selectedRef.current;
-        const size = selected ? 72 : 64;
-        const element = document.createElement('button');
-        element.type = 'button';
-        element.setAttribute('aria-label', post.approxLabel);
-        element.style.width = `${size}px`;
-        element.style.height = `${size}px`;
-        element.style.padding = '0';
-        element.style.border = 'none';
-        element.style.background = 'transparent';
-        element.style.cursor = 'pointer';
-        const image = document.createElement('img');
-        image.src = pawUri(post.urgency);
-        image.alt = '';
-        image.draggable = false;
-        image.width = size;
-        image.height = size;
-        image.style.display = 'block';
-        image.style.pointerEvents = 'none';
-        element.replaceChildren(image);
+        const element = pinButton(post.approxLabel, pawUri(post.urgency), selected ? 72 : 64);
         element.onclick = (event) => {
           event.stopPropagation();
           onSelectRef.current(post);
@@ -108,6 +132,7 @@ export function MapCanvas({
           .setLngLat([post.location.longitude, post.location.latitude])
           .addTo(map);
       });
+      markers.current = [...partnerMarkers, ...postMarkers];
     };
 
     let started = false;
@@ -139,7 +164,7 @@ export function MapCanvas({
       (post) =>
         `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
     )
-    .join('|')}`;
+    .join('|')}:${partners.map((partner) => partner.id).join('|')}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;

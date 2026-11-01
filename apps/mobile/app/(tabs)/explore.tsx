@@ -9,6 +9,7 @@ import {
   AppText,
   Button,
   Card,
+  Chip,
   Icon,
   IconButton,
   StatusPill,
@@ -21,6 +22,10 @@ import { mergePaws } from '../../src/map/knownPaws';
 import { MapCanvas } from '../../src/map/MapCanvas';
 import { belemBounds, boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
 import { Mascot } from '../../src/mascot';
+import { countPartnerTap, loadPartnersIn } from '../../src/partners/api';
+import { PartnerDetails } from '../../src/partners/PartnerDetails';
+import { PartnerInvite } from '../../src/partners/PartnerInvite';
+import type { Partner } from '../../src/partners/partners';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
@@ -56,6 +61,8 @@ export default function ExploreScreen() {
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
+  const [showPartners, setShowPartners] = useState(true);
+  const [partnerSelection, setPartnerSelection] = useState<Partner | null>(null);
   const closedAim = useRef<number | null>(null);
   const ignoreSelectUntil = useRef(0);
   const lastPin = useRef({ id: '', at: 0 });
@@ -71,6 +78,17 @@ export default function ExploreScreen() {
     queryFn: () => loadFeed(token, search),
     placeholderData: keepPreviousData,
   });
+  const partnersQuery = useQuery({
+    queryKey: ['partners', 'map', search],
+    queryFn: () => loadPartnersIn(view),
+    placeholderData: keepPreviousData,
+    enabled: showPartners,
+    staleTime: 5 * 60 * 1000,
+  });
+  const partners = useMemo(
+    () => (showPartners ? (partnersQuery.data?.partners ?? []) : []),
+    [partnersQuery.data, showPartners],
+  );
   const refetchMap = feed.refetch;
   useEffect(() => {
     if (!focused) return;
@@ -109,16 +127,31 @@ export default function ExploreScreen() {
     ignoreSelectUntil.current = Date.now() + 500;
     if (aim) closedAim.current = aim.token;
     setSelection(null);
+    setPartnerSelection(null);
   }, [aim]);
+  const selectPartner = useCallback(
+    (partner: Partner) => {
+      setSelection(null);
+      if (partnerSelection?.id === partner.id) {
+        setPartnerSelection(null);
+        return;
+      }
+      countPartnerTap(partner.id, 'view', token);
+      setPartnerSelection(partner);
+    },
+    [partnerSelection, token],
+  );
   const selectPost = useCallback((post: { id: string }) => {
     const now = Date.now();
     if (now < ignoreSelectUntil.current) return;
     if (lastPin.current.id === post.id && now - lastPin.current.at < 250) return;
     lastPin.current = { id: post.id, at: now };
+    setPartnerSelection(null);
     setSelection((current) => (current === post.id ? null : post.id));
   }, []);
+  const cardOpen = selected !== null || partnerSelection !== null;
   const controlsBottom =
-    insets.bottom + (selected ? spacing.giant * 4 : spacing.giant + spacing.lg);
+    insets.bottom + (cardOpen ? spacing.giant * 4 : spacing.giant + spacing.lg);
 
   const bannerText = feed.isError
     ? messageFrom(feed.error)
@@ -130,6 +163,8 @@ export default function ExploreScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <MapCanvas
         posts={posts}
+        partners={partners}
+        onSelectPartner={selectPartner}
         selectedId={selection}
         tracking={focused}
         controlsBottom={controlsBottom}
@@ -142,7 +177,7 @@ export default function ExploreScreen() {
         }}
         focus={focusPoint}
       />
-      {!selected && (feed.isError || inView.length === 0) ? (
+      {!cardOpen && (feed.isError || inView.length === 0) ? (
         <Card
           padding="md"
           elevation="md"
@@ -233,6 +268,33 @@ export default function ExploreScreen() {
           </Card>
         </View>
       ) : null}
+      {partnerSelection ? (
+        <View
+          style={[styles.cardWrap, { bottom: insets.bottom + CARD_BOTTOM_OFFSET }]}
+          pointerEvents="box-none"
+        >
+          <Card padding="md" elevation="md">
+            <View style={styles.cardBody}>
+              <View style={styles.cardHead}>
+                <IconButton icon="x" accessibilityLabel="Fechar" onPress={closeCard} />
+              </View>
+              <PartnerDetails partner={partnerSelection} compact />
+            </View>
+          </Card>
+        </View>
+      ) : null}
+      {!cardOpen ? (
+        <View style={[styles.layerRow, { bottom: controlsBottom }]} pointerEvents="box-none">
+          <Chip
+            label="Parceiros"
+            icon="home"
+            selected={showPartners}
+            onPress={() => setShowPartners((value) => !value)}
+          />
+          <Chip label="Anuncie aqui" icon="volume-2" onPress={() => router.push('/parceiros')} />
+        </View>
+      ) : null}
+      <PartnerInvite active={focused && !cardOpen} />
     </View>
   );
 }
@@ -251,6 +313,13 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   cardHead: { alignItems: 'flex-end' },
+  layerRow: {
+    position: 'absolute',
+    left: spacing.lg,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    zIndex: 20,
+  },
   cardBody: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   photo: { width: PHOTO_WIDTH, height: PHOTO_HEIGHT, borderRadius: radius.md },

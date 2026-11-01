@@ -31,6 +31,7 @@ import { registerLiveRoutes } from './live.js';
 import { registerFosterHomeRoutes } from './fosterHomes.js';
 import { registerCentralRoutes } from './central.js';
 import { registerLostMatchRoutes } from './lostMatch.js';
+import { registerPartnerRoutes } from './partners.js';
 import { registerPassportRoutes } from './passport.js';
 import { registerSightingRoutes } from './sightings.js';
 import {
@@ -929,6 +930,7 @@ export async function registerRoutes(
   registerFosterHomeRoutes(app, { env, pool, writeLimit, publishLimit, contactLimit });
   registerCentralRoutes(app, { env, pool, writeLimit, publishLimit });
   registerCampaignRoutes(app, { env, pool, storage, writeLimit, publishLimit });
+  registerPartnerRoutes(app, { pool, writeLimit, strictLimit });
   await registerStaffRoutes(app, { env, pool, queue });
 }
 
