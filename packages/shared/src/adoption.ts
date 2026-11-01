@@ -102,3 +102,17 @@ export type VerificationRequestInput = z.infer<typeof verificationRequestSchema>
 export function daysWaiting(since: Date, now: Date = new Date()): number {
   return Math.max(0, Math.floor((now.getTime() - since.getTime()) / 86_400_000));
 }
+
+/** Cores que a ONG pode escolher para o próprio painel. Todas saem da paleta do app. */
+export const ngoAccents = ['turquoise', 'coral', 'caramel', 'green', 'blue'] as const;
+export type NgoAccent = (typeof ngoAccents)[number];
+
+/** Tema do painel da ONG: a cor e uma frase curta que aparece embaixo do nome. */
+export const ngoThemeSchema = z
+  .object({
+    accent: z.enum(ngoAccents),
+    tagline: z.string().trim().max(120).optional(),
+  })
+  .strip();
+
+export type NgoThemeInput = z.infer<typeof ngoThemeSchema>;

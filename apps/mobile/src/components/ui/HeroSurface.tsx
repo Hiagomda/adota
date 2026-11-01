@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { PET_PATTERN_ID, PetPatternDef } from './PetPattern';
 import { size, useTheme } from '../../theme';
 
 const GRADIENT_ID = 'hero-gradient';
@@ -16,13 +17,25 @@ export interface HeroSurfaceProps {
   /** Wavy bottom edge. The content must leave `size.curve` of room at the bottom. */
   curved?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Outras cores para o degradê (ex.: a cor escolhida pela ONG). Sem elas, vale o turquesa. */
+  start?: string;
+  end?: string;
+  /** Desenha a textura de ossinho e peixinho dentro da onda, nesta cor. */
+  patternColor?: string;
 }
 
 /**
  * Turquoise gradient with the bone-and-fish texture, used behind headers. The shape is drawn with SVG
  * from the measured size, so the wave has the same depth on every screen.
  */
-export function HeroSurface({ children, curved = true, style }: HeroSurfaceProps) {
+export function HeroSurface({
+  children,
+  curved = true,
+  style,
+  start,
+  end,
+  patternColor,
+}: HeroSurfaceProps) {
   const { colors } = useTheme();
   const [box, setBox] = useState({ width: 0, height: 0 });
 
@@ -52,11 +65,13 @@ export function HeroSurface({ children, curved = true, style }: HeroSurfaceProps
       >
         <Defs>
           <LinearGradient id={GRADIENT_ID} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={colors.heroStart} />
-            <Stop offset="1" stopColor={colors.heroEnd} />
+            <Stop offset="0" stopColor={start ?? colors.heroStart} />
+            <Stop offset="1" stopColor={end ?? colors.heroEnd} />
           </LinearGradient>
+          {patternColor ? <PetPatternDef color={patternColor} /> : null}
         </Defs>
         <Path d={shape} fill={`url(#${GRADIENT_ID})`} />
+        {patternColor ? <Path d={shape} fill={`url(#${PET_PATTERN_ID})`} opacity={0.12} /> : null}
       </Svg>
       {children}
     </View>
