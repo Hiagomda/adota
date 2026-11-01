@@ -124,6 +124,7 @@ apps/api/src/register.ts      rotas principais (auth no hook onRequest → reque
 apps/api/src/feed.ts          posts, status, localização aproximada
 apps/api/src/adoptionChat.ts  conversa de adoção
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
+apps/api/src/ngoPanel.ts      painel da ONG verificada (/me/ngo-panel) e o tema dela
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
 apps/api/src/passport.ts      passaporte do animal: saúde, guarda (resgate/lar/adoção) e junção de ocorrências
 apps/api/src/fosterHomes.ts   Casa Amiga: vagas, pedidos de acolhimento e encerramento com XP

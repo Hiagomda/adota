@@ -318,6 +318,7 @@ const personalTables = [
   'user_xp_history',
   'user_badges',
   'cupu_styles',
+  'ngo_panel_settings',
   'post_follows',
   'sightings',
   'rescue_help_offers',

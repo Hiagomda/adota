@@ -18,6 +18,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
+import { registerNgoPanelRoutes } from './ngoPanel.js';
 import {
   notifyCampaignSuspension,
   registerCampaignRoutes,
@@ -26,6 +27,7 @@ import {
 import { registerContactRoutes } from './contact.js';
 import { registerEventRoutes } from './events.js';
 import { registerNeighborhoodRoutes } from './neighborhoods.js';
+import { registerLiveRoutes } from './live.js';
 import { registerFosterHomeRoutes } from './fosterHomes.js';
 import { registerCentralRoutes } from './central.js';
 import { registerLostMatchRoutes } from './lostMatch.js';
@@ -911,6 +913,7 @@ export async function registerRoutes(
 
   registerAdoptionChat(app, { env, pool });
   registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
+  registerNgoPanelRoutes(app, { env, pool, writeLimit });
   registerContactRoutes(app, { pool, contactLimit });
   registerSightingRoutes(app, {
     env,
@@ -921,6 +924,7 @@ export async function registerRoutes(
   });
   registerLostMatchRoutes(app, { env, pool, writeLimit, strictLimit, lookupLimit });
   registerNeighborhoodRoutes(app, { pool });
+  registerLiveRoutes(app, { env, pool });
   registerEventRoutes(app, { env, pool, writeLimit, strictLimit });
   registerPassportRoutes(app, { env, pool, writeLimit, publishLimit });
   registerFosterHomeRoutes(app, { env, pool, writeLimit, publishLimit, contactLimit });

@@ -347,6 +347,18 @@ export default function SettingsScreen() {
                   showChevron
                   onPress={() => router.push('/ong')}
                 />
+                {me.data?.verified && (me.data.role === 'ngo' || me.data.role === 'protector') ? (
+                  <>
+                    <Divider inset />
+                    <ListItem
+                      title="Painel da ONG"
+                      subtitle="Fichas de adoção, animais, campanhas e agenda numa tela."
+                      icon="grid"
+                      showChevron
+                      onPress={() => router.push('/painel-ong')}
+                    />
+                  </>
+                ) : null}
                 <Divider inset />
                 <ListItem
                   title="Anuncie aqui"
@@ -366,6 +378,13 @@ export default function SettingsScreen() {
                   icon="life-buoy"
                   showChevron
                   onPress={() => router.push('/support')}
+                />
+                <Divider inset />
+                <ListItem
+                  title="Como denunciar maus-tratos"
+                  icon="shield"
+                  showChevron
+                  onPress={() => router.push('/maus-tratos')}
                 />
                 <Divider inset />
                 <ListItem
