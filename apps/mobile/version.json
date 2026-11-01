@@ -1,9 +1,10 @@
 {
   "version": "0.1.0",
-  "build": 36,
+  "build": 37,
   "notes": [
-    "O resgate mostra logo abaixo do nome há quanto tempo foi publicado e por quem.",
-    "Se quem disse \"Eu vou ajudar\" ficar 12 horas sem dar notícia, o resgate volta a aparecer para outras pessoas.",
-    "As janelas que sobem de baixo, como a ficha de adoção, não travam mais ao arrastar."
+    "Novidades: central de resgates, busca de animais perdidos, campanhas transparentes e agenda de eventos.",
+    "Passaporte do animal, Casas Amigas com vagas e o armário do Cupu.",
+    "Painel da ONG e um guia para denunciar maus-tratos.",
+    "Anuncie aqui: petshops e clínicas parceiras aparecem no mapa."
   ]
 }
