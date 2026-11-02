@@ -5,6 +5,7 @@ import {
   campaignCloseSchema,
   campaignConfirmSchema,
   campaignCreateSchema,
+  type CampaignCreateInput,
   campaignDecisionNoteSchema,
   campaignEntrySchema,
   campaignListQuerySchema,
@@ -688,6 +689,86 @@ export async function notifyCampaignSuspension(
   });
 }
 
+/**
+ * Abre uma campanha em nome do responsável (dono do Pix). O app chama com a própria pessoa; o
+ * painel da equipe chama com o responsável escolhido e registra a equipe como autora no histórico.
+ */
+export async function createCampaign(
+  pool: Pool,
+  owner: { id: string },
+  input: CampaignCreateInput,
+  actor: { id: string; kind: CampaignActor },
+): Promise<{ id: string; repeated: boolean }> {
+  const title = clean(input.title);
+  const purpose = clean(input.purpose);
+  const pixKey = clean(input.pixKey);
+  if (looksLikeAnimalSale(title) || looksLikeAnimalSale(purpose)) {
+    throw new HttpError(400, 'Não é permitido vender animais.');
+  }
+  if (input.clientKey) {
+    const replay = await pool.query<{ id: string }>(
+      `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
+      [owner.id, input.clientKey],
+    );
+    if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true };
+  }
+  const links = await resolveLinks(pool, input);
+  try {
+    const id = await withTransaction(pool, async (client) => {
+      // Trava as campanhas da pessoa: dois toques ao mesmo tempo não passam do limite juntos.
+      await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [owner.id]);
+      const active = await client.query<{ total: number; same_animal: number }>(
+        `SELECT count(*)::int AS total,
+                  count(*) FILTER (WHERE $2::uuid IS NOT NULL AND animal_id = $2)::int AS same_animal
+           FROM campaigns WHERE owner_id = $1 AND status = 'active'`,
+        [owner.id, links.animalId],
+      );
+      if ((active.rows[0]?.same_animal ?? 0) > 0) {
+        throw new HttpError(409, 'Você já tem uma campanha aberta para esse animal.');
+      }
+      if ((active.rows[0]?.total ?? 0) >= MAX_ACTIVE_PER_OWNER) {
+        throw new HttpError(409, 'Encerre uma campanha antes de abrir outra.');
+      }
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO campaigns
+             (owner_id, animal_id, post_id, title, purpose, goal_cents, deadline, pix_key, client_key)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [
+          owner.id,
+          links.animalId,
+          links.postId,
+          title,
+          purpose,
+          input.goalCents,
+          input.deadline,
+          pixKey,
+          input.clientKey ?? null,
+        ],
+      );
+      const campaignId = inserted.rows[0]?.id;
+      if (!campaignId) throw new Error('campaign insert returned no id');
+      await logCampaignEvent(client, {
+        campaignId,
+        actorId: actor.id,
+        actorKind: actor.kind,
+        action: 'created',
+        after: { title, goalCents: input.goalCents, deadline: input.deadline },
+      });
+      return campaignId;
+    });
+    return { id, repeated: false };
+  } catch (error) {
+    if (input.clientKey && isUniqueViolation(error)) {
+      const replay = await pool.query<{ id: string }>(
+        `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
+        [owner.id, input.clientKey],
+      );
+      if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true };
+    }
+    throw error;
+  }
+}
+
 export function registerCampaignRoutes(
   app: FastifyInstance,
   deps: {
@@ -718,74 +799,11 @@ export function registerCampaignRoutes(
       );
     }
     const input = parse(campaignCreateSchema, request.body);
-    const title = clean(input.title);
-    const purpose = clean(input.purpose);
-    const pixKey = clean(input.pixKey);
-    if (looksLikeAnimalSale(title) || looksLikeAnimalSale(purpose)) {
-      throw new HttpError(400, 'Não é permitido vender animais.');
-    }
-    if (input.clientKey) {
-      const replay = await pool.query<{ id: string }>(
-        `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
-        [user.id, input.clientKey],
-      );
-      if (replay.rows[0]) return reply.code(200).send({ id: replay.rows[0].id });
-    }
-    const links = await resolveLinks(pool, input);
-    try {
-      const id = await withTransaction(pool, async (client) => {
-        // Trava as campanhas da pessoa: dois toques ao mesmo tempo não passam do limite juntos.
-        await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
-        const active = await client.query<{ total: number; same_animal: number }>(
-          `SELECT count(*)::int AS total,
-                  count(*) FILTER (WHERE $2::uuid IS NOT NULL AND animal_id = $2)::int AS same_animal
-           FROM campaigns WHERE owner_id = $1 AND status = 'active'`,
-          [user.id, links.animalId],
-        );
-        if ((active.rows[0]?.same_animal ?? 0) > 0) {
-          throw new HttpError(409, 'Você já tem uma campanha aberta para esse animal.');
-        }
-        if ((active.rows[0]?.total ?? 0) >= MAX_ACTIVE_PER_OWNER) {
-          throw new HttpError(409, 'Encerre uma campanha antes de abrir outra.');
-        }
-        const inserted = await client.query<{ id: string }>(
-          `INSERT INTO campaigns
-             (owner_id, animal_id, post_id, title, purpose, goal_cents, deadline, pix_key, client_key)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-          [
-            user.id,
-            links.animalId,
-            links.postId,
-            title,
-            purpose,
-            input.goalCents,
-            input.deadline,
-            pixKey,
-            input.clientKey ?? null,
-          ],
-        );
-        const campaignId = inserted.rows[0]?.id;
-        if (!campaignId) throw new Error('campaign insert returned no id');
-        await logCampaignEvent(client, {
-          campaignId,
-          actorId: user.id,
-          actorKind: 'owner',
-          action: 'created',
-          after: { title, goalCents: input.goalCents, deadline: input.deadline },
-        });
-        return campaignId;
-      });
-      return reply.code(201).send({ id });
-    } catch (error) {
-      if (input.clientKey && isUniqueViolation(error)) {
-        const replay = await pool.query<{ id: string }>(
-          `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
-          [user.id, input.clientKey],
-        );
-        if (replay.rows[0]) return reply.code(200).send({ id: replay.rows[0].id });
-      }
-      throw error;
-    }
+    const created = await createCampaign(pool, { id: user.id }, input, {
+      id: user.id,
+      kind: 'owner',
+    });
+    return reply.code(created.repeated ? 200 : 201).send({ id: created.id });
   });
 
   app.patch('/campaigns/:id', writeLimit, async (request) => {

@@ -45,7 +45,7 @@ function postId(params: unknown): string {
 }
 
 /** Quem pode divulgar feira: perfil verificado de ONG ou protetor, ou a equipe. */
-export function canOrganizeEvents(user: SessionUser): boolean {
+export function canOrganizeEvents(user: Pick<SessionUser, 'role' | 'verified'>): boolean {
   if (isOperator(user.role)) return true;
   return user.verified && (user.role === 'ngo' || user.role === 'protector');
 }
