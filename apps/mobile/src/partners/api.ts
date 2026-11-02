@@ -29,3 +29,8 @@ export function countPartnerTap(
     logBestEffort('partners:tap'),
   );
 }
+
+/** A equipe liga e desliga os anúncios no painel. Desligado, o app nem oferece o "anuncie aqui". */
+export function loadPartnersStatus(): Promise<{ enabled: boolean }> {
+  return api<{ enabled: boolean }>('/partners/status');
+}

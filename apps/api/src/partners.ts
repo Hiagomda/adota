@@ -13,6 +13,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { partnersEnabled } from './appSettings.js';
 import { requireUser } from './authz.js';
 import { HttpError } from './http.js';
 import { stripControls } from './text.js';
@@ -23,6 +24,8 @@ const MAP_LIMIT = 200;
 const SPOTLIGHT_LIMIT = 3;
 const STATS_DAYS = 30;
 const NOT_FOUND = 'Esse parceiro não existe mais.';
+export const ADS_CLOSED =
+  'Os anúncios de parceiros ainda não estão abertos. Avisaremos aqui no app quando abrirem.';
 
 export const partnerKindLabel: Record<PartnerKind, string> = {
   petshop: 'Petshop',
@@ -50,6 +53,10 @@ export interface PartnerRow {
   owner_paused: boolean;
   featured: boolean;
   review_note: string | null;
+  /** Último dia pago, AAAA-MM-DD no fuso de Belém. */
+  paid_until: string | null;
+  /** O pagamento ainda vale hoje. */
+  paid: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -57,7 +64,8 @@ export interface PartnerRow {
 export const partnerColumns = `p.id, p.user_id, p.name, p.kind, p.about, p.perk, p.hours,
   p.address_text, ST_Y(p.location::geometry) AS latitude, ST_X(p.location::geometry) AS longitude,
   p.whatsapp, p.instagram, p.status, p.owner_paused, p.featured, p.review_note, p.created_at,
-  p.updated_at`;
+  p.updated_at, to_char(p.paid_until, 'YYYY-MM-DD') AS paid_until,
+  COALESCE(p.paid_until >= (now() AT TIME ZONE 'America/Belem')::date, false) AS paid`;
 
 /** O que todo mundo vê de um parceiro aprovado. */
 export function publicPartner(row: PartnerRow) {
@@ -84,7 +92,8 @@ function ownPartner(row: PartnerRow) {
     status: row.status,
     paused: row.owner_paused,
     reviewNote: row.review_note,
-    visible: row.status === 'approved' && !row.owner_paused,
+    paidUntil: row.paid_until,
+    visible: row.status === 'approved' && !row.owner_paused && row.paid,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -123,7 +132,9 @@ function cleanInput(input: PartnerRequestInput) {
   return fields;
 }
 
-const visible = `p.status = 'approved' AND p.owner_paused = false`;
+// Aprovado, sem pausa e com o anúncio pago até hoje (fuso de Belém).
+const visible = `p.status = 'approved' AND p.owner_paused = false
+  AND p.paid_until >= (now() AT TIME ZONE 'America/Belem')::date`;
 
 export function registerPartnerRoutes(
   app: FastifyInstance,
@@ -131,9 +142,13 @@ export function registerPartnerRoutes(
 ): void {
   const { pool, writeLimit, strictLimit } = deps;
 
-  // Parceiros na área visível do mapa.
+  // O app novo pergunta antes de mostrar o "anuncie aqui", o convite e os anúncios.
+  app.get('/partners/status', async () => ({ enabled: await partnersEnabled(pool) }));
+
+  // Parceiros na área visível do mapa. Com a chave desligada, ninguém vê (nem APK antigo).
   app.get('/partners', async (request) => {
     const query = parse(partnerMapQuerySchema, request.query ?? {});
+    if (!(await partnersEnabled(pool))) return { partners: [], enabled: false };
     const result = await pool.query<PartnerRow>(
       `SELECT ${partnerColumns}
        FROM partners p
@@ -145,7 +160,7 @@ export function registerPartnerRoutes(
        LIMIT ${MAP_LIMIT}`,
       [query.west, query.south, query.east, query.north, query.kind ?? null],
     );
-    return { partners: result.rows.map(publicPartner) };
+    return { partners: result.rows.map(publicPartner), enabled: true };
   });
 
   // Cartões "Parceiro do bem" do feed: destaques escolhidos pela equipe, perto de quem vê.
@@ -156,6 +171,7 @@ export function registerPartnerRoutes(
         longitude: z.coerce.number().min(-180).max(180),
       })
       .safeParse(request.query ?? {});
+    if (!(await partnersEnabled(pool))) return { partners: [], enabled: false };
     const point = near.success
       ? `ST_SetSRID(ST_MakePoint(${near.data.longitude}, ${near.data.latitude}), 4326)::geography`
       : null;
@@ -167,7 +183,7 @@ export function registerPartnerRoutes(
        ORDER BY ${point ? `ST_Distance(p.location, ${point}) ASC,` : ''} random()
        LIMIT ${SPOTLIGHT_LIMIT}`,
     );
-    return { partners: result.rows.map(publicPartner) };
+    return { partners: result.rows.map(publicPartner), enabled: true };
   });
 
   app.get('/partners/mine', async (request) => {
@@ -190,6 +206,8 @@ export function registerPartnerRoutes(
       [user.id],
     );
     return {
+      // Com a chave desligada, o cadastro aprovado e pago ainda não aparece para ninguém.
+      enabled: await partnersEnabled(pool),
       partners: result.rows.map((row) => ({
         ...ownPartner(row),
         stats: {
@@ -213,7 +231,9 @@ export function registerPartnerRoutes(
     const row = result.rows[0];
     const viewer = request.user;
     const own = row && viewer && row.user_id === viewer.id;
-    if (!row || (!own && (row.status !== 'approved' || row.owner_paused))) {
+    const shown =
+      row?.status === 'approved' && !row.owner_paused && row.paid && (await partnersEnabled(pool));
+    if (!row || (!own && !shown)) {
       throw new HttpError(404, NOT_FOUND);
     }
     return { partner: own ? ownPartner(row) : publicPartner(row) };
@@ -222,6 +242,8 @@ export function registerPartnerRoutes(
   app.post('/partners', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     if (user.suspended) throw new HttpError(403, 'Essa conta não pode fazer isso.');
+    // APKs antigos ainda mostram o "anuncie aqui"; a chave desligada barra o cadastro aqui.
+    if (!(await partnersEnabled(pool))) throw new HttpError(403, ADS_CLOSED);
     const input = parse(partnerRequestSchema, request.body);
     const fields = cleanInput(input);
     const pending = await pool.query<{ count: number }>(
@@ -320,6 +342,7 @@ export function registerPartnerRoutes(
   app.post('/partners/:id/tap', writeLimit, async (request) => {
     const id = partnerId(request.params);
     const { kind } = parse(partnerTapSchema, request.body);
+    if (!(await partnersEnabled(pool))) return { counted: false };
     const column = { view: 'views', whatsapp: 'whatsapp_taps', route: 'route_taps' }[kind];
     await pool.query(
       `INSERT INTO partner_daily_stats (partner_id, day, ${column})

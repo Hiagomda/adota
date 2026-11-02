@@ -2,6 +2,7 @@ import { nextPartnerStatus, partnerReviewSchema } from '@patinha/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { partnersEnabled, setPartnersEnabled } from '../appSettings.js';
 import type { Env } from '../config.js';
 import { inTransaction } from '../events.js';
 import { HttpError } from '../http.js';
@@ -19,6 +20,21 @@ const listSchema = z
   .strict();
 
 const featureSchema = z.object({ featured: z.boolean() }).strict();
+
+/** Último dia pago (AAAA-MM-DD). `null` tira o anúncio do ar. */
+const paidSchema = z
+  .object({
+    paidUntil: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Escolha o dia no calendário.')
+      .refine((value) => !Number.isNaN(Date.parse(`${value}T12:00:00Z`)), {
+        message: 'Escolha o dia no calendário.',
+      })
+      .nullable(),
+  })
+  .strict();
+
+const settingsSchema = z.object({ partnersEnabled: z.boolean() }).strict();
 
 function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.output<Schema> {
   const result = schema.safeParse(value);
@@ -59,9 +75,12 @@ export function registerPartnerModerationRoutes(
       [query.filter],
     );
     return {
+      enabled: await partnersEnabled(pool),
       partners: result.rows.map((row) => ({
         ...publicPartner(row),
         status: row.status,
+        paidUntil: row.paid_until,
+        paid: row.paid,
         paused: row.owner_paused,
         reviewNote: row.review_note,
         createdAt: row.created_at.toISOString(),
@@ -86,7 +105,13 @@ export function registerPartnerModerationRoutes(
         name: string;
         status: Parameters<typeof nextPartnerStatus>[0];
         featured: boolean;
-      }>(`SELECT user_id, name, status, featured FROM partners WHERE id = $1 FOR UPDATE`, [id]);
+        paid: boolean;
+      }>(
+        `SELECT user_id, name, status, featured,
+                COALESCE(paid_until >= (now() AT TIME ZONE 'America/Belem')::date, false) AS paid
+         FROM partners WHERE id = $1 FOR UPDATE`,
+        [id],
+      );
       const partner = found.rows[0];
       if (!partner) throw new HttpError(404, 'Parceiro não encontrado.');
       const status = nextPartnerStatus(partner.status, body.action);
@@ -110,10 +135,15 @@ export function registerPartnerModerationRoutes(
       return { ...partner, status };
     });
     const messages = {
-      approved: {
-        title: 'Você é Parceiro do Cupu!',
-        body: `${decided.name} já aparece no mapa do Égua, adota!.`,
-      },
+      approved: decided.paid
+        ? {
+            title: 'Você é Parceiro do Cupu!',
+            body: `${decided.name} foi aprovado e aparece no mapa enquanto o anúncio estiver pago.`,
+          }
+        : {
+            title: 'Seu cadastro de parceiro foi aprovado',
+            body: `${decided.name}: a equipe vai chamar você no WhatsApp para combinar o pagamento do anúncio.`,
+          },
       rejected: {
         title: 'Seu pedido de parceiro não foi aprovado',
         body: `${decided.name}: ${note ?? ''}`.trim(),
@@ -162,5 +192,61 @@ export function registerPartnerModerationRoutes(
       });
     });
     return { featured };
+  });
+
+  // Até quando o anúncio vale. O pagamento é combinado fora do app; aqui só fica a data.
+  app.post('/admin/v1/partners/:id/paid', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'posts.moderate');
+    const id = parse(idSchema, request.params).id;
+    const { paidUntil } = parse(paidSchema, request.body);
+    await inTransaction(pool, async (client) => {
+      const updated = await client.query<{ before: string | null }>(
+        `UPDATE partners p SET paid_until = $2::date, updated_at = now()
+         FROM (SELECT to_char(paid_until, 'YYYY-MM-DD') AS paid_until
+               FROM partners WHERE id = $1 FOR UPDATE) old
+         WHERE p.id = $1
+         RETURNING old.paid_until AS before`,
+        [id, paidUntil],
+      );
+      const row = updated.rows[0];
+      if (!row) throw new HttpError(404, 'Parceiro não encontrado.');
+      await writeAudit(client, {
+        actorId: session.user_id,
+        action: 'partner.paid_until',
+        targetType: 'partner',
+        targetId: id,
+        before: { paidUntil: row.before },
+        after: { paidUntil },
+        ...trail(request),
+      });
+    });
+    return { paidUntil };
+  });
+
+  // Chave geral dos anúncios de parceiros: desligada, nenhum parceiro aparece no app.
+  app.get('/admin/v1/settings', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'settings.manage');
+    return { partnersEnabled: await partnersEnabled(pool) };
+  });
+
+  app.post('/admin/v1/settings', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'settings.manage');
+    const body = parse(settingsSchema, request.body);
+    await inTransaction(pool, async (client) => {
+      const before = await setPartnersEnabled(client, body.partnersEnabled, session.user_id);
+      await writeAudit(client, {
+        actorId: session.user_id,
+        action: 'settings.partners_enabled',
+        targetType: 'settings',
+        targetId: 'partners_enabled',
+        before: { partnersEnabled: before },
+        after: { partnersEnabled: body.partnersEnabled },
+        ...trail(request),
+      });
+    });
+    return { partnersEnabled: body.partnersEnabled };
   });
 }

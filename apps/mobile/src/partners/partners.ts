@@ -26,6 +26,9 @@ export interface OwnPartner extends Partner {
   status: PartnerStatus;
   paused: boolean;
   reviewNote: string | null;
+  /** Último dia pago (AAAA-MM-DD). Só vem da API nova. */
+  paidUntil?: string | null;
+  /** Aparece no mapa agora: aprovado, sem pausa e pago. */
   visible: boolean;
   createdAt: string;
   updatedAt: string;

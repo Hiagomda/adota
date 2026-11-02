@@ -19,7 +19,7 @@ const SHOW_AFTER_MS = 6000;
 const perks: { icon: IconName; text: string }[] = [
   { icon: 'map-pin', text: 'Sua loja no mapa com a casinha turquesa dos parceiros' },
   { icon: 'message-circle', text: 'Cliente chamando direto no seu WhatsApp' },
-  { icon: 'gift', text: 'Sem custo: você oferece uma vantagem a quem adota' },
+  { icon: 'gift', text: 'Plano combinado com a equipe, direto no WhatsApp' },
 ];
 
 /**

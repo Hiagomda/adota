@@ -32,6 +32,7 @@ import {
   type Partner,
   type PartnerStatus,
 } from '../../src/partners/partners';
+import { usePartnersOpen } from '../../src/partners/usePartnersOpen';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 
@@ -44,19 +45,19 @@ const steps: { icon: IconName; title: string; body: string }[] = [
   {
     icon: 'gift',
     title: 'Ofereça uma vantagem',
-    body: 'Um desconto ou mimo para quem adota ou resgata. É isso que paga o anúncio.',
+    body: 'Um desconto ou mimo para quem adota ou resgata. É o destaque do seu cartão.',
   },
   {
     icon: 'check-circle',
-    title: 'A equipe confere',
-    body: 'Aprovou, a casinha da sua loja aparece no mapa e você recebe um aviso.',
+    title: 'A equipe confere e combina o valor',
+    body: 'A equipe chama você no WhatsApp para acertar o plano. Pago, a casinha da sua loja aparece no mapa.',
   },
 ];
 
 const highlights: { icon: IconName; label: string }[] = [
   { icon: 'map-pin', label: 'No mapa' },
   { icon: 'message-circle', label: 'Direto no WhatsApp' },
-  { icon: 'heart', label: 'R$ 0 por mês' },
+  { icon: 'heart', label: 'Quem adota e resgata' },
 ];
 
 /** Exemplo de como o cartão aparece no mapa. */
@@ -90,6 +91,7 @@ export default function PartnersScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const token = useSession((state) => state.token);
+  const open = usePartnersOpen();
   const mine = useQuery({
     queryKey: ['partners', 'mine', token],
     queryFn: () => loadMyPartners(token),
@@ -143,7 +145,7 @@ export default function PartnersScreen() {
                   Anuncie aqui.
                 </AppText>
                 <AppText variant="h2" style={{ color: colors.heroAccent }}>
-                  De graça, égua!
+                  {open ? 'Sua loja no mapa, égua!' : 'Em breve, égua!'}
                 </AppText>
                 <AppText variant="body" style={{ color: colors.onHeroMuted }}>
                   Petshop, veterinário, clínica 24h, banho e tosa ou ração: apareça no mapa de quem
@@ -204,19 +206,26 @@ export default function PartnersScreen() {
               ))}
             </View>
 
-            <Button
-              title={partners.length > 0 ? 'Cadastrar outra loja' : 'Cadastrar minha loja'}
-              icon="plus"
-              variant="secondary"
-              size="lg"
-              fullWidth
-              onPress={start}
-            />
+            {open ? (
+              <Button
+                title={partners.length > 0 ? 'Cadastrar outra loja' : 'Cadastrar minha loja'}
+                icon="plus"
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onPress={start}
+              />
+            ) : (
+              <Notice
+                tone="info"
+                message="Os anúncios de parceiros ainda não estão abertos. Avisaremos aqui no app quando abrirem."
+              />
+            )}
             <View style={[styles.trust, { backgroundColor: colors.primarySoft }]}>
               <Icon name="shield" color={colors.onPrimarySoft} />
               <AppText variant="bodySmall" style={[styles.grow, { color: colors.onPrimarySoft }]}>
-                O Égua, adota! não cobra nem recebe dinheiro dos parceiros. Venda de animais não é
-                permitida.
+                O anúncio é pago e o valor é combinado com a equipe pelo WhatsApp, fora do app: o
+                Égua, adota! não recebe pagamento por aqui. Venda de animais não é permitida.
               </AppText>
             </View>
 
@@ -288,9 +297,11 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
   const label =
     partner.status === 'approved' && partner.paused
       ? 'Pausado por você'
-      : statusLabels[partner.status];
+      : partner.status === 'approved' && !partner.visible
+        ? 'Falta o pagamento'
+        : statusLabels[partner.status];
 
-  const live = partner.status === 'approved' && !partner.paused;
+  const live = partner.visible;
 
   return (
     <Card padding="none" elevation="md">
@@ -315,6 +326,12 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
       <View style={styles.own}>
         {partner.status === 'pending' ? (
           <Notice tone="info" message="A equipe vai conferir e você recebe um aviso aqui no app." />
+        ) : null}
+        {partner.status === 'approved' && !partner.paused && !partner.visible ? (
+          <Notice
+            tone="info"
+            message="Aprovado! A equipe vai chamar você no WhatsApp para combinar o pagamento. Pago, sua loja aparece no mapa."
+          />
         ) : null}
         {partner.reviewNote && partner.status !== 'approved' ? (
           <Notice tone="warning" message={`Recado da equipe: ${partner.reviewNote}`} />
