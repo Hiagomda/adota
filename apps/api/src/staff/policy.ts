@@ -13,6 +13,7 @@ export const permissions = [
   'users.read',
   'users.suspend',
   'campaigns.review',
+  'settings.manage',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -60,13 +61,21 @@ const byRole: Record<StaffRole, readonly Permission[]> = {
   support: ['session.revoke_own', 'overview.read', 'users.read'],
   ong_reviewer: ['session.revoke_own', 'overview.read', 'verifications.manage', 'users.read'],
   finance_reviewer: ['session.revoke_own', 'overview.read', 'campaigns.review'],
-  admin: ['session.revoke_own', 'audit.read', 'team.read', 'campaigns.review', ...moderation],
+  admin: [
+    'session.revoke_own',
+    'audit.read',
+    'team.read',
+    'campaigns.review',
+    'settings.manage',
+    ...moderation,
+  ],
   superadmin: [
     'session.revoke_own',
     'audit.read',
     'team.read',
     'team.manage',
     'campaigns.review',
+    'settings.manage',
     ...moderation,
   ],
 };

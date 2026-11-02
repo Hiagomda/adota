@@ -25,6 +25,7 @@ import { Mascot } from '../../src/mascot';
 import { countPartnerTap, loadPartnersIn } from '../../src/partners/api';
 import { PartnerDetails } from '../../src/partners/PartnerDetails';
 import { PartnerInvite } from '../../src/partners/PartnerInvite';
+import { usePartnersOpen } from '../../src/partners/usePartnersOpen';
 import type { Partner } from '../../src/partners/partners';
 import { useSession } from '../../src/session';
 import { motion, radius, spacing, useTheme } from '../../src/theme';
@@ -61,6 +62,7 @@ export default function ExploreScreen() {
   const [bounds, setBounds] = useState<MapBounds>(belemBounds);
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
+  const partnersOpen = usePartnersOpen();
   const [showPartners, setShowPartners] = useState(true);
   const [partnerSelection, setPartnerSelection] = useState<Partner | null>(null);
   const closedAim = useRef<number | null>(null);
@@ -82,12 +84,12 @@ export default function ExploreScreen() {
     queryKey: ['partners', 'map', search],
     queryFn: () => loadPartnersIn(view),
     placeholderData: keepPreviousData,
-    enabled: showPartners,
+    enabled: showPartners && partnersOpen,
     staleTime: 5 * 60 * 1000,
   });
   const partners = useMemo(
-    () => (showPartners ? (partnersQuery.data?.partners ?? []) : []),
-    [partnersQuery.data, showPartners],
+    () => (showPartners && partnersOpen ? (partnersQuery.data?.partners ?? []) : []),
+    [partnersQuery.data, showPartners, partnersOpen],
   );
   const refetchMap = feed.refetch;
   useEffect(() => {
@@ -283,7 +285,7 @@ export default function ExploreScreen() {
           </Card>
         </View>
       ) : null}
-      {!cardOpen ? (
+      {!cardOpen && partnersOpen ? (
         <View style={[styles.layerRow, { bottom: controlsBottom }]} pointerEvents="box-none">
           <Chip
             label="Parceiros"
@@ -294,7 +296,7 @@ export default function ExploreScreen() {
           <Chip label="Anuncie aqui" icon="volume-2" onPress={() => router.push('/parceiros')} />
         </View>
       ) : null}
-      <PartnerInvite active={focused && !cardOpen} />
+      <PartnerInvite active={focused && !cardOpen && partnersOpen} />
     </View>
   );
 }

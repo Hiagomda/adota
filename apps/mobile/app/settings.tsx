@@ -26,6 +26,7 @@ import { AvatarCropper } from '../src/profile/AvatarCropper';
 import { permissionOutcome } from '../src/permissions';
 import { uploadProfilePhoto } from '../src/place/publish';
 import { useCupuTips } from '../src/cupu/tipStorage';
+import { usePartnersOpen } from '../src/partners/usePartnersOpen';
 import { logBestEffort } from '../src/crash/bestEffort';
 import { useSession } from '../src/session';
 import { screenColumn, spacing, useTheme } from '../src/theme';
@@ -35,6 +36,7 @@ const radiusChoices = [5, 10, 20, 30];
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const partnersOpen = usePartnersOpen();
   const token = useSession((state) => state.token);
   const logout = useSession((state) => state.logout);
   const client = useQueryClient();
@@ -359,14 +361,18 @@ export default function SettingsScreen() {
                     />
                   </>
                 ) : null}
-                <Divider inset />
-                <ListItem
-                  title="Anuncie aqui"
-                  subtitle="Petshop, clínica ou loja de ração? Apareça no mapa como Parceiro do Cupu."
-                  icon="home"
-                  showChevron
-                  onPress={() => router.push('/parceiros')}
-                />
+                {partnersOpen ? (
+                  <>
+                    <Divider inset />
+                    <ListItem
+                      title="Anuncie aqui"
+                      subtitle="Petshop, clínica ou loja de ração? Apareça no mapa como Parceiro do Cupu."
+                      icon="home"
+                      showChevron
+                      onPress={() => router.push('/parceiros')}
+                    />
+                  </>
+                ) : null}
               </Card>
             </View>
 

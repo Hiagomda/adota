@@ -244,7 +244,7 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
                 placeholder="Ex.: 10% de desconto em ração para quem adotar pelo app"
                 maxLength={PERK_MAX}
                 multiline
-                helper="É o que aparece em destaque no seu cartão. Aqui ninguém paga pra anunciar: a vantagem é a sua parte."
+                helper="É o que aparece em destaque no seu cartão para quem adota ou resgata."
               />
               <ScrollView
                 horizontal
@@ -355,8 +355,8 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
               onPress={() => void send()}
             />
             <AppText variant="caption" color="textSecondary" style={styles.center}>
-              O Égua, adota! não cobra nem recebe dinheiro dos parceiros. Venda de animais não é
-              permitida.
+              O anúncio é pago e o valor é combinado com a equipe pelo WhatsApp, fora do app: o
+              Égua, adota! não recebe pagamento por aqui. Venda de animais não é permitida.
             </AppText>
           </View>
         </View>
