@@ -1,10 +1,8 @@
 {
   "version": "0.1.0",
-  "build": 37,
+  "build": 38,
   "notes": [
-    "Novidades: central de resgates, busca de animais perdidos, campanhas transparentes e agenda de eventos.",
-    "Passaporte do animal, Casas Amigas com vagas e o armário do Cupu.",
-    "Painel da ONG e um guia para denunciar maus-tratos.",
-    "Anuncie aqui: petshops e clínicas parceiras aparecem no mapa."
+    "Parceiros no mapa com ícone próprio: sacolinha para petshop e cruz para veterinário.",
+    "O cartão do parceiro e o anúncio do feed mostram a mesma casinha."
   ]
 }
