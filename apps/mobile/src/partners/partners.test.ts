@@ -4,6 +4,7 @@ import {
   INVITE_FIRST_DELAY_MS,
   INVITE_REPEAT_MS,
   nearestPartners,
+  partnerPinKind,
   partnerGreeting,
   routeUrl,
   shouldInvite,
@@ -11,6 +12,15 @@ import {
 } from './partners.ts';
 
 const day = 24 * 60 * 60 * 1000;
+
+test('the map pin follows the kind of place', () => {
+  assert.equal(partnerPinKind('vet'), 'vet');
+  assert.equal(partnerPinKind('clinic_24h'), 'vet');
+  assert.equal(partnerPinKind('petshop'), 'petshop');
+  assert.equal(partnerPinKind('feed_store'), 'petshop');
+  assert.equal(partnerPinKind('grooming'), 'petshop');
+  assert.equal(partnerPinKind('other'), 'generic');
+});
 
 test('the invite waits for the first days and then repeats every three weeks', () => {
   const start = 1_000_000_000_000;

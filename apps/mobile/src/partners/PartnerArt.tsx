@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AppText, HeroSurface, Icon, PetPattern } from '../components/ui';
-import { partnerPinSource } from '../map/paw';
+import { partnerPinSources } from '../map/paw';
 import { radius, spacing, useTheme } from '../theme';
+import { partnerPinKind, type PartnerKind } from './partners';
 
 /** Faixa turquesa com a textura de ossinho e peixinho, a mesma da entrada do app. */
 export function PartnerBanner({
@@ -23,11 +24,11 @@ export function PartnerBanner({
   );
 }
 
-/** A casinha dos parceiros, a mesma do mapa. */
-export function PartnerPin({ size = 48 }: { size?: number }) {
+/** A casinha dos parceiros, a mesma do mapa. Sem `kind`, a da patinha (selo do programa). */
+export function PartnerPin({ size = 48, kind }: { size?: number; kind?: PartnerKind }) {
   return (
     <Image
-      source={partnerPinSource}
+      source={partnerPinSources[kind ? partnerPinKind(kind) : 'generic']}
       style={{ width: size, height: size }}
       resizeMode="contain"
       accessibilityElementsHidden

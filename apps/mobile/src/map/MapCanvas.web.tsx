@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
-import type { Partner } from '../partners/partners';
+import { partnerPinKind, type Partner } from '../partners/partners';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
@@ -112,7 +112,7 @@ export function MapCanvas({
       markers.current.forEach((marker) => marker.remove());
       // Parceiros primeiro, para as patas ficarem por cima.
       const partnerMarkers = partnersRef.current.map((partner) => {
-        const element = pinButton(partner.name, partnerPinUri(), 52);
+        const element = pinButton(partner.name, partnerPinUri(partnerPinKind(partner.kind)), 52);
         element.onclick = (event) => {
           event.stopPropagation();
           onSelectPartnerRef.current?.(partner);
@@ -164,7 +164,7 @@ export function MapCanvas({
       (post) =>
         `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
     )
-    .join('|')}:${partners.map((partner) => partner.id).join('|')}`;
+    .join('|')}:${partners.map((partner) => `${partner.id}:${partner.kind}`).join('|')}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;

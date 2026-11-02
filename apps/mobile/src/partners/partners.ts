@@ -41,6 +41,15 @@ export const partnerKinds: PartnerKind[] = [
   'other',
 ];
 
+/** Desenho do marcador no mapa: cruz para a saúde, sacolinha para as lojas, patinha no resto. */
+export type PartnerPinKind = 'vet' | 'petshop' | 'generic';
+
+export function partnerPinKind(kind: PartnerKind): PartnerPinKind {
+  if (kind === 'vet' || kind === 'clinic_24h') return 'vet';
+  if (kind === 'petshop' || kind === 'feed_store' || kind === 'grooming') return 'petshop';
+  return 'generic';
+}
+
 export const partnerKindLabels: Record<PartnerKind, string> = {
   petshop: 'Petshop',
   vet: 'Veterinário',

@@ -1,4 +1,5 @@
 import { Image, type ImageSourcePropType } from 'react-native';
+import type { PartnerPinKind } from '../partners/partners';
 
 export type Urgency = 'low' | 'medium' | 'high';
 
@@ -15,12 +16,19 @@ export const pawSource: Record<Urgency, ImageSourcePropType> = {
 /** Casinha dos Parceiros do Cupu (scripts/partner-pin.mjs). */
 export const partnerPinSource: ImageSourcePropType = require('../../assets/partner-pin.png');
 
+/** Casinha de cada tipo: cruz para veterinário e clínica, sacolinha para as lojas. */
+export const partnerPinSources: Record<PartnerPinKind, ImageSourcePropType> = {
+  generic: partnerPinSource,
+  petshop: require('../../assets/partner-pin-petshop.png'),
+  vet: require('../../assets/partner-pin-vet.png'),
+};
+
 export function pawUri(urgency: Urgency): string {
   return imageUri(pawSource[urgency]);
 }
 
-export function partnerPinUri(): string {
-  return imageUri(partnerPinSource);
+export function partnerPinUri(kind: PartnerPinKind = 'generic'): string {
+  return imageUri(partnerPinSources[kind]);
 }
 
 function imageUri(source: ImageSourcePropType): string {

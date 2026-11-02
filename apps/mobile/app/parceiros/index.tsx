@@ -296,7 +296,7 @@ function OwnPartnerCard({ partner }: { partner: OwnPartner }) {
     <Card padding="none" elevation="md">
       <PartnerBanner rounded={0} style={styles.ownBanner}>
         <View style={styles.ownBannerRow}>
-          <PartnerPin size={40} />
+          <PartnerPin size={40} kind={partner.kind} />
           <View style={styles.grow}>
             <AppText variant="h3" numberOfLines={2} style={{ color: colors.onHero }}>
               {partner.name}

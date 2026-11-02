@@ -39,7 +39,7 @@ export function PartnerDetails({
     <View style={styles.body}>
       <View style={styles.head}>
         <View style={[styles.pinWrap, { backgroundColor: colors.primarySoft }]}>
-          <PartnerPin size={44} />
+          <PartnerPin size={44} kind={partner.kind} />
         </View>
         <View style={styles.title}>
           <View style={styles.seal}>

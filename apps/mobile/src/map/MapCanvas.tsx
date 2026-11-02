@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, IconButton } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { ensureDeviceWatch, readDeviceFix } from '../place/deviceLocation';
-import type { Partner } from '../partners/partners';
+import { partnerPinKind, type Partner } from '../partners/partners';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permissions';
 import type { Post } from '../types';
 import { radius, size, spacing, useTheme } from '../theme';
@@ -55,8 +55,10 @@ const pawImages = {
   pawHigh: require('../../assets/paw-high.png') as number,
   pawMedium: require('../../assets/paw-medium.png') as number,
   pawLow: require('../../assets/paw-low.png') as number,
-  // Casinha dos Parceiros do Cupu (scripts/partner-pin.mjs).
+  // Casinhas dos Parceiros do Cupu (scripts/partner-pin.mjs), uma por tipo de lugar.
   partnerPin: require('../../assets/partner-pin.png') as number,
+  partnerPetshop: require('../../assets/partner-pin-petshop.png') as number,
+  partnerVet: require('../../assets/partner-pin-vet.png') as number,
 };
 
 const cameraBounds = {
@@ -119,7 +121,16 @@ const partnerHitStyle: ComponentProps<typeof CircleLayer>['style'] = {
   circleTranslate: [0, -36],
 };
 const partnerPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
-  iconImage: 'partnerPin',
+  // Veterinário e clínica 24h com a cruz; petshop, ração e banho e tosa com a sacolinha.
+  iconImage: [
+    'match',
+    ['get', 'pin'],
+    'vet',
+    'partnerVet',
+    'petshop',
+    'partnerPetshop',
+    'partnerPin',
+  ],
   iconSize: 0.5,
   iconAnchor: 'bottom',
   iconAllowOverlap: true,
@@ -403,7 +414,7 @@ export function MapCanvas({
   const partnerKey = partners
     .map(
       (partner) =>
-        `${partner.id}:${partner.location.longitude.toFixed(5)}:${partner.location.latitude.toFixed(5)}`,
+        `${partner.id}:${partner.kind}:${partner.location.longitude.toFixed(5)}:${partner.location.latitude.toFixed(5)}`,
     )
     .sort()
     .join('|');
@@ -413,7 +424,7 @@ export function MapCanvas({
       features: partners.map((partner) => ({
         type: 'Feature',
         id: partner.id,
-        properties: { partnerId: partner.id },
+        properties: { partnerId: partner.id, pin: partnerPinKind(partner.kind) },
         geometry: {
           type: 'Point',
           coordinates: [partner.location.longitude, partner.location.latitude],
