@@ -39,7 +39,7 @@ export function PartnerSpotlight({ slot = 0 }: { slot?: number }) {
     >
       <PartnerBanner rounded={0} style={styles.side}>
         <View style={styles.sideInner}>
-          <PartnerPin size={64} />
+          <PartnerPin size={64} kind={partner.kind} />
           <AppText variant="caption" style={[styles.sideText, { color: colors.onHero }]}>
             PARCEIRO{'\n'}DO CUPU
           </AppText>
