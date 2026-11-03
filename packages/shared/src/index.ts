@@ -252,3 +252,17 @@ export {
   type PartnerTapKind,
   type PartnerUpdateInput,
 } from './partner.js';
+export {
+  CHECKIN_DAYS,
+  CHECKIN_LATE_DAYS,
+  adopterSchema,
+  checkinAnswerSchema,
+  checkinDueAt,
+  checkinMoodSchema,
+  checkinNeedsAttention,
+  checkinsToNotify,
+  dueCheckinDays,
+  type CheckinAnswer,
+  type CheckinDay,
+  type CheckinMood,
+} from './followup.js';
