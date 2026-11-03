@@ -202,6 +202,7 @@ export default function PostScreen() {
     try {
       await api(path, { method, token, body });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       return true;
@@ -224,6 +225,7 @@ export default function PostScreen() {
         body: { kind: 'will_help' },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -329,6 +331,7 @@ export default function PostScreen() {
         body: { outcome },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       if (outcome === 'could_not' && result.status === 'open') {
@@ -1057,6 +1060,7 @@ export default function PostScreen() {
                     },
                   });
                   await client.invalidateQueries({ queryKey: ['post', id, token] });
+                  await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
                   setNote(
                     created.reviewStatus === 'published'
                       ? 'Nota publicada no diário. Quem acompanha este resgate recebe o aviso.'
@@ -1304,6 +1308,7 @@ export default function PostScreen() {
           }
           await api(`/posts/${item.id}`, { method: 'PATCH', token, body });
           await client.invalidateQueries({ queryKey: ['post', id, token] });
+          await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
           await client.invalidateQueries({ queryKey: ['posts'] });
           await client.invalidateQueries({ queryKey: ['map'] });
           setEditOpen(false);

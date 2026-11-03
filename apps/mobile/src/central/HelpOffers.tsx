@@ -14,13 +14,18 @@ import {
 } from '../components/ui';
 import { spacing } from '../theme';
 import {
+  blockedOfferKinds,
   helpOfferKinds,
+  missingOfferKinds,
   offerKindLabel,
   offerStatusLabel,
   type HelpOffer,
+  type HelpOfferKind,
   type HelpOffersPage,
+  type RescuePlanPage,
 } from './central';
 import { OfferSheet } from './OfferSheet';
+import { RescuePlan } from './RescuePlan';
 
 const statusTone = {
   offered: 'info',
@@ -37,10 +42,17 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
   const client = useQueryClient();
   const toast = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [preset, setPreset] = useState<HelpOfferKind | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const offers = useQuery({
     queryKey: ['help-offers', postId, token],
     queryFn: () => api<HelpOffersPage>(`/posts/${postId}/help-offers`, { token }),
+  });
+  // Plano de ação: servidores antigos respondem 404 e a seção simplesmente não aparece.
+  const plan = useQuery({
+    queryKey: ['rescue-plan', postId, token],
+    queryFn: () => api<RescuePlanPage>(`/posts/${postId}/plan`, { token }),
+    retry: false,
   });
   const page = offers.data;
   if (offers.isLoading) return null;
@@ -54,11 +66,24 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
     );
   }
   const list = page.offers;
-  if (list.length === 0 && !page.canOffer) return null;
+  const planShown = Boolean(plan.data?.applies && plan.data.needs.length > 0);
+  if (list.length === 0 && !page.canOffer && !planShown) return null;
   const mineActive = list
     .filter((offer) => offer.mine && (offer.status === 'offered' || offer.status === 'accepted'))
     .map((offer) => offer.kind);
-  const allOffered = helpOfferKinds.every((kind) => mineActive.includes(kind.value));
+  const blocked = blockedOfferKinds(plan.data?.needs);
+  const allOffered = helpOfferKinds.every(
+    (kind) => mineActive.includes(kind.value) || blocked[kind.value],
+  );
+
+  function openSheet(kind: HelpOfferKind | null) {
+    setPreset(
+      kind ??
+        missingOfferKinds(plan.data?.needs).find((item) => !mineActive.includes(item)) ??
+        null,
+    );
+    setSheetOpen(true);
+  }
 
   async function decide(offer: HelpOffer, decision: 'accept' | 'decline' | 'withdraw') {
     if (busy) return;
@@ -66,6 +91,7 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
     try {
       await api(`/help-offers/${offer.id}/${decision}`, { method: 'POST', token });
       await client.invalidateQueries({ queryKey: ['help-offers', postId] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', postId] });
       toast.show(
         decision === 'accept'
           ? 'Oferta aceita. Combinem pelos comentários.'
@@ -84,6 +110,14 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
 
   return (
     <View style={styles.section}>
+      <RescuePlan
+        postId={postId}
+        token={token}
+        plan={plan}
+        canOffer={page.canOffer && Boolean(token)}
+        offeredKinds={mineActive}
+        onOffer={openSheet}
+      />
       <AppText variant="h2">Outras ajudas</AppText>
       {list.length === 0 ? (
         <AppText color="textSecondary">
@@ -149,7 +183,7 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
           icon="gift"
           variant="outline"
           fullWidth
-          onPress={() => setSheetOpen(true)}
+          onPress={() => openSheet(null)}
         />
       ) : null}
       <OfferSheet
@@ -157,11 +191,14 @@ export function HelpOffers({ postId, token }: { postId: string; token: string | 
         postId={postId}
         token={token}
         already={mineActive}
+        blocked={blocked}
+        preset={preset}
         onClose={() => setSheetOpen(false)}
         onSent={async () => {
           setSheetOpen(false);
           toast.show('Oferta enviada. Quem cuida do resgate vai responder.', 'success');
           await client.invalidateQueries({ queryKey: ['help-offers', postId] });
+          await client.invalidateQueries({ queryKey: ['rescue-plan', postId] });
         }}
       />
     </View>

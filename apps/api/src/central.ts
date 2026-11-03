@@ -2,6 +2,8 @@ import {
   centralQuerySchema,
   centralScore,
   helpOfferDecisionSchema,
+  missingReason,
+  openNeedKinds,
   helpOfferSchema,
   nextOfferStatus,
   publicDistanceKm,
@@ -17,6 +19,7 @@ import type { Env } from './config.js';
 import { HttpError } from './http.js';
 import { publicMediaUrl } from './media.js';
 import { notifyPeople } from './notify.js';
+import { needFor, plansFor } from './rescuePlan.js';
 import type { SessionUser } from './session.js';
 import { stripControls } from './text.js';
 
@@ -63,6 +66,7 @@ interface CaseRow {
   species: string;
   size: string;
   animal_name: string | null;
+  health_notes: string | null;
   approx_lat: number;
   approx_lng: number;
   distance_m: number | null;
@@ -126,7 +130,7 @@ export async function loadCentral(
   }
   const result = await pool.query<CaseRow>(
     `SELECT p.id, p.urgency, p.status, p.created_at, p.approx_label, p.author_id,
-            a.id AS animal_id, a.species, a.size, a.name AS animal_name,
+            a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.health_notes,
             ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
             ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
             ${distance} AS distance_m,
@@ -174,6 +178,11 @@ export async function loadCentral(
           )
         ).rows;
 
+  const plans = await plansFor(
+    pool,
+    rows.map((row) => ({ ...row, type: 'rescue_alert' })),
+  );
+
   const now = Date.now();
   const volunteers = new Set<string>();
   let withoutHelpCount = 0;
@@ -202,6 +211,9 @@ export async function loadCentral(
       hasFoster: offerCounts.foster > 0 || row.foster_stay !== null,
       distanceKm,
     });
+    const plan = plans.get(row.id) ?? [];
+    const missing = missingReason(openNeedKinds(plan));
+    if (missing) reasons.push(missing);
     // Rosto e primeiro nome de quem ajuda: o bastante para ver que tem gente, sem expor mais.
     const seen = new Set<string>();
     const faces = [];
@@ -238,6 +250,8 @@ export async function loadCentral(
       fosterStay: row.foster_stay,
       volunteers: faces,
       withoutHelp,
+      // Plano de ação: o que o caso ainda precisa (APKs antigos ignoram).
+      needs: plan.map((need) => ({ kind: need.kind, state: need.state })),
       score,
       reasons,
       viewer: {
@@ -375,6 +389,23 @@ export async function createOffer(
     [user.id, post.author_id],
   );
   if ((blocked.rowCount ?? 0) > 0) throw new HttpError(404, 'Esse resgate não existe.');
+  // Plano de ação: o que já tem quem resolva (ou não precisa) não recebe outra oferta igual.
+  const need = await needFor(pool, postId, input.kind);
+  if (need?.state === 'covered' || need?.state === 'dismissed') {
+    const already = await pool.query(
+      `SELECT 1 FROM rescue_help_offers
+       WHERE post_id = $1 AND user_id = $2 AND kind = $3 AND status IN ('offered', 'accepted')`,
+      [postId, user.id, input.kind],
+    );
+    if ((already.rowCount ?? 0) === 0) {
+      throw new HttpError(
+        409,
+        need.state === 'covered'
+          ? `Esse resgate já tem ${offerKindTitle[input.kind]}. Veja o que ainda falta no plano.`
+          : `Quem cuida disse que não precisa de ${offerKindTitle[input.kind]}. Veja o que ainda falta no plano.`,
+      );
+    }
+  }
   const note = input.note ? stripControls(input.note).trim() || null : null;
   const inserted = await pool.query<{ id: string }>(
     `INSERT INTO rescue_help_offers (post_id, user_id, kind, note)
