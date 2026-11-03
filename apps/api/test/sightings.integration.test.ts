@@ -117,6 +117,44 @@ describe('sightings', () => {
     expect((await sight(postId, 'late@egua.local')).statusCode).toBe(409);
   });
 
+  it('sends a sighting kept offline once, at the time it was seen', async () => {
+    const postId = await rescue();
+    await insertUser('passerby@egua.local', 'passerby');
+    const seenAt = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    const first = await sight(postId, 'passerby@egua.local', {
+      clientKey: 'off-line-0001',
+      seenAt,
+    });
+    expect(first.statusCode).toBe(201);
+    const again = await sight(postId, 'passerby@egua.local', {
+      clientKey: 'off-line-0001',
+      seenAt,
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().id).toBe(first.json().id);
+
+    const stored = await pool.query<{ created_at: Date }>(
+      'SELECT created_at FROM sightings WHERE post_id = $1',
+      [postId],
+    );
+    expect(stored.rowCount).toBe(1);
+    expect(Math.abs(stored.rows[0]!.created_at.getTime() - Date.parse(seenAt))).toBeLessThan(1000);
+    const notices = await pool.query(`SELECT 1 FROM notifications WHERE type = 'sighting'`);
+    expect(notices.rowCount).toBe(1);
+
+    // Hora no futuro ou de muitos dias atrás não vale: fica entre agora e um dia antes.
+    const future = await sight(postId, 'passerby@egua.local', {
+      clientKey: 'off-line-0002',
+      seenAt: new Date(Date.now() + 86_400_000).toISOString(),
+    });
+    expect(future.statusCode).toBe(201);
+    const clamped = await pool.query<{ created_at: Date }>(
+      'SELECT created_at FROM sightings WHERE client_key = $1',
+      ['off-line-0002'],
+    );
+    expect(clamped.rows[0]!.created_at.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
   it('removes the sightings of a person who deletes the account', async () => {
     const postId = await rescue();
     const passerby = await insertUser('passerby@egua.local', 'passerby');
