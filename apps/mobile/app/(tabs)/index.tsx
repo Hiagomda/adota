@@ -523,6 +523,11 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
       >
+        <Chip
+          label="Não sei o que fazer"
+          icon="help-circle"
+          onPress={() => router.push('/assistente')}
+        />
         <Chip label="Central" icon="radio" onPress={() => router.push('/central')} />
         <Chip label="Adoção" icon="home" onPress={() => router.push('/adocao')} />
         <Chip

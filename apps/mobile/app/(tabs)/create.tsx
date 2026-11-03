@@ -44,6 +44,7 @@ import type { Post } from '../../src/types';
 import { logBestEffort } from '../../src/crash/bestEffort';
 import { furColors, toggleFurColor, type FurColor } from '../../src/lost/lostMatch';
 import { ageBands, careKeys, careQuestion, type AgeBand, type CareKey } from '../../src/post/care';
+import { cupuPrefill, urgencyLabel } from '../../src/cupu/assistant';
 import {
   clearCreateDraft,
   saveCreateDraft,
@@ -115,8 +116,16 @@ const BOTTOM_SPACE = spacing.giant * 2;
 export default function CreateScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ kind?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    kind?: string | string[];
+    urgency?: string | string[];
+    species?: string | string[];
+    description?: string | string[];
+    cupu?: string | string[];
+  }>();
   const askedKind = Array.isArray(params.kind) ? params.kind[0] : params.kind;
+  // O assistente do Cupu manda o texto e a urgência já montados; `cupu` muda a cada envio.
+  const fromCupu = cupuPrefill(params);
   const insets = useSafeAreaInsets();
   const [columnWidth, setColumnWidth] = useState(0);
   const contentWidth = Math.max(columnWidth, MIN_COLUMN_WIDTH);
@@ -148,29 +157,44 @@ export default function CreateScreen() {
     openCreateCamera();
   }, [bootShot]);
   const [animalName, setAnimalName] = useState(restored?.name ?? '');
-  const [description, setDescription] = useState(restored?.description ?? '');
+  const [description, setDescription] = useState(
+    fromCupu?.description || (restored?.description ?? ''),
+  );
   const [reference, setReference] = useState(restored?.reference ?? '');
   const [kind, setKind] = useState<'rescue_alert' | 'lost' | 'adoption'>(
-    askedKind === 'lost'
-      ? 'lost'
-      : askedKind === 'adoption'
-        ? 'adoption'
-        : (restored?.kind ?? 'rescue_alert'),
+    fromCupu?.kind ??
+      (askedKind === 'lost'
+        ? 'lost'
+        : askedKind === 'adoption'
+          ? 'adoption'
+          : (restored?.kind ?? 'rescue_alert')),
   );
   const [appliedKind, setAppliedKind] = useState(askedKind);
   if (askedKind !== appliedKind) {
     setAppliedKind(askedKind);
     if (askedKind === 'lost' || askedKind === 'adoption') setKind(askedKind);
   }
-  const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>(restored?.species ?? 'dog');
+  const [species, setSpecies] = useState<'dog' | 'cat' | 'other'>(
+    fromCupu?.species ?? restored?.species ?? 'dog',
+  );
   const [size, setSize] = useState<'small' | 'medium' | 'large'>(restored?.size ?? 'medium');
   const [sex, setSex] = useState<'male' | 'female' | 'unknown'>(restored?.sex ?? 'unknown');
   const [furs, setFurs] = useState<FurColor[]>(restored?.colors ?? []);
   const [age, setAge] = useState<AgeBand | null>(restored?.age ?? null);
   const [care, setCare] = useState<Partial<Record<CareKey, true>>>(restored?.care ?? {});
   const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>(
-    restored?.urgency ?? (askedKind === 'adoption' ? 'low' : 'high'),
+    fromCupu?.urgency ?? restored?.urgency ?? (askedKind === 'adoption' ? 'low' : 'high'),
   );
+  const [appliedCupu, setAppliedCupu] = useState<string | null>(fromCupu?.id ?? null);
+  const [cupuUrgency, setCupuUrgency] = useState(fromCupu?.urgency ?? null);
+  if (fromCupu && fromCupu.id !== appliedCupu) {
+    setAppliedCupu(fromCupu.id);
+    setKind(fromCupu.kind);
+    setUrgency(fromCupu.urgency);
+    setCupuUrgency(fromCupu.urgency);
+    if (fromCupu.species) setSpecies(fromCupu.species);
+    if (fromCupu.description) setDescription(fromCupu.description);
+  }
   const [manual, setManual] = useState<MapPoint | null>(restored?.point ?? null);
   const [moved, setMoved] = useState(Boolean(restored?.point));
   // Only species and size are asked up front; the rest waits behind "Mais detalhes".
@@ -262,6 +286,7 @@ export default function CreateScreen() {
     setSex('unknown');
     setManual(null);
     setMoved(false);
+    setCupuUrgency(null);
     setDraftNotice(false);
     clearCreateDraft().catch((error: unknown) => {
       reportError(error, { source: 'handled', where: 'create-draft:clear' });
@@ -581,6 +606,12 @@ export default function CreateScreen() {
                 {kind !== 'adoption' ? (
                   <View style={styles.group}>
                     <AppText variant="bodyStrong">Urgência</AppText>
+                    {cupuUrgency ? (
+                      <AppText variant="bodySmall" color="textSecondary">
+                        O Cupu sugeriu “{urgencyLabel[cupuUrgency]}” pelo que você marcou. Mude se
+                        achar que é outra.
+                      </AppText>
+                    ) : null}
                     <View style={styles.chips}>
                       {urgencyOptions.map((option) => (
                         <Chip
