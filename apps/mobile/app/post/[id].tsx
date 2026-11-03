@@ -53,6 +53,8 @@ import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { uploadProfilePhoto } from '../../src/place/publish';
 import { journeyOf } from '../../src/post/journey';
+import { currentStep, operationSteps, type OperationPage } from '../../src/operation/operation';
+import { needsAttention, pendingCheckin, type FollowupPage } from '../../src/followup/followup';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
@@ -153,6 +155,20 @@ export default function PostScreen() {
     enabled: Boolean(id),
   });
   const whatsapp = useWhatsAppContact(token, setNote);
+  // Modo resgate: quem disse "vou ajudar" retoma do passo em que parou.
+  const operation = useQuery({
+    queryKey: ['operation', id, token],
+    queryFn: () => api<OperationPage>(`/posts/${id}/operation`, { token }),
+    enabled: Boolean(id && token && post.data?.type === 'rescue_alert' && post.data.viewerWillHelp),
+    retry: false,
+  });
+  // Acompanhamento da adoção: o tutor responde os check-ins; quem publicou vê e indica o tutor.
+  const followup = useQuery({
+    queryKey: ['followup', id, token],
+    queryFn: () => api<FollowupPage>(`/posts/${id}/followup`, { token }),
+    enabled: Boolean(id && token && post.data?.status === 'adopted'),
+    retry: false,
+  });
   const sightings = useQuery({
     queryKey: ['sightings', id, token],
     queryFn: () => api<{ sightings: Sighting[] }>(`/posts/${id}/sightings`, { token }),
@@ -194,6 +210,7 @@ export default function PostScreen() {
     try {
       await api(path, { method, token, body });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       return true;
@@ -216,6 +233,7 @@ export default function PostScreen() {
         body: { kind: 'will_help' },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -226,6 +244,8 @@ export default function PostScreen() {
       setNote(
         'Combinado. O ponto exato deste resgate fica visível para você. Sem notícia sua em 12 horas, ele volta a aparecer para outras pessoas.',
       );
+      // Assumiu o resgate: entra direto no modo resgate, com os passos e o ponto exato.
+      router.push(`/resgate/${post.data.id}`);
     } catch (error) {
       setHelpOpen(false);
       setNote(messageFrom(error));
@@ -319,6 +339,7 @@ export default function PostScreen() {
         body: { outcome },
       });
       await client.invalidateQueries({ queryKey: ['post', id, token] });
+      await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
       await client.invalidateQueries({ queryKey: ['posts'] });
       await client.invalidateQueries({ queryKey: ['map'] });
       if (outcome === 'could_not' && result.status === 'open') {
@@ -597,6 +618,43 @@ export default function PostScreen() {
             </View>
 
             <RescueJourney type={item.type} status={item.status} />
+
+            {operation.data?.canOperate ? (
+              <Card padding="none" elevation="md">
+                <ListItem
+                  title="Continuar no modo resgate"
+                  subtitle={`Próximo passo: ${
+                    operationSteps.find((entry) => entry.value === currentStep(operation.data))
+                      ?.title ?? 'Resumo do atendimento'
+                  }`}
+                  icon="navigation"
+                  showChevron
+                  onPress={() => router.push(`/resgate/${item.id}`)}
+                />
+              </Card>
+            ) : null}
+
+            {item.status === 'adopted' &&
+            followup.data &&
+            (followup.data.followup || followup.data.canSetAdopter) ? (
+              <Card padding="none" elevation="md">
+                <ListItem
+                  title="Acompanhamento da adoção"
+                  subtitle={
+                    followup.data.canSetAdopter
+                      ? 'Diga quem adotou para acompanhar a adaptação'
+                      : pendingCheckin(followup.data)
+                        ? 'Conte como está a adaptação'
+                        : needsAttention(followup.data)
+                          ? 'O tutor pediu atenção'
+                          : 'Check-ins aos 7, 30 e 90 dias'
+                  }
+                  icon="heart"
+                  showChevron
+                  onPress={() => router.push(`/acompanhamento/${item.id}`)}
+                />
+              </Card>
+            ) : null}
 
             {item.status === 'not_found' ? (
               <View
@@ -1032,6 +1090,7 @@ export default function PostScreen() {
                     },
                   });
                   await client.invalidateQueries({ queryKey: ['post', id, token] });
+                  await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
                   setNote(
                     created.reviewStatus === 'published'
                       ? 'Nota publicada no diário. Quem acompanha este resgate recebe o aviso.'
@@ -1279,6 +1338,7 @@ export default function PostScreen() {
           }
           await api(`/posts/${item.id}`, { method: 'PATCH', token, body });
           await client.invalidateQueries({ queryKey: ['post', id, token] });
+          await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
           await client.invalidateQueries({ queryKey: ['posts'] });
           await client.invalidateQueries({ queryKey: ['map'] });
           setEditOpen(false);
