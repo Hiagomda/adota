@@ -258,3 +258,20 @@ export {
   type PartnerTapKind,
   type PartnerUpdateInput,
 } from './partner.js';
+export {
+  missingReason,
+  openNeedKinds,
+  planApplies,
+  rescueNeedKindSchema,
+  rescueNeedMarkBodySchema,
+  rescueNeedMarkSchema,
+  rescueNeedOrder,
+  rescueNeedTitle,
+  rescuePlan,
+  type RescueNeed,
+  type RescueNeedKind,
+  type RescueNeedMark,
+  type RescueNeedState,
+  type RescuePlanInput,
+  type StoredRescueNeedMark,
+} from './rescuePlan.js';
