@@ -66,6 +66,8 @@ export const centralQuerySchema = z
     status: centralStatusSchema.optional(),
     /** Só casos que ainda ninguém assumiu nem ofereceu ajuda. */
     withoutHelp: bool,
+    /** Só casos parados, do que mais precisa de atenção para o que menos. */
+    stalled: bool,
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .refine((value) => (value.latitude === undefined) === (value.longitude === undefined), {
@@ -154,4 +156,66 @@ function waitLabel(hours: number): string {
 export function publicDistanceKm(meters: number): number {
   const half = Math.round(meters / 500) / 2;
   return Math.max(0.5, half);
+}
+
+export interface StalledInput {
+  urgency: 'low' | 'medium' | 'high';
+  status: CentralStatus;
+  /** Horas desde que o caso foi publicado. */
+  ageHours: number;
+  /** Horas desde a última novidade (diário, vou ajudar, oferta, avistamento, Casa Amiga). */
+  quietHours: number;
+  goingCount: number;
+  /** Idade em horas da oferta mais antiga ainda sem resposta, ou null. */
+  pendingOfferHours: number | null;
+  hasFoster: boolean;
+}
+
+export interface StalledCase {
+  /** Quanto maior, antes na fila. */
+  priority: number;
+  /** Frases curtas com o motivo, para a equipe saber por que o caso está ali. */
+  reasons: string[];
+}
+
+/** Quanto tempo sem novidade faz um caso na rua contar como parado, por urgência. */
+export const STALLED_QUIET_HOURS: Record<'low' | 'medium' | 'high', number> = {
+  high: 6,
+  medium: 24,
+  low: 48,
+};
+/** Oferta esperando resposta de quem publicou há mais que isso. */
+export const STALLED_OFFER_HOURS = 24;
+/** Resgatado sem lar temporário há mais que isso. */
+export const STALLED_NO_FOSTER_HOURS = 72;
+
+/**
+ * Casos parados: na rua sem novidade além do prazo da urgência, oferta sem resposta há mais de um
+ * dia, ou resgatado sem lar há mais de três dias. Os critérios são fixos e cada um vira uma razão
+ * legível; a prioridade soma urgência, tempo parado (até quatro vezes o prazo) e falta de ajuda.
+ */
+export function stalledCase(input: StalledInput): StalledCase | null {
+  const reasons: string[] = [];
+  let priority = 0;
+  const street = input.status !== 'rescued';
+  const limit = STALLED_QUIET_HOURS[input.urgency];
+  if (street && input.quietHours >= limit) {
+    reasons.push(`Sem novidade há ${waitLabel(input.quietHours)}`);
+    priority += Math.round(Math.min(input.quietHours / limit, 4) * 10);
+    if (input.goingCount === 0) {
+      reasons.push('Ninguém a caminho');
+      priority += 15;
+    }
+  }
+  if (input.pendingOfferHours !== null && input.pendingOfferHours >= STALLED_OFFER_HOURS) {
+    reasons.push(`Oferta sem resposta há ${waitLabel(input.pendingOfferHours)}`);
+    priority += 10;
+  }
+  if (input.status === 'rescued' && !input.hasFoster && input.ageHours >= STALLED_NO_FOSTER_HOURS) {
+    reasons.push(`Resgatado e sem lar há ${waitLabel(input.ageHours)}`);
+    priority += 10;
+  }
+  if (reasons.length === 0) return null;
+  priority += input.urgency === 'high' ? 30 : input.urgency === 'medium' ? 15 : 0;
+  return { priority, reasons };
 }

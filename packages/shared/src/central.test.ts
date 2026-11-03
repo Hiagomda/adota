@@ -5,6 +5,7 @@ import {
   helpOfferSchema,
   nextOfferStatus,
   publicDistanceKm,
+  stalledCase,
   type CentralScoreInput,
 } from './central.js';
 
@@ -96,5 +97,41 @@ describe('public distance', () => {
     expect(publicDistanceKm(30)).toBe(0.5);
     expect(publicDistanceKm(1240)).toBe(1);
     expect(publicDistanceKm(1260)).toBe(1.5);
+  });
+});
+
+describe('stalled cases', () => {
+  const calm = {
+    urgency: 'medium' as const,
+    status: 'open' as const,
+    ageHours: 2,
+    quietHours: 2,
+    goingCount: 0,
+    pendingOfferHours: null,
+    hasFoster: false,
+  };
+
+  it('leaves fresh cases alone', () => {
+    expect(stalledCase(calm)).toBeNull();
+    expect(stalledCase({ ...calm, status: 'rescued', ageHours: 30, quietHours: 30 })).toBeNull();
+  });
+
+  it('uses a shorter limit for urgent cases', () => {
+    expect(stalledCase({ ...calm, quietHours: 7 })).toBeNull();
+    const urgent = stalledCase({ ...calm, urgency: 'high', quietHours: 7 });
+    expect(urgent?.reasons).toEqual(['Sem novidade há 7 h', 'Ninguém a caminho']);
+  });
+
+  it('flags offers without answer and rescued animals without a home', () => {
+    const offer = stalledCase({ ...calm, goingCount: 1, pendingOfferHours: 30 });
+    expect(offer?.reasons).toEqual(['Oferta sem resposta há 1 dia']);
+    const home = stalledCase({ ...calm, status: 'rescued', ageHours: 100, quietHours: 80 });
+    expect(home?.reasons).toEqual(['Resgatado e sem lar há 4 dias']);
+  });
+
+  it('puts the urgent, longer stalled case without help first', () => {
+    const a = stalledCase({ ...calm, urgency: 'high', quietHours: 48 });
+    const b = stalledCase({ ...calm, quietHours: 30, goingCount: 2 });
+    expect(a!.priority).toBeGreaterThan(b!.priority);
   });
 });

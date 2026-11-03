@@ -75,3 +75,9 @@ test('clock is in Belém time', () => {
   assert.equal(belemClock('2026-10-28T17:05:00Z'), '14:05');
   assert.equal(belemClock('invalid'), '');
 });
+
+test('the stalled filter goes to the server and counts as a filter', () => {
+  const filters = { ...defaultCentralFilters, stalled: true };
+  assert.equal(centralPath(filters, null), '/central?stalled=true');
+  assert.equal(activeFilterCount(filters, false), 1);
+});

@@ -32,6 +32,8 @@ export interface CentralCase {
   fosterStay?: 'requested' | 'approved' | null;
   volunteers: { name: string; handle: string; avatarUrl: string | null }[];
   withoutHelp: boolean;
+  /** Caso parado: motivos e prioridade. Ausente em servidores antigos. */
+  stalled?: { priority: number; reasons: string[] } | null;
   score: number;
   reasons: string[];
   viewer: { isAuthor: boolean; willHelp: boolean; offers: HelpOfferKind[] };
@@ -40,7 +42,14 @@ export interface CentralCase {
 export interface CentralPage {
   serverTime: string;
   refreshSeconds: number;
-  summary: { activeCases: number; withoutHelp: number; volunteers: number; urgent: number };
+  summary: {
+    activeCases: number;
+    withoutHelp: number;
+    volunteers: number;
+    urgent: number;
+    /** Ausente em servidores antigos. */
+    stalled?: number;
+  };
   cases: CentralCase[];
 }
 
@@ -132,6 +141,8 @@ export interface CentralFilters {
   species: SpeciesFilter;
   radiusKm: number;
   withoutHelp: boolean;
+  /** Só os casos parados, na ordem da fila de atenção. */
+  stalled: boolean;
 }
 
 export const defaultCentralFilters: CentralFilters = {
@@ -139,6 +150,7 @@ export const defaultCentralFilters: CentralFilters = {
   species: 'all',
   radiusKm: 0,
   withoutHelp: false,
+  stalled: false,
 };
 
 /**
@@ -157,6 +169,7 @@ export function centralPath(
   if (filters.species !== 'all') params.push(`species=${filters.species}`);
   if (filters.status !== 'all') params.push(`status=${filters.status}`);
   if (filters.withoutHelp) params.push('withoutHelp=true');
+  if (filters.stalled) params.push('stalled=true');
   return params.length > 0 ? `/central?${params.join('&')}` : '/central';
 }
 
@@ -167,6 +180,7 @@ export function activeFilterCount(filters: CentralFilters, hasLocation: boolean)
   if (filters.species !== 'all') count += 1;
   if (filters.radiusKm > 0 && hasLocation) count += 1;
   if (filters.withoutHelp) count += 1;
+  if (filters.stalled) count += 1;
   return count;
 }
 
