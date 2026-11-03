@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, loadFeed, loadPost, messageFrom } from '../../src/api';
+import { api, isNetworkError, loadFeed, loadPost, messageFrom } from '../../src/api';
+import { PendingRecords } from '../../src/net/PendingRecords';
+import { enqueueRecord } from '../../src/net/recordQueue';
 import { requestMapFocus } from '../../src/map/focusRequest';
 import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
 import {
@@ -656,6 +658,14 @@ export default function PostScreen() {
               </Card>
             ) : null}
 
+            <PendingRecords
+              postId={item.id}
+              onSent={() => {
+                void client.invalidateQueries({ queryKey: ['post', id, token] });
+                void client.invalidateQueries({ queryKey: ['sightings', id] });
+              }}
+            />
+
             {item.status === 'not_found' ? (
               <View
                 accessibilityRole="summary"
@@ -1071,23 +1081,23 @@ export default function PostScreen() {
                   setNote('Entre na sua conta para escrever no diário.');
                   return false;
                 }
+                const note = {
+                  type: 'update',
+                  species: item.animal.species,
+                  size: item.animal.size,
+                  urgency: 'low',
+                  description,
+                  latitude: item.location.latitude,
+                  longitude: item.location.longitude,
+                  approxLabel: item.approxLabel,
+                  parentPostId: item.id,
+                };
                 try {
                   const photoKey = photoUri ? await uploadProfilePhoto(token, photoUri) : null;
                   const created = await api<{ reviewStatus: string }>('/posts', {
                     method: 'POST',
                     token,
-                    body: {
-                      type: 'update',
-                      species: item.animal.species,
-                      size: item.animal.size,
-                      urgency: 'low',
-                      description,
-                      latitude: item.location.latitude,
-                      longitude: item.location.longitude,
-                      approxLabel: item.approxLabel,
-                      parentPostId: item.id,
-                      media: photoKey ? [{ url: photoKey }] : [],
-                    },
+                    body: { ...note, media: photoKey ? [{ url: photoKey }] : [] },
                   });
                   await client.invalidateQueries({ queryKey: ['post', id, token] });
                   await client.invalidateQueries({ queryKey: ['rescue-plan', id] });
@@ -1098,6 +1108,21 @@ export default function PostScreen() {
                   );
                   return created.reviewStatus === 'published';
                 } catch (error) {
+                  if (isNetworkError(error)) {
+                    // Sem internet: a nota fica no celular e vai sozinha quando a conexão voltar.
+                    await enqueueRecord({
+                      kind: 'diary',
+                      postId: item.id,
+                      token,
+                      label: photoUri ? 'Nota com foto no diário' : 'Nota no diário',
+                      body: note,
+                      photoUri,
+                    });
+                    setNote(
+                      'Sem internet. A nota ficou guardada e vai sozinha quando a conexão voltar.',
+                    );
+                    return true;
+                  }
                   setNote(messageFrom(error));
                   return false;
                 }
