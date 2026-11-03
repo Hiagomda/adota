@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import type { Env } from './config.js';
 import { belemWhen, fillOpenSpots, inTransaction } from './events.js';
 import { captureServerError } from './monitoring.js';
+import { sendAdoptionCheckins } from './followups.js';
 import { notifyPeople } from './notify.js';
 
 const queueName = 'event-reminders';
@@ -109,6 +110,8 @@ export function startEventReminders(redis: Redis, pool: Pool, env: Env) {
     async () => {
       await promoteWaitlists(pool, env);
       await sendEventReminders(pool, env);
+      // Check-ins depois da adoção (7, 30 e 90 dias) vão na mesma varredura.
+      await sendAdoptionCheckins(pool, env);
     },
     { connection },
   );

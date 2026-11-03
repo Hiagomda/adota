@@ -56,6 +56,7 @@ import { useViewerLocation } from '../../src/place/deviceLocation';
 import { uploadProfilePhoto } from '../../src/place/publish';
 import { journeyOf } from '../../src/post/journey';
 import { currentStep, operationSteps, type OperationPage } from '../../src/operation/operation';
+import { needsAttention, pendingCheckin, type FollowupPage } from '../../src/followup/followup';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
@@ -161,6 +162,13 @@ export default function PostScreen() {
     queryKey: ['operation', id, token],
     queryFn: () => api<OperationPage>(`/posts/${id}/operation`, { token }),
     enabled: Boolean(id && token && post.data?.type === 'rescue_alert' && post.data.viewerWillHelp),
+    retry: false,
+  });
+  // Acompanhamento da adoção: o tutor responde os check-ins; quem publicou vê e indica o tutor.
+  const followup = useQuery({
+    queryKey: ['followup', id, token],
+    queryFn: () => api<FollowupPage>(`/posts/${id}/followup`, { token }),
+    enabled: Boolean(id && token && post.data?.status === 'adopted'),
     retry: false,
   });
   const sightings = useQuery({
@@ -624,6 +632,28 @@ export default function PostScreen() {
                   icon="navigation"
                   showChevron
                   onPress={() => router.push(`/resgate/${item.id}`)}
+                />
+              </Card>
+            ) : null}
+
+            {item.status === 'adopted' &&
+            followup.data &&
+            (followup.data.followup || followup.data.canSetAdopter) ? (
+              <Card padding="none" elevation="md">
+                <ListItem
+                  title="Acompanhamento da adoção"
+                  subtitle={
+                    followup.data.canSetAdopter
+                      ? 'Diga quem adotou para acompanhar a adaptação'
+                      : pendingCheckin(followup.data)
+                        ? 'Conte como está a adaptação'
+                        : needsAttention(followup.data)
+                          ? 'O tutor pediu atenção'
+                          : 'Check-ins aos 7, 30 e 90 dias'
+                  }
+                  icon="heart"
+                  showChevron
+                  onPress={() => router.push(`/acompanhamento/${item.id}`)}
                 />
               </Card>
             ) : null}

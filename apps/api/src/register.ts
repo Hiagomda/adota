@@ -32,6 +32,7 @@ import { registerFosterHomeRoutes } from './fosterHomes.js';
 import { registerCentralRoutes } from './central.js';
 import { registerRescuePlanRoutes } from './rescuePlan.js';
 import { registerOperationRoutes } from './operation.js';
+import { followupAfterStatus, registerFollowupRoutes } from './followups.js';
 import { registerLostMatchRoutes } from './lostMatch.js';
 import { registerPartnerRoutes } from './partners.js';
 import { registerPassportRoutes } from './passport.js';
@@ -452,6 +453,9 @@ export async function registerRoutes(
     await changeStatus(pool, id, user, body.status);
     await notifyStatusChange(pool, env, id, body.status).catch(
       bestEffort(request, 'notify:status'),
+    );
+    await followupAfterStatus(pool, env, id, user, body.status).catch(
+      bestEffort(request, 'followup:status'),
     );
     return { status: body.status };
   });
@@ -933,6 +937,7 @@ export async function registerRoutes(
   registerCentralRoutes(app, { env, pool, writeLimit, publishLimit });
   registerRescuePlanRoutes(app, { pool, writeLimit });
   registerOperationRoutes(app, { env, pool, writeLimit });
+  registerFollowupRoutes(app, { env, pool, writeLimit, contactLimit });
   registerCampaignRoutes(app, { env, pool, storage, writeLimit, publishLimit });
   registerPartnerRoutes(app, { pool, writeLimit, strictLimit });
   await registerStaffRoutes(app, { env, pool, queue });
