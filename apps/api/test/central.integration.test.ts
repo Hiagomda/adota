@@ -133,7 +133,13 @@ describe('rescue central', () => {
     expect(second?.volunteers).toEqual([{ name: 'vizinho', handle: 'vizinho', avatarUrl: null }]);
     expect(first?.location.exact).toBe(false);
     expect(first?.distanceKm).toBeGreaterThanOrEqual(0.5);
-    expect(page.summary).toEqual({ activeCases: 2, withoutHelp: 1, volunteers: 1, urgent: 1 });
+    expect(page.summary).toEqual({
+      activeCases: 2,
+      withoutHelp: 1,
+      volunteers: 1,
+      urgent: 1,
+      stalled: 0,
+    });
 
     const onlyWithout = await central('?withoutHelp=true');
     expect(onlyWithout.cases.map((item) => item.id)).toEqual([urgent]);

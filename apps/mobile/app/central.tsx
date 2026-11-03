@@ -31,6 +31,7 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  Icon,
   Notice,
   Photo,
   SkeletonRows,
@@ -163,6 +164,12 @@ export default function CentralScreen() {
               icon="user-x"
               selected={filters.withoutHelp}
               onPress={() => set({ withoutHelp: !filters.withoutHelp })}
+            />
+            <Chip
+              label={page?.summary.stalled ? `Parados (${page.summary.stalled})` : 'Parados'}
+              icon="clock"
+              selected={filters.stalled}
+              onPress={() => set({ stalled: !filters.stalled })}
             />
             {statusFilters.map((option) => (
               <Chip
@@ -312,6 +319,12 @@ function CaseCard({
     .filter(Boolean)
     .join(' · ');
   const helping = helpSummary(item);
+  // Parado já diz há quanto tempo e se tem gente indo: a linha comum não repete.
+  const reasons = item.stalled
+    ? item.reasons.filter(
+        (reason) => !item.stalled?.reasons.includes(reason) && !reason.startsWith('Esperando há'),
+      )
+    : item.reasons;
   return (
     // O cartão não é um botão: os botões de dentro não podem ficar aninhados num toque maior.
     <Card elevation="md" padding="none">
@@ -339,9 +352,20 @@ function CaseCard({
             </AppText>
           </View>
         </View>
-        {item.reasons.length > 0 ? (
+        {item.stalled ? (
+          <View style={[styles.stalled, { backgroundColor: colors.warningSoft }]}>
+            <Icon name="clock" size="sm" color={colors.onWarningSoft} />
+            <AppText
+              variant="bodySmallStrong"
+              style={[styles.flex, { color: colors.onWarningSoft }]}
+            >
+              Parado: {item.stalled.reasons.join(' · ')}
+            </AppText>
+          </View>
+        ) : null}
+        {reasons.length > 0 ? (
           <AppText variant="bodySmallStrong" style={{ color: colors.onSecondarySoft }}>
-            {item.reasons.join(' · ')}
+            {reasons.join(' · ')}
           </AppText>
         ) : null}
         <View style={[styles.helpers, { backgroundColor: colors.surfaceMuted }]}>
@@ -385,6 +409,14 @@ const styles = StyleSheet.create({
   column: screenColumn,
   stats: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
   stat: { flex: 1 },
+  flex: { flex: 1 },
+  stalled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
   chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   notice: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   list: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },

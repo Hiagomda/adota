@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   activeFilterCount,
+  blockedOfferKinds,
+  missingOfferKinds,
+  openNeedCount,
+  type RescueNeed,
   belemClock,
   caseDistance,
   centralPath,
@@ -74,4 +78,24 @@ test('offer form follows the server rule and has no transport', () => {
 test('clock is in Belém time', () => {
   assert.equal(belemClock('2026-10-28T17:05:00Z'), '14:05');
   assert.equal(belemClock('invalid'), '');
+});
+
+test('the stalled filter goes to the server and counts as a filter', () => {
+  const filters = { ...defaultCentralFilters, stalled: true };
+  assert.equal(centralPath(filters, null), '/central?stalled=true');
+  assert.equal(activeFilterCount(filters, false), 1);
+});
+
+test('the plan blocks offers already covered or not needed', () => {
+  const needs: RescueNeed[] = [
+    { kind: 'check_site', state: 'covered', detail: '', marked: false },
+    { kind: 'vet', state: 'open', detail: '', marked: false },
+    { kind: 'foster', state: 'covered', detail: '', marked: false },
+    { kind: 'food', state: 'dismissed', detail: '', marked: true },
+    { kind: 'supplies', state: 'offered', detail: '', marked: false },
+  ];
+  assert.deepEqual(blockedOfferKinds(needs), { foster: 'já tem', food: 'não precisa' });
+  assert.deepEqual(missingOfferKinds(needs), ['vet']);
+  assert.equal(openNeedCount(needs), 1);
+  assert.deepEqual(blockedOfferKinds(undefined), {});
 });

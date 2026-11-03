@@ -32,6 +32,8 @@ export interface CentralCase {
   fosterStay?: 'requested' | 'approved' | null;
   volunteers: { name: string; handle: string; avatarUrl: string | null }[];
   withoutHelp: boolean;
+  /** Caso parado: motivos e prioridade. Ausente em servidores antigos. */
+  stalled?: { priority: number; reasons: string[] } | null;
   score: number;
   reasons: string[];
   viewer: { isAuthor: boolean; willHelp: boolean; offers: HelpOfferKind[] };
@@ -40,7 +42,14 @@ export interface CentralCase {
 export interface CentralPage {
   serverTime: string;
   refreshSeconds: number;
-  summary: { activeCases: number; withoutHelp: number; volunteers: number; urgent: number };
+  summary: {
+    activeCases: number;
+    withoutHelp: number;
+    volunteers: number;
+    urgent: number;
+    /** Ausente em servidores antigos. */
+    stalled?: number;
+  };
   cases: CentralCase[];
 }
 
@@ -132,6 +141,8 @@ export interface CentralFilters {
   species: SpeciesFilter;
   radiusKm: number;
   withoutHelp: boolean;
+  /** Só os casos parados, na ordem da fila de atenção. */
+  stalled: boolean;
 }
 
 export const defaultCentralFilters: CentralFilters = {
@@ -139,6 +150,7 @@ export const defaultCentralFilters: CentralFilters = {
   species: 'all',
   radiusKm: 0,
   withoutHelp: false,
+  stalled: false,
 };
 
 /**
@@ -157,6 +169,7 @@ export function centralPath(
   if (filters.species !== 'all') params.push(`species=${filters.species}`);
   if (filters.status !== 'all') params.push(`status=${filters.status}`);
   if (filters.withoutHelp) params.push('withoutHelp=true');
+  if (filters.stalled) params.push('stalled=true');
   return params.length > 0 ? `/central?${params.join('&')}` : '/central';
 }
 
@@ -167,6 +180,7 @@ export function activeFilterCount(filters: CentralFilters, hasLocation: boolean)
   if (filters.species !== 'all') count += 1;
   if (filters.radiusKm > 0 && hasLocation) count += 1;
   if (filters.withoutHelp) count += 1;
+  if (filters.stalled) count += 1;
   return count;
 }
 
@@ -232,4 +246,66 @@ export function belemClock(iso: string): string {
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return '';
   return new Date(time - 3 * 3_600_000).toISOString().slice(11, 16);
+}
+
+/** Plano de ação do resgate (GET /posts/:id/plan). Espelho do packages/shared/src/rescuePlan.ts. */
+export type RescueNeedKind = 'check_site' | 'vet' | 'foster' | 'food' | 'supplies';
+export type RescueNeedState = 'open' | 'offered' | 'covered' | 'dismissed';
+export type RescueNeedMark = 'needed' | 'covered' | 'dismissed' | 'auto';
+
+export interface RescueNeed {
+  kind: RescueNeedKind;
+  state: RescueNeedState;
+  detail: string;
+  marked: boolean;
+}
+
+export interface RescuePlanPage {
+  applies: boolean;
+  canManage: boolean;
+  needs: RescueNeed[];
+}
+
+export const rescueNeedKinds: { value: RescueNeedKind; label: string; icon: IconName }[] = [
+  { value: 'check_site', label: 'Alguém no local', icon: 'map-pin' },
+  { value: 'vet', label: 'Veterinário', icon: 'activity' },
+  { value: 'foster', label: 'Lar temporário', icon: 'home' },
+  { value: 'food', label: 'Ração', icon: 'package' },
+  { value: 'supplies', label: 'Materiais', icon: 'gift' },
+];
+
+export function needLabel(kind: RescueNeedKind): string {
+  return rescueNeedKinds.find((item) => item.value === kind)?.label ?? 'Ajuda';
+}
+
+export const needStateLabel: Record<RescueNeedState, string> = {
+  open: 'Falta',
+  offered: 'Tem oferta',
+  covered: 'Resolvido',
+  dismissed: 'Não precisa',
+};
+
+/** Tipos de oferta que o plano já resolveu ou dispensou, com o motivo para o chip da oferta. */
+export function blockedOfferKinds(
+  needs: readonly RescueNeed[] | undefined,
+): Partial<Record<HelpOfferKind, string>> {
+  const blocked: Partial<Record<HelpOfferKind, string>> = {};
+  for (const need of needs ?? []) {
+    if (need.kind === 'check_site') continue;
+    if (need.state === 'covered') blocked[need.kind] = 'já tem';
+    if (need.state === 'dismissed') blocked[need.kind] = 'não precisa';
+  }
+  return blocked;
+}
+
+/** Tipos de ajuda que estão em falta, para a oferta já abrir com o mais urgente marcado. */
+export function missingOfferKinds(needs: readonly RescueNeed[] | undefined): HelpOfferKind[] {
+  return (needs ?? [])
+    .filter((need) => need.state === 'open' && need.kind !== 'check_site')
+    .map((need) => need.kind as HelpOfferKind);
+}
+
+/** Quantas necessidades do plano ainda estão em falta (para o título da seção). */
+export function openNeedCount(needs: readonly RescueNeed[] | undefined): number {
+  return (needs ?? []).filter((need) => need.state === 'open').length;
 }
