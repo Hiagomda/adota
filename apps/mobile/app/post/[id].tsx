@@ -53,6 +53,7 @@ import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { uploadProfilePhoto } from '../../src/place/publish';
 import { journeyOf } from '../../src/post/journey';
+import { currentStep, operationSteps, type OperationPage } from '../../src/operation/operation';
 import { careChips } from '../../src/post/care';
 import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
@@ -153,6 +154,13 @@ export default function PostScreen() {
     enabled: Boolean(id),
   });
   const whatsapp = useWhatsAppContact(token, setNote);
+  // Modo resgate: quem disse "vou ajudar" retoma do passo em que parou.
+  const operation = useQuery({
+    queryKey: ['operation', id, token],
+    queryFn: () => api<OperationPage>(`/posts/${id}/operation`, { token }),
+    enabled: Boolean(id && token && post.data?.type === 'rescue_alert' && post.data.viewerWillHelp),
+    retry: false,
+  });
   const sightings = useQuery({
     queryKey: ['sightings', id, token],
     queryFn: () => api<{ sightings: Sighting[] }>(`/posts/${id}/sightings`, { token }),
@@ -228,6 +236,8 @@ export default function PostScreen() {
       setNote(
         'Combinado. O ponto exato deste resgate fica visível para você. Sem notícia sua em 12 horas, ele volta a aparecer para outras pessoas.',
       );
+      // Assumiu o resgate: entra direto no modo resgate, com os passos e o ponto exato.
+      router.push(`/resgate/${post.data.id}`);
     } catch (error) {
       setHelpOpen(false);
       setNote(messageFrom(error));
@@ -600,6 +610,21 @@ export default function PostScreen() {
             </View>
 
             <RescueJourney type={item.type} status={item.status} />
+
+            {operation.data?.canOperate ? (
+              <Card padding="none" elevation="md">
+                <ListItem
+                  title="Continuar no modo resgate"
+                  subtitle={`Próximo passo: ${
+                    operationSteps.find((entry) => entry.value === currentStep(operation.data))
+                      ?.title ?? 'Resumo do atendimento'
+                  }`}
+                  icon="navigation"
+                  showChevron
+                  onPress={() => router.push(`/resgate/${item.id}`)}
+                />
+              </Card>
+            ) : null}
 
             {item.status === 'not_found' ? (
               <View
