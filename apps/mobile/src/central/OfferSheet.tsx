@@ -14,6 +14,8 @@ export function OfferSheet({
   postId,
   token,
   already,
+  blocked = {},
+  preset = null,
   onClose,
   onSent,
 }: {
@@ -22,6 +24,10 @@ export function OfferSheet({
   token: string | null;
   /** Tipos que a pessoa já ofereceu nesse resgate. */
   already: readonly HelpOfferKind[];
+  /** Tipos que o plano de ação já resolveu ou dispensou, com o motivo ("já tem", "não precisa"). */
+  blocked?: Partial<Record<HelpOfferKind, string>>;
+  /** Tipo marcado ao abrir (o que está em falta no plano). */
+  preset?: HelpOfferKind | null;
   onClose: () => void;
   onSent: (kind: HelpOfferKind) => void | Promise<void>;
 }) {
@@ -29,6 +35,14 @@ export function OfferSheet({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+
+  // Abrir pelo plano ("Posso ajudar" em Ração) já marca a ração. Ajuste durante o render, só
+  // quando a folha abre: depois a pessoa escolhe à vontade.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible && preset && !already.includes(preset) && !blocked[preset]) setKind(preset);
+  }
 
   // Cada abertura começa do zero, para a oferta de um caso não ir parar em outro.
   function reset() {
@@ -73,13 +87,14 @@ export function OfferSheet({
         <View style={styles.chips} accessibilityRole="radiogroup">
           {helpOfferKinds.map((item) => {
             const done = already.includes(item.value);
+            const reason = done ? 'já ofereceu' : blocked[item.value];
             return (
               <Chip
                 key={item.value}
-                label={done ? `${item.label} (já ofereceu)` : item.label}
+                label={reason ? `${item.label} (${reason})` : item.label}
                 icon={item.icon}
                 selected={kind === item.value}
-                disabled={done}
+                disabled={Boolean(reason)}
                 onPress={() => setKind(item.value)}
               />
             );
