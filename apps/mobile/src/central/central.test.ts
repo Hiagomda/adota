@@ -80,6 +80,12 @@ test('clock is in Belém time', () => {
   assert.equal(belemClock('invalid'), '');
 });
 
+test('the stalled filter goes to the server and counts as a filter', () => {
+  const filters = { ...defaultCentralFilters, stalled: true };
+  assert.equal(centralPath(filters, null), '/central?stalled=true');
+  assert.equal(activeFilterCount(filters, false), 1);
+});
+
 test('the plan blocks offers already covered or not needed', () => {
   const needs: RescueNeed[] = [
     { kind: 'check_site', state: 'covered', detail: '', marked: false },

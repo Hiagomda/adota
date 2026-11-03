@@ -7,6 +7,7 @@ import {
   helpOfferSchema,
   nextOfferStatus,
   publicDistanceKm,
+  stalledCase,
   type CentralStatus,
   type HelpOfferKind,
   type HelpOfferStatus,
@@ -186,6 +187,7 @@ export async function loadCentral(
   const now = Date.now();
   const volunteers = new Set<string>();
   let withoutHelpCount = 0;
+  let stalledCount = 0;
   const cases = rows.map((row) => {
     const mine = people.filter((person) => person.post_id === row.id);
     const offers = mine.filter((person) => person.role !== 'going');
@@ -202,6 +204,22 @@ export async function loadCentral(
     const withoutHelp = helperIds.size === 0 && row.foster_stay === null;
     if (withoutHelp) withoutHelpCount += 1;
     const distanceKm = row.distance_m === null ? null : publicDistanceKm(row.distance_m);
+    const pendingSince = offers
+      .filter((offer) => offer.status === 'offered')
+      .reduce<number | null>((oldest, offer) => {
+        const at = offer.at.getTime();
+        return oldest === null || at < oldest ? at : oldest;
+      }, null);
+    const stalled = stalledCase({
+      urgency: row.urgency,
+      status: row.status,
+      ageHours: (now - row.created_at.getTime()) / 3_600_000,
+      quietHours: (now - row.last_activity_at.getTime()) / 3_600_000,
+      goingCount: row.going,
+      pendingOfferHours: pendingSince === null ? null : (now - pendingSince) / 3_600_000,
+      hasFoster: offerCounts.foster > 0 || row.foster_stay !== null,
+    });
+    if (stalled) stalledCount += 1;
     const { score, reasons } = centralScore({
       urgency: row.urgency,
       status: row.status,
@@ -252,6 +270,8 @@ export async function loadCentral(
       withoutHelp,
       // Plano de ação: o que o caso ainda precisa (APKs antigos ignoram).
       needs: plan.map((need) => ({ kind: need.kind, state: need.state })),
+      // Caso parado: motivos e prioridade da fila (APKs antigos ignoram).
+      stalled,
       score,
       reasons,
       viewer: {
@@ -265,8 +285,10 @@ export async function loadCentral(
   });
   const sorted = cases
     .filter((item) => !query.withoutHelp || item.withoutHelp)
+    .filter((item) => !query.stalled || item.stalled !== null)
     .sort(
       (left, right) =>
+        (query.stalled ? (right.stalled?.priority ?? 0) - (left.stalled?.priority ?? 0) : 0) ||
         right.score - left.score ||
         Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
         left.id.localeCompare(right.id),
@@ -281,6 +303,7 @@ export async function loadCentral(
       withoutHelp: withoutHelpCount,
       volunteers: volunteers.size,
       urgent: cases.filter((item) => item.urgency === 'high').length,
+      stalled: stalledCount,
     },
     cases: sorted,
   };
