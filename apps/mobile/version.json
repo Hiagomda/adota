@@ -1,8 +1,10 @@
 {
   "version": "0.1.0",
-  "build": 38,
+  "build": 39,
   "notes": [
-    "Parceiros no mapa com ícone próprio: sacolinha para petshop e cruz para veterinário.",
-    "O cartão do parceiro e o anúncio do feed mostram a mesma casinha."
+    "Cupu te ajuda: perguntas rápidas levam ao resgate certo, com o que fazer na hora em caso grave.",
+    "Modo resgate: confirme saída, chegada e o resumo do atendimento, e retome de onde parou.",
+    "Plano de ação no resgate, check-ins depois da adoção e central com os casos parados.",
+    "Sem internet? Avistamentos e notas do diário ficam guardados e vão sozinhos depois."
   ]
 }
