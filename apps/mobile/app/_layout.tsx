@@ -23,6 +23,7 @@ import { syncNearbyPresence } from '../src/nearby/presence';
 import { usePushOpen } from '../src/nearby/usePushOpen';
 import { primeCreateDraft } from '../src/place/createDraftStore';
 import { primeColorScheme } from '../src/theme/schemeChoice';
+import { flushRecords } from '../src/net/recordQueue';
 import { flushOutbox } from '../src/place/outbox';
 import { queryClient } from '../src/queryClient';
 import { useSession } from '../src/session';
@@ -116,10 +117,16 @@ function RootLayout() {
   useEffect(() => {
     // Storage itself failing is the only way this rejects; record it instead of a silent
     // unhandled rejection every 20 seconds.
-    const flush = () =>
-      flushOutbox(useSession.getState().token).catch((error: unknown) =>
+    const flush = () => {
+      const token = useSession.getState().token;
+      flushOutbox(token).catch((error: unknown) =>
         reportError(error, { source: 'handled', where: 'outbox:flush' }),
       );
+      // Avistamentos e notas do diário feitos sem internet vão no mesmo relógio.
+      flushRecords(token).catch((error: unknown) =>
+        reportError(error, { source: 'handled', where: 'records:flush' }),
+      );
+    };
     void flush();
     const timer = setInterval(() => void flush(), OUTBOX_INTERVAL_MS);
     return () => clearInterval(timer);

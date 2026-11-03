@@ -22,7 +22,25 @@ const sightingSchema = z.object({
   latitude: z.number().gte(-90).lte(90),
   longitude: z.number().gte(-180).lte(180),
   note: z.string().trim().max(200).optional(),
+  /** Quando a pessoa viu, se o avistamento ficou guardado sem internet. */
+  seenAt: z.string().datetime({ offset: true }).optional(),
+  /** Chave do celular para a fila sem internet: reenviar não duplica. */
+  clientKey: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8,64}$/)
+    .optional(),
 });
+
+/** Um avistamento guardado sem internet vale pela hora em que foi visto, até um dia antes. */
+const MAX_OFFLINE_HOURS = 24;
+
+export function sightingTime(seenAt: string | undefined, now: Date = new Date()): Date {
+  if (!seenAt) return now;
+  const at = Date.parse(seenAt);
+  if (Number.isNaN(at)) return now;
+  const oldest = now.getTime() - MAX_OFFLINE_HOURS * 3_600_000;
+  return new Date(Math.min(now.getTime(), Math.max(oldest, at)));
+}
 
 const postParams = z.object({ id: z.string().uuid() });
 
@@ -75,7 +93,16 @@ export function registerSightingRoutes(
     const id = postId(request.params);
     const body = sightingSchema.safeParse(request.body);
     if (!body.success) throw new HttpError(400, 'Confira o ponto e a nota e tente de novo.');
-    const { latitude, longitude } = body.data;
+    const { latitude, longitude, clientKey } = body.data;
+    if (clientKey) {
+      // Reenvio da fila sem internet: o que já foi salvo volta igual, sem segundo aviso.
+      const replay = await pool.query<{ id: string }>(
+        'SELECT id FROM sightings WHERE user_id = $1 AND client_key = $2',
+        [user.id, clientKey],
+      );
+      const existing = replay.rows[0]?.id;
+      if (existing) return reply.code(200).send({ id: existing, replayed: true });
+    }
     if (!insideServiceArea({ latitude, longitude })) {
       throw new HttpError(400, 'Esse ponto fica fora de Belém.');
     }
@@ -105,12 +132,34 @@ export function registerSightingRoutes(
 
     // Tests never call the real map service.
     const label = env.NODE_ENV === 'test' ? null : await labelFor(latitude, longitude, request.log);
-    const inserted = await pool.query<{ id: string }>(
-      `INSERT INTO sightings (post_id, user_id, location, approx_label, note)
-       VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5, $6)
-       RETURNING id`,
-      [id, user.id, longitude, latitude, label, note || null],
-    );
+    let inserted;
+    try {
+      inserted = await pool.query<{ id: string }>(
+        `INSERT INTO sightings (post_id, user_id, location, approx_label, note, client_key, created_at)
+         VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5, $6, $7, $8)
+         RETURNING id`,
+        [
+          id,
+          user.id,
+          longitude,
+          latitude,
+          label,
+          note || null,
+          clientKey ?? null,
+          sightingTime(body.data.seenAt),
+        ],
+      );
+    } catch (error) {
+      // Dois reenvios ao mesmo tempo: o segundo perde no índice único e devolve o primeiro.
+      if (clientKey && (error as { code?: string }).code === '23505') {
+        const replay = await pool.query<{ id: string }>(
+          'SELECT id FROM sightings WHERE user_id = $1 AND client_key = $2',
+          [user.id, clientKey],
+        );
+        return reply.code(200).send({ id: replay.rows[0]?.id, replayed: true });
+      }
+      throw error;
+    }
     await notifySighting(pool, env, id, user.id, label, note).catch((error: unknown) => {
       request.log.warn({ err: error }, 'sightings: notification failed');
     });

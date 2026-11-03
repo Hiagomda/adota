@@ -3,7 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, messageFrom } from '../../src/api';
+import { api, isNetworkError, messageFrom } from '../../src/api';
+import { enqueueRecord } from '../../src/net/recordQueue';
 import { AppText, Button, Header, Input, Notice, useToast } from '../../src/components/ui';
 import type { MapPoint } from '../../src/map/geo';
 import { insideServiceArea } from '../../src/map/serviceArea';
@@ -42,20 +43,37 @@ export default function SightingScreen() {
     }
     setSending(true);
     setMessage(null);
+    const body = {
+      latitude: point.latitude,
+      longitude: point.longitude,
+      ...(note.trim() ? { note: note.trim() } : {}),
+    };
     try {
       await api(`/posts/${id}/sightings`, {
         method: 'POST',
         token,
-        body: {
-          latitude: point.latitude,
-          longitude: point.longitude,
-          ...(note.trim() ? { note: note.trim() } : {}),
-        },
+        body,
       });
       await client.invalidateQueries({ queryKey: ['sightings', id] });
       toast.show('Obrigado! Avisamos quem publicou este resgate.', 'success');
       router.back();
     } catch (error) {
+      if (isNetworkError(error)) {
+        // Sem internet: guarda no celular com a hora de agora e manda sozinho depois.
+        await enqueueRecord({
+          kind: 'sighting',
+          postId: id,
+          token,
+          label: 'Avistamento',
+          body,
+        });
+        toast.show(
+          'Sem internet. O avistamento ficou guardado e vai sozinho quando a conexão voltar.',
+          'info',
+        );
+        router.back();
+        return;
+      }
       setMessage(messageFrom(error));
     } finally {
       setSending(false);
