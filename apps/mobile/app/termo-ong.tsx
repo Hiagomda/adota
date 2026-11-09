@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fieldHelp, ORG_TERM_MAX, ORG_TERM_MIN, type OrgTerm } from '../src/adoptionTerm/term';
@@ -34,9 +34,9 @@ export default function OrgTermScreen() {
   const toast = useToast();
   const client = useQueryClient();
   const token = useSession((state) => state.token);
-  const [choice, setChoice] = useState<Choice>('app');
-  const [body, setBody] = useState('');
-  const [requireIdentity, setRequireIdentity] = useState(false);
+  const [pickedChoice, setChoice] = useState<Choice | null>(null);
+  const [typedBody, setBody] = useState<string | null>(null);
+  const [pickedIdentity, setRequireIdentity] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -48,12 +48,10 @@ export default function OrgTermScreen() {
   });
   const data = query.data;
 
-  useEffect(() => {
-    if (!data) return;
-    setChoice(data.body ? 'own' : 'app');
-    setBody(data.body ?? data.appTemplate);
-    setRequireIdentity(data.requireIdentity);
-  }, [data]);
+  // Enquanto a pessoa não mexe, vale o que está salvo.
+  const choice: Choice = pickedChoice ?? (data?.body ? 'own' : 'app');
+  const body = typedBody ?? data?.body ?? data?.appTemplate ?? '';
+  const requireIdentity = pickedIdentity ?? data?.requireIdentity ?? false;
 
   const length = body.trim().length;
   const tooShort = length < ORG_TERM_MIN;

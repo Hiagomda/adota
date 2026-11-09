@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { looksLikeFullName, maskCpf, type AdoptionTermPage } from '../../src/adoptionTerm/term';
@@ -33,7 +33,7 @@ export default function AdoptionTermScreen() {
   const toast = useToast();
   const client = useQueryClient();
   const token = useSession((state) => state.token);
-  const [fullName, setFullName] = useState('');
+  const [typedName, setFullName] = useState<string | null>(null);
   const [cpf, setCpf] = useState('');
   const [address, setAddress] = useState('');
   const [agree, setAgree] = useState(false);
@@ -59,11 +59,7 @@ export default function AdoptionTermScreen() {
   const name = post.data ? animalHeadline(post.data.animal) : undefined;
 
   // O nome da conta já vem escrito; a pessoa completa com o sobrenome se faltar.
-  const accountName = me.data?.name ?? '';
-  useEffect(() => {
-    if (accountName && !fullName) setFullName(accountName);
-    // Só na primeira vez que o nome chega.
-  }, [accountName]);
+  const fullName = typedName ?? me.data?.name ?? '';
 
   const needsIdentity = page?.requireIdentity ?? false;
   const cpfDigits = cpf.replace(/\D/g, '');
