@@ -1,10 +1,11 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 39,
+  "androidVersionCode": 40,
   "notes": [
-    "Cupu te ajuda: perguntas rápidas levam ao resgate certo, com o que fazer na hora em caso grave.",
-    "Modo resgate: confirme saída, chegada e o resumo do atendimento, e retome de onde parou.",
-    "Plano de ação no resgate, check-ins depois da adoção e central com os casos parados.",
-    "Sem internet? Avistamentos e notas do diário ficam guardados e vão sozinhos depois."
-  ]
+    "Este aplicativo tem uma assinatura nova: desinstale o antigo e instale este. Sua conta e seus posts continuam salvos.",
+    "Endereço novo eguaadota.com.br, tudo com conexão segura.",
+    "Termo de adoção responsável, com o termo próprio da ONG.",
+    "Conversa de adoção de volta no app, com a equipe de olho para proteger os bichos."
+  ],
+  "reinstall": true
 }
