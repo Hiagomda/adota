@@ -13,6 +13,7 @@ export const permissions = [
   'users.read',
   'users.suspend',
   'campaigns.review',
+  'chats.moderate',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -46,6 +47,7 @@ const moderation: readonly Permission[] = [
   'posts.moderate',
   'users.read',
   'users.suspend',
+  'chats.moderate',
 ];
 
 const byRole: Record<StaffRole, readonly Permission[]> = {
@@ -56,6 +58,7 @@ const byRole: Record<StaffRole, readonly Permission[]> = {
     'posts.moderate',
     'users.read',
     'users.suspend',
+    'chats.moderate',
   ],
   support: ['session.revoke_own', 'overview.read', 'users.read'],
   ong_reviewer: ['session.revoke_own', 'overview.read', 'verifications.manage', 'users.read'],

@@ -98,7 +98,7 @@ const commentSchema = z.object({
   parentCommentId: z.string().uuid().optional(),
 });
 const reportSchema = z.object({
-  targetType: z.enum(['post', 'comment', 'user', 'campaign']),
+  targetType: z.enum(['post', 'comment', 'user', 'campaign', 'adoption_thread']),
   targetId: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
 });
@@ -722,6 +722,17 @@ export async function registerRoutes(
   app.post('/reports', publishLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const body = parse(reportSchema, request.body);
+    if (body.targetType === 'adoption_thread') {
+      // Conversa é privada: só quem está nela denuncia, e a denúncia já põe na fila da equipe.
+      const thread = await pool.query(
+        `UPDATE adoption_threads t
+         SET review_status = 'flagged', flagged_at = now()
+         FROM posts p
+         WHERE t.id = $1 AND p.id = t.post_id AND (t.adopter_id = $2 OR p.author_id = $2)`,
+        [body.targetId, user.id],
+      );
+      if ((thread.rowCount ?? 0) === 0) throw new HttpError(404, 'Essa conversa não existe.');
+    }
     // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
     await pool.query(
       `INSERT INTO reports (reporter_id, target_type, target_id, reason)
@@ -767,6 +778,15 @@ export async function registerRoutes(
       }
       if (target.target_type === 'campaign') {
         await suspendReportedCampaign(request, target.target_id);
+      }
+      if (target.target_type === 'adoption_thread') {
+        await pool.query(
+          `UPDATE adoption_threads
+           SET closed_at = COALESCE(closed_at, now()),
+               closed_reason = COALESCE(closed_reason, 'Denúncia aceita pela equipe.')
+           WHERE id = $1`,
+          [target.target_id],
+        );
       }
     }
     await pool.query(`UPDATE reports SET status = $2 WHERE id = $1`, [
@@ -898,7 +918,7 @@ export async function registerRoutes(
     };
   });
 
-  registerAdoptionChat(app, { env, pool });
+  registerAdoptionChat(app, { env, pool, writeLimit });
   registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
   registerNgoPanelRoutes(app, { env, pool, writeLimit });
   registerContactRoutes(app, { pool, contactLimit });

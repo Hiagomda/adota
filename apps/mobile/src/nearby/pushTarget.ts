@@ -18,7 +18,16 @@ export function postIdFromPush(data: unknown): string | null {
 /** Telas que um aviso pode abrir além do resgate. Qualquer outra coisa é ignorada. */
 const routeWithId =
   /^\/(animal|post|campanha|evento|lost-matches|parceiro|acompanhamento)\/([^/?#]+)$/;
-const plainRoutes = new Set(['/casa-amiga', '/central', '/agenda', '/campanhas', '/parceiros']);
+const plainRoutes = new Set([
+  '/casa-amiga',
+  '/central',
+  '/agenda',
+  '/campanhas',
+  '/parceiros',
+  '/conversas',
+]);
+/** Conversa de adoção: o animal e, para quem cuida, com quem é a conversa. */
+const chatRoute = /^\/chat\/([0-9a-f-]{36})(?:\?with=([0-9a-f-]{36}))?$/i;
 
 /**
  * A tela que um aviso abre: `route` (avisos novos), senão o resgate de `postId`/`url`. Nunca
@@ -29,6 +38,8 @@ export function routeFromPush(data: unknown): string | null {
     const route = (data as Record<string, unknown>).route;
     if (typeof route === 'string') {
       if (plainRoutes.has(route)) return route;
+      const chat = chatRoute.exec(route);
+      if (chat?.[1] && uuid.test(chat[1]) && (!chat[2] || uuid.test(chat[2]))) return route;
       const match = routeWithId.exec(route);
       if (match?.[2] && uuid.test(match[2])) return route;
     }

@@ -110,6 +110,13 @@ export default function ProfileScreen() {
             <AppText variant="h3" numberOfLines={1} style={styles.topTitle}>
               {me.data ? `@${me.data.handle}` : 'Perfil'}
             </AppText>
+            {token ? (
+              <IconButton
+                icon="message-circle"
+                accessibilityLabel="Minhas conversas de adoção"
+                onPress={() => router.push('/conversas')}
+              />
+            ) : null}
             <IconButton
               icon="settings"
               accessibilityLabel="Ajustes"

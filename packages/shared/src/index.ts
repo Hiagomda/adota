@@ -290,6 +290,16 @@ export {
   type CheckinMood,
 } from './followup.js';
 export {
+  chatFlagKinds,
+  chatFlagLabels,
+  chatFlagTip,
+  chatNoticePoints,
+  chatNoticeVersion,
+  scanChatMessage,
+  type ChatFlag,
+  type ChatScan,
+} from './chatModeration.js';
+export {
   ORG_TERM_MAX,
   ORG_TERM_MIN,
   TERM_FIELDS,
