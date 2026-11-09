@@ -1,0 +1,11 @@
+name: tmp checar dominio
+on: push
+jobs:
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in https://media.eguaadota.com.br/minio/health/live http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/minio/health/live https://img.eguaadota.com.br/health https://eguaadota.com.br https://admin.eguaadota.com.br; do
+            echo "=== $u"; curl -sS -o /dev/null -w '%{http_code}\n' -m 15 "$u" || true
+            curl -vsk -o /dev/null -m 15 "$u" 2>&1 | grep -iE 'subject:|issuer:|subjectAltName' || true
+          done
