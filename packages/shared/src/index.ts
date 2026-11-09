@@ -289,3 +289,13 @@ export {
   type CheckinDay,
   type CheckinMood,
 } from './followup.js';
+export {
+  chatFlagKinds,
+  chatFlagLabels,
+  chatFlagTip,
+  chatNoticePoints,
+  chatNoticeVersion,
+  scanChatMessage,
+  type ChatFlag,
+  type ChatScan,
+} from './chatModeration.js';

@@ -34,3 +34,11 @@ test('ignora rota fora da lista', () => {
   assert.equal(routeFromPush({ route: '/animal/../settings' }), null);
   assert.equal(routeFromPush({ route: `/animal/${id}/x` }), null);
 });
+
+test('abre a conversa de adoção, com ou sem a pessoa', () => {
+  assert.equal(routeFromPush({ route: `/chat/${id}` }), `/chat/${id}`);
+  assert.equal(routeFromPush({ route: `/chat/${id}?with=${id}` }), `/chat/${id}?with=${id}`);
+  assert.equal(routeFromPush({ route: '/conversas' }), '/conversas');
+  assert.equal(routeFromPush({ route: `/chat/${id}?with=x` }), null);
+  assert.equal(routeFromPush({ route: `/chat/${id}?with=${id}&x=1` }), null);
+});

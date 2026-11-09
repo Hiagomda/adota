@@ -90,8 +90,8 @@ function Question<Value>({
 }
 
 /**
- * "Quero adotar": antes do WhatsApp, perguntas de tocar que mudam com as respostas. A ficha fica salva para quem
- * cuida e volta preenchida no próximo animal. `onSent` abre a conversa com as respostas escritas.
+ * "Quero adotar": antes da conversa, perguntas de tocar que mudam com as respostas. A ficha fica salva para quem
+ * cuida e volta preenchida no próximo animal. `onSent` abre a conversa no app.
  */
 export function AdoptionInterestSheet({
   visible,
@@ -157,11 +157,11 @@ export function AdoptionInterestSheet({
   }
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title="Antes de chamar no WhatsApp">
+    <BottomSheet visible={visible} onClose={onClose} title="Antes de conversar">
       <ScrollView style={{ maxHeight: height * 0.62 }} contentContainerStyle={styles.body}>
         <AppText color="textSecondary">
-          Responda rapidinho. Suas respostas vão na primeira mensagem e ajudam quem cuida a conhecer
-          você. Endereço e documento vocês combinam na conversa.
+          Responda rapidinho. Suas respostas vão para quem cuida e ajudam a conhecer você. Depois a
+          conversa abre aqui no app, com o telefone oculto.
         </AppText>
         <ProgressBar
           value={(total - missing) / total}
@@ -260,7 +260,7 @@ export function AdoptionInterestSheet({
         <Button
           title={
             answers
-              ? 'Mandar ficha e abrir o WhatsApp'
+              ? 'Mandar ficha e abrir a conversa'
               : missing === 1
                 ? 'Falta 1 pergunta'
                 : `Faltam ${missing} perguntas`
