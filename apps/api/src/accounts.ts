@@ -319,6 +319,7 @@ const personalTables = [
   'user_badges',
   'cupu_styles',
   'ngo_panel_settings',
+  'org_adoption_terms',
   'post_follows',
   'sightings',
   'rescue_help_offers',
