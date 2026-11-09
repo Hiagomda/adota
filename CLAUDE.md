@@ -122,7 +122,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 ```
 apps/api/src/register.ts      rotas principais (auth no hook onRequest → request.user)
 apps/api/src/feed.ts          posts, status, localização aproximada
-apps/api/src/adoptionChat.ts  conversa de adoção
+apps/api/src/adoptionChat.ts  conversa de adoção monitorada (filtro em packages/shared/src/chatModeration.ts; painel em staff/chats.ts)
 apps/api/src/adoption.ts      ficha de quem quer adotar, fila de espera, feiras e cadastro de ONG
 apps/api/src/ngoPanel.ts      painel da ONG verificada (/me/ngo-panel) e o tema dela
 apps/api/src/staff/           rotas da equipe (login com senha, auditoria)
@@ -156,6 +156,8 @@ download/                     página de download servida pelo container `downlo
 - Campanhas (`/campanhas`, `campaigns.ts`): só perfil verificado (ou a equipe) abre. O app não recebe dinheiro e não existe gateway nem webhook: o Pix é do responsável e o progresso soma só lançamentos `confirmed`, que sempre têm comprovante. O "fiz um Pix" de quem doou fica `pending` e nunca soma até o responsável confirmar. Nada é apagado: correção é anular com motivo, e `campaign_events` tem gatilho que bloqueia UPDATE/DELETE. Comprovante de despesa é público; o de doação só responsável, equipe (admin, superadmin, `finance_reviewer`) e quem doou. Denúncia usa `reports` com `target_type = 'campaign'`; aceitar suspende (Pix sai do ar). Painel: `GET /admin/v1/campaigns` e `POST /admin/v1/campaigns/:id/status` com a permissão `campaigns.review`. A equipe também cria pelo painel (`staff/create.ts`): `POST /admin/v1/events` (`posts.moderate`, sai em nome da conta da equipe) e `POST /admin/v1/campaigns` (`campaigns.review`, com `ownerHandle` opcional do responsável verificado dono do Pix; o histórico registra `staff`).
 
 - Parceiros do Cupu (`partners.ts`, telas `/parceiros` e `/parceiro/:id`): o app não cobra nem recebe dinheiro; o parceiro entra de graça oferecendo uma vantagem a quem adota ou resgata. Todo cadastro e toda edição passam pela equipe (`/admin/v1/partners`, permissão `posts.moderate`). Loja é lugar público, então o ponto aparece exato. O convite (popup no mapa) aparece no máximo a cada 21 dias, nunca nos 3 primeiros dias nem para quem já é parceiro. As contagens (`partner_daily_stats`) são só números por dia, sem saber quem tocou.
+
+- Conversa de adoção (`adoptionChat.ts`, telas `/chat/:postId` e `/conversas`): voltou em 09/11/2026 como caminho principal do "Quero adotar", com o telefone oculto; o WhatsApp ficou como opção ("Prefere o WhatsApp?"). É monitorada: a pessoa aceita o aviso antes da primeira mensagem (`POST /me/chat-notice`, `users.chat_notice_version`; subir `chatNoticeVersion` obriga todos a aceitar de novo) e uma faixa no topo lembra disso. O filtro (`scanChatMessage`) barra venda, preço e Pix (a mensagem fica `withheld`, só a equipe vê) e só sinaliza golpe, contato fora do app, ofensa, ameaça, maus-tratos e assédio (entrega e põe a conversa em `review_status = 'flagged'`). O texto do filtro no app é espelho em `apps/mobile/src/chat/chatRules.ts`. Painel: `/admin/v1/chats` com a permissão `chats.moderate` (moderação, admin, superadmin); abrir a conversa inteira grava `chat.read` na auditoria. Denúncia de conversa usa `reports` com `target_type = 'adoption_thread'` e só quem está na conversa denuncia. Conversa parada há 180 dias sai na varredura de `eventReminders.ts`, menos as sinalizadas ou com denúncia aberta.
 
 ## Regras
 

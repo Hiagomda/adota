@@ -67,11 +67,7 @@ import { furColorsText } from '../../src/lost/lostMatch';
 import { sharePoster } from '../../src/lost/sharePoster';
 import { PostEditor } from '../../src/post/PostEditor';
 import { AdoptionInterestSheet } from '../../src/post/AdoptionInterestSheet';
-import {
-  answerLines,
-  interestMessage,
-  type AdoptionAnswers,
-} from '../../src/post/adoptionInterest';
+import { answerLines, type AdoptionAnswers } from '../../src/post/adoptionInterest';
 import { choiceNote, statusChoices, type StatusChoice } from '../../src/post/statusChoices';
 import { waitingLabel } from '../../src/post/waiting';
 import { isTeamRole, useSession } from '../../src/session';
@@ -423,11 +419,11 @@ export default function PostScreen() {
         }
       : adoptionContact
         ? {
-            title: forAdoption ? 'Quero adotar' : 'Falar no WhatsApp',
+            title: forAdoption ? 'Quero adotar' : 'Abrir conversa',
             icon: 'message-circle',
             variant: 'secondary',
-            loading: contactBusy,
-            onPress: () => (forAdoption ? startAdoption() : talkToAuthor()),
+            // A conversa é no app (monitorada, telefone oculto); o WhatsApp fica como opção.
+            onPress: () => (forAdoption ? startAdoption() : openChat()),
           }
         : lostOpen && canOwn
           ? {
@@ -495,6 +491,15 @@ export default function PostScreen() {
     void whatsapp.open(`/posts/${item.id}/contact`, text);
   }
 
+  function openChat() {
+    if (!item) return;
+    if (!token) {
+      setNote('Entre na sua conta para conversar com quem cuida.');
+      return;
+    }
+    router.push(`/chat/${item.id}`);
+  }
+
   function startAdoption() {
     if (!token) {
       setNote('Entre na sua conta para falar com quem cuida.');
@@ -503,20 +508,10 @@ export default function PostScreen() {
     setInterestOpen(true);
   }
 
-  function sendInterest(answers: AdoptionAnswers, extra: string) {
-    if (!item) return;
+  // A ficha já foi gravada pelo sheet; quem cuida vê em "Quem quer adotar". A conversa abre no app.
+  function sendInterest() {
     setInterestOpen(false);
-    void whatsapp.open(
-      `/posts/${item.id}/contact`,
-      interestMessage({
-        authorFirstName,
-        animalRef,
-        answers,
-        species: item.animal.species,
-        note: extra,
-        link: postLink,
-      }),
-    );
+    openChat();
   }
 
   function talkToFosterHome(home: { id: string; name: string }) {
@@ -815,6 +810,21 @@ export default function PostScreen() {
                   />
                 </View>
               </Card>
+              {adoptionContact && !isAuthor ? (
+                <Card
+                  padding="none"
+                  elevation="none"
+                  style={{ backgroundColor: colors.surfaceMuted }}
+                >
+                  <ListItem
+                    title="Prefere o WhatsApp?"
+                    subtitle="Só se quem cuida liberou o número. Fora do app a equipe não acompanha a conversa."
+                    icon="phone"
+                    showChevron
+                    onPress={talkToAuthor}
+                  />
+                </Card>
+              ) : null}
               {item.author.phone && !adoptionContact ? (
                 <Card
                   padding="none"
@@ -835,11 +845,17 @@ export default function PostScreen() {
             {ownAdoption ? (
               <View style={styles.section}>
                 <AppText variant="h2">Quem quer adotar</AppText>
+                <Button
+                  title="Ver conversas"
+                  icon="message-circle"
+                  variant="outline"
+                  onPress={() => router.push(`/chat/${item.id}`)}
+                />
                 {interestList.length === 0 ? (
                   <AppText color="textSecondary">
                     {interests.isError
                       ? messageFrom(interests.error)
-                      : 'Quando alguém tocar em "Quero adotar", a ficha dessa pessoa aparece aqui e a conversa abre no seu WhatsApp.'}
+                      : 'Quando alguém tocar em "Quero adotar", a ficha dessa pessoa aparece aqui e a conversa abre no app, com o telefone oculto.'}
                   </AppText>
                 ) : (
                   <Card padding="none" elevation="md">

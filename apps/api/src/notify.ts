@@ -569,6 +569,8 @@ export interface NotifyTarget {
   body: string;
   postId?: string;
   route?: string;
+  /** Conversa de adoção: com `postId`, diz qual das conversas daquele animal abrir. */
+  adopterId?: string;
 }
 
 /**

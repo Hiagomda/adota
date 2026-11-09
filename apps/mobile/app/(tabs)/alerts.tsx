@@ -56,7 +56,7 @@ export default function AlertsScreen() {
 
   function open(item: AppNotification) {
     // Primeiro abre o animal; marcar como lido é detalhe e, sem internet, não pode travar o toque.
-    // Avisos antigos da conversa de adoção também caem no animal: a conversa foi para o WhatsApp.
+    // Aviso da conversa de adoção traz a rota da conversa; os antigos (sem rota) caem no animal.
     const route = routeFromPush(item.payload);
     if (route) router.push(route as never);
     if (!token) return;

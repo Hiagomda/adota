@@ -136,6 +136,10 @@ export const adoptionMessages = pgTable('adoption_messages', {
   threadId: uuid('thread_id').notNull(),
   senderId: uuid('sender_id').notNull(),
   body: text('body').notNull(),
+  flags: text('flags').array().notNull().default([]),
+  withheld: boolean('withheld').notNull().default(false),
+  hiddenAt: timestamp('hidden_at', { withTimezone: true }),
+  hiddenBy: uuid('hidden_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

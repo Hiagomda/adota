@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
 import { registerNgoPanelRoutes } from './ngoPanel.js';
+import { registerAdoptionTermRoutes } from './adoptionTerms.js';
 import {
   notifyCampaignSuspension,
   registerCampaignRoutes,
@@ -97,7 +98,7 @@ const commentSchema = z.object({
   parentCommentId: z.string().uuid().optional(),
 });
 const reportSchema = z.object({
-  targetType: z.enum(['post', 'comment', 'user', 'campaign']),
+  targetType: z.enum(['post', 'comment', 'user', 'campaign', 'adoption_thread']),
   targetId: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
 });
@@ -109,8 +110,6 @@ const fosterSchema = z.object({
   longitude: z.number().gte(-180).lte(180),
   radiusKm: z.number().positive().max(50),
 });
-const adoptionSchema = z.object({ body: z.string().trim().min(20).max(4000) });
-
 /**
  * Write limits count per account, after the session is resolved: many phones in Belém share one
  * carrier IP (CGNAT), so an IP count would block neighbours. Without a session it falls back to
@@ -687,24 +686,6 @@ export async function registerRoutes(
     return { available: true };
   });
 
-  app.post('/posts/:id/adoption-term', strictLimit, async (request, reply) => {
-    const user = requireUser(request.user);
-    const id = resourceId(request.params);
-    const body = parse(adoptionSchema, request.body);
-    const post = await pool.query<{ status: string }>(`SELECT status FROM posts WHERE id = $1`, [
-      id,
-    ]);
-    if (post.rows[0]?.status !== 'for_adoption') {
-      throw new HttpError(400, 'O termo só vale quando o animal está para adoção.');
-    }
-    await pool.query(
-      `INSERT INTO adoption_terms (post_id, user_id, body) VALUES ($1, $2, $3)
-       ON CONFLICT (post_id, user_id) DO UPDATE SET body = EXCLUDED.body, accepted_at = now()`,
-      [id, user.id, body.body],
-    );
-    return reply.code(201).send({ accepted: true });
-  });
-
   app.get('/notifications', async (request) => {
     const user = requireUser(request.user);
     const result = await pool.query(
@@ -741,6 +722,17 @@ export async function registerRoutes(
   app.post('/reports', publishLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const body = parse(reportSchema, request.body);
+    if (body.targetType === 'adoption_thread') {
+      // Conversa é privada: só quem está nela denuncia, e a denúncia já põe na fila da equipe.
+      const thread = await pool.query(
+        `UPDATE adoption_threads t
+         SET review_status = 'flagged', flagged_at = now()
+         FROM posts p
+         WHERE t.id = $1 AND p.id = t.post_id AND (t.adopter_id = $2 OR p.author_id = $2)`,
+        [body.targetId, user.id],
+      );
+      if ((thread.rowCount ?? 0) === 0) throw new HttpError(404, 'Essa conversa não existe.');
+    }
     // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
     await pool.query(
       `INSERT INTO reports (reporter_id, target_type, target_id, reason)
@@ -786,6 +778,15 @@ export async function registerRoutes(
       }
       if (target.target_type === 'campaign') {
         await suspendReportedCampaign(request, target.target_id);
+      }
+      if (target.target_type === 'adoption_thread') {
+        await pool.query(
+          `UPDATE adoption_threads
+           SET closed_at = COALESCE(closed_at, now()),
+               closed_reason = COALESCE(closed_reason, 'Denúncia aceita pela equipe.')
+           WHERE id = $1`,
+          [target.target_id],
+        );
       }
     }
     await pool.query(`UPDATE reports SET status = $2 WHERE id = $1`, [
@@ -917,7 +918,7 @@ export async function registerRoutes(
     };
   });
 
-  registerAdoptionChat(app, { env, pool });
+  registerAdoptionChat(app, { env, pool, writeLimit });
   registerAdoptionRoutes(app, { env, pool, writeLimit, strictLimit });
   registerNgoPanelRoutes(app, { env, pool, writeLimit });
   registerContactRoutes(app, { pool, contactLimit });
@@ -938,6 +939,7 @@ export async function registerRoutes(
   registerRescuePlanRoutes(app, { pool, writeLimit });
   registerOperationRoutes(app, { env, pool, writeLimit });
   registerFollowupRoutes(app, { env, pool, writeLimit, contactLimit });
+  registerAdoptionTermRoutes(app, { env, pool, writeLimit, strictLimit });
   registerCampaignRoutes(app, { env, pool, storage, writeLimit, publishLimit });
   registerPartnerRoutes(app, { pool, writeLimit, strictLimit });
   await registerStaffRoutes(app, { env, pool, queue });

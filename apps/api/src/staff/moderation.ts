@@ -160,6 +160,7 @@ export function registerModerationRoutes(
       pending_review: number;
       open_reports: number;
       pending_verifications: number;
+      flagged_chats: number;
     }>(
       `SELECT
          (SELECT count(*)::int FROM users WHERE deleted_at IS NULL) AS users_total,
@@ -177,7 +178,9 @@ export function registerModerationRoutes(
          (SELECT count(*)::int FROM posts WHERE review_status = 'pending') AS pending_review,
          (SELECT count(*)::int FROM reports WHERE status = 'open') AS open_reports,
          (SELECT count(*)::int FROM verification_requests
-           WHERE status = 'pending') AS pending_verifications`,
+           WHERE status = 'pending') AS pending_verifications,
+         (SELECT count(*)::int FROM adoption_threads
+           WHERE review_status = 'flagged') AS flagged_chats`,
     );
     const responseTime = await pool.query<{ seconds: number | null }>(
       `SELECT avg(EXTRACT(EPOCH FROM (r.created_at - p.created_at)))::float AS seconds
@@ -197,6 +200,7 @@ export function registerModerationRoutes(
       pendingReview: row?.pending_review ?? 0,
       openReports: row?.open_reports ?? 0,
       pendingVerifications: row?.pending_verifications ?? 0,
+      flaggedChats: row?.flagged_chats ?? 0,
       meanSecondsToResponse: responseTime.rows[0]?.seconds ?? null,
       rescues30d: rescues,
     };
@@ -208,7 +212,7 @@ export function registerModerationRoutes(
     const query = parse(reportListSchema, request.query ?? {});
     const result = await pool.query<{
       id: string;
-      target_type: 'post' | 'comment' | 'user' | 'campaign';
+      target_type: 'post' | 'comment' | 'user' | 'campaign' | 'adoption_thread';
       target_id: string;
       reason: string;
       status: string;
@@ -225,18 +229,21 @@ export function registerModerationRoutes(
                 WHEN 'post' THEN left(p.description, 280)
                 WHEN 'comment' THEN left(c.body, 280)
                 WHEN 'campaign' THEN left(cp.title || ': ' || cp.purpose, 280)
+                WHEN 'adoption_thread' THEN 'Conversa de adoção entre @' || tha.handle || ' e @' || thu.handle
                 ELSE tu.name
               END AS target_text,
               CASE r.target_type
                 WHEN 'post' THEN pa.handle
                 WHEN 'comment' THEN ca.handle
                 WHEN 'campaign' THEN cpo.handle
+                WHEN 'adoption_thread' THEN thu.handle
                 ELSE tu.handle
               END AS target_handle,
               CASE r.target_type
                 WHEN 'post' THEN p.hidden
                 WHEN 'comment' THEN c.hidden
                 WHEN 'campaign' THEN cp.status = 'suspended'
+                WHEN 'adoption_thread' THEN th.closed_at IS NOT NULL
                 ELSE tu.suspended
               END AS target_hidden,
               (SELECT count(*)::int FROM reports same
@@ -250,6 +257,10 @@ export function registerModerationRoutes(
        LEFT JOIN users tu ON r.target_type = 'user' AND tu.id = r.target_id
        LEFT JOIN campaigns cp ON r.target_type = 'campaign' AND cp.id = r.target_id
        LEFT JOIN users cpo ON cpo.id = cp.owner_id
+       LEFT JOIN adoption_threads th ON r.target_type = 'adoption_thread' AND th.id = r.target_id
+       LEFT JOIN posts thp ON thp.id = th.post_id
+       LEFT JOIN users tha ON tha.id = thp.author_id
+       LEFT JOIN users thu ON thu.id = th.adopter_id
        WHERE r.status = $1
        ORDER BY r.created_at ${query.status === 'open' ? 'ASC' : 'DESC'}
        LIMIT 100`,
@@ -306,6 +317,16 @@ export function registerModerationRoutes(
         }
         if (target.target_type === 'user') {
           await client.query(`UPDATE users SET suspended = true WHERE id = $1`, [target.target_id]);
+        }
+        if (target.target_type === 'adoption_thread') {
+          await client.query(
+            `UPDATE adoption_threads
+             SET closed_at = COALESCE(closed_at, now()),
+                 closed_reason = COALESCE(closed_reason, 'Denúncia aceita pela equipe.'),
+                 review_status = 'reviewed', reviewed_at = now(), reviewed_by = $2
+             WHERE id = $1`,
+            [target.target_id, session.user_id],
+          );
         }
         if (target.target_type === 'campaign') {
           const changed = await setCampaignSuspended(client, {
