@@ -30,10 +30,9 @@ jobs:
         id: conferir
         run: |
           set -u
-          host=fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
-          servicos="API|http://api-$host/health
-          Fotos|http://imgproxy-$host/health
-          Página de download|https://download-$host/version.json"
+          servicos="API|https://api.eguaadota.com.br/health
+          Fotos|https://img.eguaadota.com.br/health
+          Página de download|https://app.eguaadota.com.br/version.json"
           falhas=""
           while IFS='|' read -r nome url; do
             ok=0
