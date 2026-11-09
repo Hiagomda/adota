@@ -7,7 +7,7 @@ O identificador é `app.egua.adota` no Android e no iOS. O scheme do deep link �
 - Conta de desenvolvedor verificada.
 - Build de produção pelo EAS: `pnpm dlx eas-cli build --profile production --platform android`.
 - Ficha: nome Égua, adota!, categoria social, classificação livre.
-- Política de privacidade pública em `https://app.eguaadota.app` e o mesmo texto da tela Termos e privacidade.
+- Política de privacidade pública em `https://app.eguaadota.com.br` e o mesmo texto da tela Termos e privacidade.
 - Declaração de dados: localização aproximada, fotos, identificador da conta e token de notificação.
 - Permissões explicadas em português: localização em uso, câmera e fotos.
 - Não há compra dentro do app. O Pix de um perfil verificado acontece fora do Égua, adota!.
@@ -20,7 +20,7 @@ O identificador é `app.egua.adota` no Android e no iOS. O scheme do deep link �
 - Build de produção: `pnpm dlx eas-cli build --profile production --platform ios` e `pnpm dlx eas-cli submit --platform ios`.
 - Sign in with Apple aparece na tela de entrada. Ele só conclui o login quando o Firebase do projeto está configurado. O login por e-mail precisa existir na mesma tela.
 - Chave APNs enviada ao Firebase, conforme `docs/notificacoes.md`.
-- Política de privacidade e URL de suporte `mailto:contato@eguaadota.app`.
+- Política de privacidade e URL de suporte `mailto:contato@eguaadota.com.br`.
 - O app não vende animal e não processa pagamento.
 - Notas de revisão: Belém é a cidade inicial; a localização pública é aproximada; a exclusão da conta está em Ajustes.
 - Capturas de 6,7" e 6,5", sem moldura de outra marca.
