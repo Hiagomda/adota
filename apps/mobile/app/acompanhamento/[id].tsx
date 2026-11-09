@@ -20,6 +20,7 @@ import {
   useToast,
 } from '../../src/components/ui';
 import { useWhatsAppContact } from '../../src/contact/useWhatsAppContact';
+import { termStatusLine, type AdoptionTermPage } from '../../src/adoptionTerm/term';
 import { formatWhen } from '../../src/format';
 import {
   dayTitle,
@@ -67,6 +68,12 @@ export default function FollowupScreen() {
   });
   const page = query.data;
   const followup = page?.followup ?? null;
+  const term = useQuery({
+    queryKey: ['adoption-term', id, token],
+    queryFn: () => api<AdoptionTermPage>(`/posts/${id}/adoption-term`, { token }),
+    enabled: Boolean(id && token && followup),
+  });
+  const termLine = termStatusLine(term.data);
   const pending = pendingCheckin(page);
   const name = post.data ? animalHeadline(post.data.animal) : 'o animal';
 
@@ -192,6 +199,28 @@ export default function FollowupScreen() {
                 tone="warning"
                 message={`${followup.tutor.name.split(' ')[0]} contou que a adaptação está difícil. Converse antes de uma devolução.`}
               />
+            ) : null}
+
+            {termLine && term.data ? (
+              <Card elevation={term.data.canAccept ? 'md' : 'sm'}>
+                <View style={styles.section}>
+                  <View style={styles.checkinTop}>
+                    <AppText variant="h2">Termo de adoção</AppText>
+                    <InfoChip
+                      label={term.data.accepted ? 'Aceito' : 'Falta aceitar'}
+                      tone={term.data.accepted ? 'success' : 'warning'}
+                    />
+                  </View>
+                  <AppText color="textSecondary">{termLine}</AppText>
+                  <Button
+                    title={term.data.canAccept ? 'Ler e aceitar o termo' : 'Ver o termo'}
+                    icon="file-text"
+                    variant={term.data.canAccept ? 'primary' : 'outline'}
+                    fullWidth
+                    onPress={() => router.push(`/termo/${id}`)}
+                  />
+                </View>
+              </Card>
             ) : null}
 
             {pending ? (

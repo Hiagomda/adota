@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { registerAdoptionChat } from './adoptionChat.js';
 import { registerAdoptionRoutes } from './adoption.js';
 import { registerNgoPanelRoutes } from './ngoPanel.js';
+import { registerAdoptionTermRoutes } from './adoptionTerms.js';
 import {
   notifyCampaignSuspension,
   registerCampaignRoutes,
@@ -109,8 +110,6 @@ const fosterSchema = z.object({
   longitude: z.number().gte(-180).lte(180),
   radiusKm: z.number().positive().max(50),
 });
-const adoptionSchema = z.object({ body: z.string().trim().min(20).max(4000) });
-
 /**
  * Write limits count per account, after the session is resolved: many phones in Belém share one
  * carrier IP (CGNAT), so an IP count would block neighbours. Without a session it falls back to
@@ -687,24 +686,6 @@ export async function registerRoutes(
     return { available: true };
   });
 
-  app.post('/posts/:id/adoption-term', strictLimit, async (request, reply) => {
-    const user = requireUser(request.user);
-    const id = resourceId(request.params);
-    const body = parse(adoptionSchema, request.body);
-    const post = await pool.query<{ status: string }>(`SELECT status FROM posts WHERE id = $1`, [
-      id,
-    ]);
-    if (post.rows[0]?.status !== 'for_adoption') {
-      throw new HttpError(400, 'O termo só vale quando o animal está para adoção.');
-    }
-    await pool.query(
-      `INSERT INTO adoption_terms (post_id, user_id, body) VALUES ($1, $2, $3)
-       ON CONFLICT (post_id, user_id) DO UPDATE SET body = EXCLUDED.body, accepted_at = now()`,
-      [id, user.id, body.body],
-    );
-    return reply.code(201).send({ accepted: true });
-  });
-
   app.get('/notifications', async (request) => {
     const user = requireUser(request.user);
     const result = await pool.query(
@@ -938,6 +919,7 @@ export async function registerRoutes(
   registerRescuePlanRoutes(app, { pool, writeLimit });
   registerOperationRoutes(app, { env, pool, writeLimit });
   registerFollowupRoutes(app, { env, pool, writeLimit, contactLimit });
+  registerAdoptionTermRoutes(app, { env, pool, writeLimit, strictLimit });
   registerCampaignRoutes(app, { env, pool, storage, writeLimit, publishLimit });
   registerPartnerRoutes(app, { pool, writeLimit, strictLimit });
   await registerStaffRoutes(app, { env, pool, queue });

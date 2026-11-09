@@ -100,7 +100,7 @@ export async function startFollowup(
   const name = await animalName(pool, postId);
   await notifyPeople(pool, env, [tutorId], 'adoption_followup', {
     title: 'Parabéns pela adoção!',
-    body: `Daqui a 7, 30 e 90 dias vamos perguntar como ${name} está. Se precisar de ajuda antes, é só abrir o acompanhamento.`,
+    body: `Leia e aceite o termo de adoção de ${name}. Daqui a 7, 30 e 90 dias vamos perguntar como está a adaptação.`,
     postId,
     route: `/acompanhamento/${postId}`,
   });
