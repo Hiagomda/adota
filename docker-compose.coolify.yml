@@ -1,7 +1,8 @@
 # Test stack for the VPS that already runs Coolify.
 # Coolify's proxy owns ports 80 and 443, so this file publishes none.
-# Public URLs are fixed here and must match the domain fields in Coolify. The installed APK
-# calls api-…, photos load from imgproxy-… and uploads go to minio-… on the same sslip host.
+# Os endereços públicos ficam fixos aqui e precisam bater com os domínios no Coolify (eguaadota.com.br, HTTPS).
+# APKs antigos ainda chamam http://api-…sslip.io, então o Coolify mantém os domínios sslip ao lado dos novos
+# em cada serviço. WEB_ORIGIN e ADMIN_ORIGIN aceitam vários endereços separados por vírgula.
 
 name: egua-adota
 
@@ -35,8 +36,8 @@ services:
   minio:
     image: bitnamilegacy/minio:2025.7.23
     environment:
-      SERVICE_URL_MINIO_9000: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
-      MINIO_SERVER_URL: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      SERVICE_URL_MINIO_9000: https://media.eguaadota.com.br
+      MINIO_SERVER_URL: https://media.eguaadota.com.br
       MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MINIO}
       MINIO_DEFAULT_BUCKETS: patinha-media
@@ -58,7 +59,7 @@ services:
       context: .
       dockerfile: docker/imgcache.Dockerfile
     environment:
-      SERVICE_URL_IMGPROXY_8080: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      SERVICE_URL_IMGPROXY_8080: https://img.eguaadota.com.br
     volumes:
       - imgcache:/var/cache/imgproxy
     depends_on:
@@ -91,7 +92,7 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     environment:
-      SERVICE_URL_API_3010: http://api-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      SERVICE_URL_API_3010: https://api.eguaadota.com.br
       NODE_ENV: production
       PORT: '3010'
       DATABASE_URL: postgres://patinha:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/patinha
@@ -100,16 +101,16 @@ services:
       FIREBASE_PROJECT_ID: egua-adota
       OWNER_EMAILS: hiago.yan@hotmail.com
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: http://minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      MINIO_PUBLIC_ENDPOINT: https://media.eguaadota.com.br
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
       MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}
       MINIO_BUCKET: patinha-media
-      IMGPROXY_URL: http://imgproxy-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      IMGPROXY_URL: https://img.eguaadota.com.br
       IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
       IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
-      WEB_ORIGIN: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      WEB_ORIGIN: https://app.eguaadota.com.br,https://eguaadota.com.br,https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       # Endereço do painel da equipe (repositório AdotaSite).
-      ADMIN_ORIGIN: https://admin-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      ADMIN_ORIGIN: https://admin.eguaadota.com.br,https://admin-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       SEED_IF_EMPTY: 'true'
       # Erros da API no Sentry. Cole o DSN do projeto da API nas variáveis do Coolify; vazio desliga.
       SENTRY_DSN: ${SENTRY_DSN:-}
@@ -144,9 +145,9 @@ services:
       context: .
       dockerfile: docker/download.Dockerfile
     environment:
-      SERVICE_URL_DOWNLOAD_80: https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      SERVICE_URL_DOWNLOAD_80: https://app.eguaadota.com.br
       # O app web (/app) envia fotos por /media/ e o MinIO confere a assinatura com este host.
-      MINIO_PUBLIC_HOST: minio-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
+      MINIO_PUBLIC_HOST: media.eguaadota.com.br
     volumes:
       - apk:/apk
     restart: unless-stopped

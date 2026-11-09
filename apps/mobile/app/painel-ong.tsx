@@ -8,6 +8,7 @@ import { animalHeadline, placeOf } from '../src/animalLabels';
 import { CampaignTile } from '../src/campaign/CampaignTile';
 import type { CampaignSummary } from '../src/campaign/campaign';
 import {
+  ActionCard,
   AnimalCard,
   AppText,
   Card,
@@ -338,6 +339,13 @@ export default function NgoPanelScreen() {
               </Touchable>
             ))}
           </View>
+
+          <ActionCard
+            icon="file-text"
+            title="Termo de adoção"
+            description="Use o termo do app ou coloque o da sua ONG"
+            onPress={() => router.push('/termo-ong')}
+          />
 
           <SectionHeader
             title="Campanhas"

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { api, messageFrom } from '../api';
@@ -112,6 +113,7 @@ export function AdoptionInterestSheet({
   onSent: (answers: AdoptionAnswers, note: string) => void;
 }) {
   const { height } = useWindowDimensions();
+  const router = useRouter();
   const [draft, setDraft] = useState<AnswerDraft>({});
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
@@ -253,6 +255,16 @@ export function AdoptionInterestSheet({
           placeholder="Por exemplo: trabalho em casa e tenho tempo para ele"
           multiline
           maxLength={NOTE_LIMIT}
+        />
+        <Button
+          title="Ler o termo de adoção"
+          icon="file-text"
+          variant="ghost"
+          accessibilityHint="Quem adotar aceita esse termo pelo app"
+          onPress={() => {
+            onClose();
+            router.push(`/termo/${postId}`);
+          }}
         />
       </ScrollView>
       <View style={styles.footer}>
