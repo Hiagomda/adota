@@ -29,7 +29,11 @@ import {
   type HeroSlide,
 } from '../../src/components/ui';
 import { openCreateCamera } from '../../src/createCamera';
+import type { CampaignSummary } from '../../src/campaign/campaign';
+import type { EventList } from '../../src/events/agenda';
 import { FairCard } from '../../src/events/FairCard';
+import { HighlightBanner } from '../../src/home/HighlightBanner';
+import { pickHighlights, type Highlight } from '../../src/home/highlights';
 import { useFairs } from '../../src/events/useFairs';
 import { adoptionQuery, noAdoptionFilters } from '../../src/post/adoptionQuery';
 import { ageBandOf, ageBands } from '../../src/post/care';
@@ -275,6 +279,15 @@ export default function HomeScreen() {
     queryKey: ['home-adoption', 'cat', token],
     queryFn: () => loadFeed(token, adoptionQuery({ ...noAdoptionFilters, species: 'cat' })),
   });
+  // Banner de destaques: campanhas abertas e eventos/mutirões que vêm por aí.
+  const openCampaigns = useQuery({
+    queryKey: ['campaigns', 'open', token],
+    queryFn: () => api<{ campaigns: CampaignSummary[] }>('/campaigns?status=open', { token }),
+  });
+  const upcomingEvents = useQuery({
+    queryKey: ['events', 'home', token],
+    queryFn: () => api<EventList>('/events', { token }),
+  });
   const me = useQuery({
     queryKey: ['me', token],
     queryFn: () => loadMe(token ?? ''),
@@ -315,6 +328,10 @@ export default function HomeScreen() {
   const dogPosts = adoptionPosts.filter((post) => post.animal.species === 'dog');
   const dogRail = dogPosts.length > HERO_SLIDES ? dogPosts.slice(HERO_SLIDES) : dogPosts;
   const catRail = (adoptionCats.data?.posts ?? emptyPosts).filter((post) => keep(post));
+  const highlights = pickHighlights(
+    openCampaigns.data?.campaigns ?? [],
+    upcomingEvents.data?.events ?? [],
+  );
   const searching = seek.trim().length > 0;
   const refetchFeed = feed.refetch;
   const pageGeneration = useRef(0);
@@ -400,6 +417,8 @@ export default function HomeScreen() {
     void adoption.refetch();
     void adoptionCats.refetch();
     void fairs.refetch();
+    void openCampaigns.refetch();
+    void upcomingEvents.refetch();
     if (nearPoint) void nearbyStories.refetch();
     if (token) {
       void me.refetch();
@@ -414,8 +433,10 @@ export default function HomeScreen() {
     nearPoint,
     nearbyStories,
     notifications,
+    openCampaigns,
     stories,
     token,
+    upcomingEvents,
   ]);
 
   useEffect(() => {
@@ -436,6 +457,14 @@ export default function HomeScreen() {
       router.navigate('/create');
     });
   }, [router]);
+
+  const openHighlight = useCallback(
+    (item: Highlight) => {
+      if (item.kind === 'campaign') router.push(`/campanha/${item.campaign.id}`);
+      else router.push(`/evento/${item.event.id}`);
+    },
+    [router],
+  );
 
   const renderPost = useCallback(
     ({ item, index }: { item: Post; index: number }) => {
@@ -544,6 +573,9 @@ export default function HomeScreen() {
 
       {searching ? null : (
         <>
+          <View style={styles.highlights}>
+            <HighlightBanner items={highlights} onOpen={openHighlight} />
+          </View>
           <View style={styles.hero}>
             <HeroCarousel slides={heroSlides} actionLabel="Quero conhecer" onOpen={openPost} />
           </View>
@@ -694,6 +726,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hero: { ...screenColumn, paddingTop: spacing.sm },
+  highlights: { ...screenColumn, paddingBottom: spacing.xs },
   rail: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,

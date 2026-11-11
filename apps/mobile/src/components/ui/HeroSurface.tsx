@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,8 +9,6 @@ import {
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { PET_PATTERN_ID, PetPatternDef } from './PetPattern';
 import { size, useTheme } from '../../theme';
-
-const GRADIENT_ID = 'hero-gradient';
 
 export interface HeroSurfaceProps {
   children: ReactNode;
@@ -37,6 +35,11 @@ export function HeroSurface({
   patternColor,
 }: HeroSurfaceProps) {
   const { colors } = useTheme();
+  // Um id por capa: no web os <defs> de todas as capas dividem a página, e com id repetido
+  // todas pintavam com o degradê da primeira (faixa de destaques com cores trocadas).
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const gradientId = `hero-gradient-${uid}`;
+  const patternId = `${PET_PATTERN_ID}-${uid}`;
   const [box, setBox] = useState({ width: 0, height: 0 });
 
   function onLayout(event: LayoutChangeEvent) {
@@ -64,14 +67,14 @@ export function HeroSurface({
         importantForAccessibility="no-hide-descendants"
       >
         <Defs>
-          <LinearGradient id={GRADIENT_ID} x1="0" y1="0" x2="1" y2="1">
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor={start ?? colors.heroStart} />
             <Stop offset="1" stopColor={end ?? colors.heroEnd} />
           </LinearGradient>
-          {patternColor ? <PetPatternDef color={patternColor} /> : null}
+          {patternColor ? <PetPatternDef color={patternColor} id={patternId} /> : null}
         </Defs>
-        <Path d={shape} fill={`url(#${GRADIENT_ID})`} />
-        {patternColor ? <Path d={shape} fill={`url(#${PET_PATTERN_ID})`} opacity={0.12} /> : null}
+        <Path d={shape} fill={`url(#${gradientId})`} />
+        {patternColor ? <Path d={shape} fill={`url(#${patternId})`} opacity={0.12} /> : null}
       </Svg>
       {children}
     </View>
