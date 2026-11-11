@@ -32,9 +32,9 @@ function Fish({ color }: { color: string }) {
  * `fill="url(#pet-pattern)"`. Two of each per tile, turned different ways, so the repeat does not
  * read as a grid.
  */
-export function PetPatternDef({ color }: { color: string }) {
+export function PetPatternDef({ color, id = PET_PATTERN_ID }: { color: string; id?: string }) {
   return (
-    <Pattern id={PET_PATTERN_ID} patternUnits="userSpaceOnUse" width={TILE} height={TILE}>
+    <Pattern id={id} patternUnits="userSpaceOnUse" width={TILE} height={TILE}>
       <G transform="translate(16 15) rotate(-35)">
         <Bone color={color} />
       </G>
