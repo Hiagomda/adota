@@ -5,10 +5,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for u in https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/ https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/version.json http://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/version.json https://app.eguaadota.com.br/ https://app.eguaadota.com.br/version.json; do
-            echo "=== $u"; curl -sS -m 15 -w '\nHTTP %{http_code} -> %{redirect_url}\n' "$u" | tail -c 900 || true
-            curl -vsk -o /dev/null -m 15 "$u" 2>&1 | grep -iE 'subject:|issuer:|expire' || true
+          sleep 60
+          for u in https://app.eguaadota.com.br/version.json https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/version.json https://api.eguaadota.com.br/health; do
+            echo "=== $u"; curl -sS -m 15 -w '\nHTTP %{http_code}\n' "$u" | tail -c 900 || true
           done
-          for u in https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/egua-adota.apk https://app.eguaadota.com.br/egua-adota.apk; do
+          for u in https://app.eguaadota.com.br/egua-adota.apk https://download-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io/egua-adota.apk; do
             echo "=== HEAD $u"; curl -sSI -m 15 "$u" | grep -iE '^HTTP|content-length|last-modified' || true
           done
