@@ -1,11 +1,9 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 42,
+  "androidVersionCode": 43,
   "notes": [
     "Se o seu aplicativo é de antes de 10/11, desinstale e instale este (assinatura nova). Sua conta e seus posts continuam salvos.",
-    "Pontos solidários de ração e água no mapa: cadastre um ponto que você cuida ou conhece.",
-    "Conversa de adoção mais justa: o filtro não barra mais frases comuns como \"estou vendo a foto\".",
-    "Correções no compartilhar, no botão Voltar, nas fotos antigas e no aviso do iPhone."
+    "Novo e-mail de contato: contato@eguaadota.com.br, no Suporte e nos Termos."
   ],
   "reinstall": true
 }

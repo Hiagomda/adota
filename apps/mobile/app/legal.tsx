@@ -82,7 +82,7 @@ export default function LegalScreen() {
             <AppText color="textSecondary">
               Seus direitos: você pode pedir acesso, correção ou exclusão dos seus dados e a revisão
               por uma pessoa de qualquer decisão tomada a partir do filtro automático. Peça pelo
-              Suporte do app.
+              Suporte do app ou pelo e-mail contato@eguaadota.com.br.
             </AppText>
             <VersionMark />
           </View>
