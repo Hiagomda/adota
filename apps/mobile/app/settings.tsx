@@ -381,6 +381,14 @@ export default function SettingsScreen() {
                 />
                 <Divider inset />
                 <ListItem
+                  title="Achou um bug?"
+                  subtitle="O app está em pleno desenvolvimento. Conta o que deu errado."
+                  icon="alert-circle"
+                  showChevron
+                  onPress={() => router.push({ pathname: '/bug', params: { from: '/settings' } })}
+                />
+                <Divider inset />
+                <ListItem
                   title="Como denunciar maus-tratos"
                   icon="shield"
                   showChevron

@@ -36,6 +36,13 @@ export default function SupportScreen() {
             ONG.
           </AppText>
           <Button title={SUPPORT_EMAIL} icon="mail" size="lg" onPress={writeEmail} />
+          <Button
+            title="Achou um bug? Avise aqui"
+            icon="alert-circle"
+            variant="ghost"
+            size="lg"
+            onPress={() => router.push({ pathname: '/bug', params: { from: '/support' } })}
+          />
           <VersionMark />
         </View>
       </View>

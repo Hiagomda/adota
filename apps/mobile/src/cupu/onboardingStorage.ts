@@ -20,3 +20,19 @@ export async function markCupuOnboardingSeen(userId: string): Promise<void> {
   await AsyncStorage.setItem(cupuOnboardingKey(userId), 'true');
   await AsyncStorage.removeItem(legacyDeviceKey);
 }
+
+// Aviso de que o app está em pleno desenvolvimento, com o besourinho de avisar bug. Fica num
+// marcador próprio para quem já viu a apresentação antes dele existir também ver uma vez.
+const devNoticePrefix = '@egua_adota:has_seen_dev_notice';
+
+export function devNoticeKey(userId: string): string {
+  return `${devNoticePrefix}:${userId}`;
+}
+
+export async function hasSeenDevNotice(userId: string): Promise<boolean> {
+  return (await AsyncStorage.getItem(devNoticeKey(userId))) === 'true';
+}
+
+export async function markDevNoticeSeen(userId: string): Promise<void> {
+  await AsyncStorage.setItem(devNoticeKey(userId), 'true');
+}

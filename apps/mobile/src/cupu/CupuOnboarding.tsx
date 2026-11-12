@@ -3,10 +3,17 @@ import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { AppText, Button, Icon, Touchable, type IconName } from '../components/ui';
 import { Mascot, type MascotPose } from '../mascot';
+import { reportError } from '../crash/reporter';
 import { useSession } from '../session';
 import { motion, radius, spacing, useMotionDuration, useTheme, type ColorRoles } from '../theme';
 import { vocativeFromName } from '../vocative';
-import { hasSeenCupuOnboarding, markCupuOnboardingSeen } from './onboardingStorage';
+import { BugIcon } from '../bugReport/BugIcon';
+import {
+  hasSeenCupuOnboarding,
+  hasSeenDevNotice,
+  markCupuOnboardingSeen,
+  markDevNoticeSeen,
+} from './onboardingStorage';
 
 interface Step {
   pose: MascotPose;
@@ -17,7 +24,24 @@ interface Step {
   /** Linha de destaque com ícone, para o que a pessoa precisa saber antes de usar. */
   tip?: { icon: IconName; text: string };
   button: string;
+  /** Mostra o besourinho de avisar bug no quadro, como ele aparece no topo do Início. */
+  showsBugButton?: boolean;
 }
+
+/** O app é novo: o Cupu avisa e apresenta o botão de bug. Vai para todo mundo uma vez. */
+const devStep: Step = {
+  pose: 'search',
+  tint: 'secondarySoft',
+  title: 'O app é novinho!',
+  description:
+    'O Égua, adota! acabou de nascer e está em pleno desenvolvimento. Se algo travar ou parecer estranho, me avisa pelo besourinho que eu levo direto pra equipe consertar.',
+  tip: {
+    icon: 'arrow-up-right',
+    text: 'O besourinho fica no topo do Início. Também tem “Achou um bug?” em Configurações.',
+  },
+  button: 'Combinado!',
+  showsBugButton: true,
+};
 
 const steps: Step[] = [
   {
@@ -28,6 +52,7 @@ const steps: Step[] = [
       'Mas pode me chamar de Cupu. O Égua, adota! junta quem vê, quem resgata e quem adota os bichinhos de rua de Belém. Te mostro o básico rapidinho.',
     button: 'Bora ver',
   },
+  devStep,
   {
     pose: 'camera',
     tint: 'secondarySoft',
@@ -84,14 +109,18 @@ export default function CupuOnboarding() {
   const clearCupuPrompt = useSession((state) => state.clearCupuPrompt);
   const userName = useSession((state) => state.user?.name);
   const userId = useSession((state) => state.user?.id);
+  // full: apresentação inteira (primeiro login). dev: só o aviso do app novo, para quem já viu.
+  const [mode, setMode] = useState<'full' | 'dev'>('full');
   const pages = useMemo(
     () =>
-      steps.map((item, itemIndex) =>
-        itemIndex === 0
-          ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupuaçu` }
-          : item,
-      ),
-    [userName],
+      mode === 'dev'
+        ? [devStep]
+        : steps.map((item, itemIndex) =>
+            itemIndex === 0
+              ? { ...item, title: `Ei, ${vocativeFromName(userName)}! Eu sou o Cupuaçu` }
+              : item,
+          ),
+    [mode, userName],
   );
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
@@ -100,20 +129,35 @@ export default function CupuOnboarding() {
   const last = index === pages.length - 1;
 
   useEffect(() => {
-    if (!ready || !cupuPrompt || !userId) return;
+    if (!ready || !userId) return;
     let cancelled = false;
-    void hasSeenCupuOnboarding(userId).then((seen) => {
-      if (cancelled) return;
-      if (!seen) setVisible(true);
-      else clearCupuPrompt();
-    });
+    void Promise.all([hasSeenCupuOnboarding(userId), hasSeenDevNotice(userId)])
+      .then(([seen, seenDev]) => {
+        if (cancelled) return;
+        if (cupuPrompt && !seen) {
+          setMode('full');
+          setVisible(true);
+        } else if (!seenDev) {
+          // Quem já conhecia o app (ou abriu já logado) vê só o aviso do app novo, uma vez.
+          setMode('dev');
+          setVisible(true);
+        } else if (cupuPrompt) {
+          clearCupuPrompt();
+        }
+      })
+      .catch((error: unknown) => {
+        reportError(error, { source: 'handled', where: 'cupu:onboarding-storage' });
+      });
     return () => {
       cancelled = true;
     };
   }, [clearCupuPrompt, cupuPrompt, ready, userId]);
 
   async function finish() {
-    if (userId) await markCupuOnboardingSeen(userId);
+    if (userId) {
+      if (mode === 'full') await markCupuOnboardingSeen(userId);
+      await markDevNoticeSeen(userId);
+    }
     setVisible(false);
     setIndex(0);
     clearCupuPrompt();
@@ -166,6 +210,22 @@ export default function CupuOnboarding() {
             >
               <View style={[styles.art, { backgroundColor: colors[step.tint] }]}>
                 <Mascot pose={step.pose} size={MASCOT} />
+                {step.showsBugButton ? (
+                  <View
+                    style={[
+                      styles.bugPointer,
+                      { backgroundColor: colors.surfaceRaised },
+                      shadows.sm,
+                    ]}
+                    accessible
+                    accessibilityLabel="Botão do besourinho, no topo do Início"
+                  >
+                    <View style={[styles.bugCircle, { backgroundColor: colors.secondarySoft }]}>
+                      <BugIcon size={26} />
+                    </View>
+                    <AppText variant="bodySmallStrong">Achou um bug?</AppText>
+                  </View>
+                ) : null}
               </View>
               <View style={styles.text} accessibilityLiveRegion="polite">
                 <AppText variant="h2" style={styles.center} accessibilityRole="header">
@@ -254,6 +314,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     overflow: 'hidden',
+  },
+  bugPointer: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingLeft: spacing.xs,
+    paddingRight: spacing.md,
+    borderRadius: radius.pill,
+  },
+  bugCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   text: { gap: spacing.sm },
   center: { textAlign: 'center' },
