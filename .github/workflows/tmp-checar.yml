@@ -2,7 +2,7 @@ name: tmp checar dominio
 on: push
 jobs:
   c:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: |
           mkdir t && cd t && npm init -y >/dev/null && npm i playwright@1.48.2 2>&1 | tail -3 && npx playwright install --with-deps webkit 2>&1 | tail -5
