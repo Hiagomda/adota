@@ -1,6 +1,11 @@
 import { Platform } from 'react-native';
 import { apiUrl } from '../api';
-import { appVersion, formatAppVersionDetailed, releaseName, type AppEnvironment } from '../appVersion';
+import {
+  appVersion,
+  formatAppVersionDetailed,
+  releaseName,
+  type AppEnvironment,
+} from '../appVersion';
 import { sentryDsn } from '../crash/reporter';
 import { lastRequestLabel } from '../net/timings';
 import { downloadPageUrl } from '../updates/checkForAppUpdate';
