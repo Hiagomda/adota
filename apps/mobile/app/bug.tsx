@@ -1,23 +1,14 @@
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, messageFrom } from '../src/api';
-import {
-  BUG_MESSAGE_MAX,
-  BUG_MESSAGE_MIN,
-  bugReportBody,
-  bugReportEmailText,
-} from '../src/bugReport/bugReport';
+import { BUG_MESSAGE_MAX, BUG_MESSAGE_MIN, bugReportBody } from '../src/bugReport/bugReport';
 import { BugIcon } from '../src/bugReport/BugIcon';
 import { AppText, Button, Header, Input, Notice, useToast } from '../src/components/ui';
-import { reportError } from '../src/crash/reporter';
 import { Mascot } from '../src/mascot';
 import { useSession } from '../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../src/theme';
-
-const SUPPORT_EMAIL = 'contato@eguaadota.com.br';
 
 export default function BugReportScreen() {
   const { colors } = useTheme();
@@ -52,22 +43,6 @@ export default function BugReportScreen() {
     } finally {
       setSending(false);
     }
-  }
-
-  function sendByEmail() {
-    const body = bugReportEmailText(bugReportBody(text, from ?? null));
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-      'Bug no Égua, adota!',
-    )}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch((mailError: unknown) => {
-      reportError(mailError, { source: 'handled', where: 'bug:mailto' });
-      Clipboard.setStringAsync(`${SUPPORT_EMAIL}\n\n${body}`)
-        .then(() => toast.show('Não achei um app de e-mail. Copiei o aviso para você.', 'info'))
-        .catch((copyError: unknown) => {
-          reportError(copyError, { source: 'handled', where: 'bug:copy' });
-          toast.show(`Não achei um app de e-mail. Escreva para ${SUPPORT_EMAIL}.`, 'info');
-        });
-    });
   }
 
   return (
@@ -111,15 +86,18 @@ export default function BugReportScreen() {
                 disabled={tooShort}
                 onPress={() => void send()}
               />
-            ) : null}
-            <Button
-              title={token ? 'Prefiro mandar por e-mail' : 'Mandar por e-mail'}
-              icon="mail"
-              variant={token ? 'ghost' : 'secondary'}
-              size="lg"
-              disabled={tooShort}
-              onPress={sendByEmail}
-            />
+            ) : (
+              <>
+                <Notice tone="info" message="Entre na sua conta para mandar o aviso à equipe." />
+                <Button
+                  title="Entrar"
+                  icon="log-in"
+                  variant="secondary"
+                  size="lg"
+                  onPress={() => router.push('/login')}
+                />
+              </>
+            )}
           </View>
         </View>
       </ScrollView>

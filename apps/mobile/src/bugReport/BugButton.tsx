@@ -27,7 +27,10 @@ export function BugButton({ style }: { style?: StyleProp<ViewStyle> }) {
       pressedScale={0.92}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: pressed ? colors.surfaceMuted : colors.secondarySoft },
+        {
+          backgroundColor: pressed ? colors.surfaceMuted : colors.secondarySoft,
+          borderColor: colors.secondary,
+        },
         style,
       ]}
     >
@@ -41,6 +44,7 @@ const styles = StyleSheet.create({
     width: size.touch,
     height: size.touch,
     borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

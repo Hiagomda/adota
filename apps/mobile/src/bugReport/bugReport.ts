@@ -23,15 +23,3 @@ export function bugReportBody(message: string, screen: string | null): BugReport
     device: deviceSummary().slice(0, 120),
   };
 }
-
-/** Mesmo aviso em texto, para mandar por e-mail quando a internet ou a conta falham. */
-export function bugReportEmailText(body: BugReportBody): string {
-  return [
-    body.message,
-    '',
-    '---',
-    `Tela: ${body.screen ?? 'não sei'}`,
-    `Versão: ${body.appVersion}`,
-    `Aparelho: ${body.device} · ${body.platform}`,
-  ].join('\n');
-}

@@ -1,8 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 44,
+  "androidVersionCode": 45,
   "notes": [
-    "O Cupu avisa que o app é novinho e está em pleno desenvolvimento.",
-    "Achou um bug? Toque no besourinho no topo do Início e conte o que aconteceu."
+    "Criar evento com o local marcado no mapa, e os eventos aparecem no mapa com o desenho de cada tipo.",
+    "Borda de Belém no mapa sem linha dupla.",
+    "Campanhas com foto no banner, Pix com copiar e QR code e aprovação da equipe.",
+    "Achou um bug? O besourinho manda o aviso direto para a equipe."
   ]
 }
