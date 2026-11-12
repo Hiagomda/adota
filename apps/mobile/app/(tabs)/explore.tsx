@@ -30,7 +30,7 @@ import { PartnerDetails } from '../../src/partners/PartnerDetails';
 import { PartnerInvite } from '../../src/partners/PartnerInvite';
 import type { Partner } from '../../src/partners/partners';
 import { useSession } from '../../src/session';
-import { motion, radius, size, spacing, useTheme } from '../../src/theme';
+import { motion, radius, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 
 const speciesLabel: Record<string, string> = {
@@ -180,6 +180,9 @@ export default function ExploreScreen() {
   const cardOpen = selected !== null || partnerSelection !== null || shownFeedPoint !== null;
   const controlsBottom =
     insets.bottom + (cardOpen ? spacing.giant * 4 : spacing.giant + spacing.lg);
+  // A fileira de camadas ocupa a largura toda; o botão "Minha localização" fica logo acima dela.
+  const [layerRowHeight, setLayerRowHeight] = useState(0);
+  const locateBottom = cardOpen ? controlsBottom : controlsBottom + layerRowHeight + spacing.sm;
 
   const bannerText = feed.isError
     ? messageFrom(feed.error)
@@ -197,7 +200,7 @@ export default function ExploreScreen() {
         onSelectFeedPoint={selectFeedPoint}
         selectedId={selection}
         tracking={focused}
-        controlsBottom={controlsBottom}
+        controlsBottom={locateBottom}
         onSelect={selectPost}
         onDismiss={closeCard}
         onCommitBounds={(next) => {
@@ -339,6 +342,7 @@ export default function ExploreScreen() {
           keyboardShouldPersistTaps="handled"
           style={[styles.layerRow, { bottom: controlsBottom }]}
           contentContainerStyle={styles.layerChips}
+          onLayout={(event) => setLayerRowHeight(Math.round(event.nativeEvent.layout.height))}
         >
           <Chip
             label="Ração e água"
@@ -375,15 +379,15 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   cardHead: { alignItems: 'flex-end' },
-  // Rola de lado e para antes do botão "Minha localização", à direita.
+  // Rola de lado de uma borda à outra da tela, abaixo do botão "Minha localização".
   layerRow: {
     position: 'absolute',
     left: 0,
-    right: spacing.lg + size.touch + spacing.sm,
+    right: 0,
     flexGrow: 0,
     zIndex: 20,
   },
-  layerChips: { paddingLeft: spacing.lg, paddingRight: spacing.sm, gap: spacing.sm },
+  layerChips: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   cardBody: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   photo: { width: PHOTO_WIDTH, height: PHOTO_HEIGHT, borderRadius: radius.md },

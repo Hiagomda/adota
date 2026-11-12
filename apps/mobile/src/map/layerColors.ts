@@ -11,3 +11,13 @@ export const mapColors = {
   /** Área de toque invisível (opacidade quase zero) sobre os marcadores. */
   hitArea: lightColors.shadow,
 } as const;
+
+/**
+ * O limite da área atendida: um véu leve fora dela e uma linha fina por cima. A linha sai do
+ * contorno simplificado (`serviceShape`), então não dobra nas margens dos rios.
+ */
+export const serviceLimit = {
+  lineWidth: 2,
+  lineOpacity: 0.85,
+  maskOpacity: 0.22,
+} as const;

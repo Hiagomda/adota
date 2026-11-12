@@ -1,8 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { mapColors } from './layerColors';
+import { mapColors, serviceLimit } from './layerColors';
 import { serviceCamera, serviceMask, serviceOutline } from './serviceArea';
-
-const limitGreen = '#1F8F4E';
 
 export function limitMapToBelem(map: MapLibreMap) {
   map.setMinZoom(8.5);
@@ -20,16 +18,18 @@ export function showServiceLimit(map: MapLibreMap) {
       id: 'service-mask',
       type: 'fill',
       source: 'service-mask',
-      paint: { 'fill-color': mapColors.outsideArea, 'fill-opacity': 0.28 },
+      paint: { 'fill-color': mapColors.outsideArea, 'fill-opacity': serviceLimit.maskOpacity },
     });
     map.addSource('service-outline', { type: 'geojson', data: serviceOutline });
     map.addLayer({
       id: 'service-outline',
       type: 'line',
       source: 'service-outline',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': limitGreen,
-        'line-width': 3,
+        'line-color': mapColors.areaOutline,
+        'line-width': serviceLimit.lineWidth,
+        'line-opacity': serviceLimit.lineOpacity,
       },
     });
   };
