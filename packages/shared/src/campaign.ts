@@ -29,6 +29,11 @@ const receiptKey = z
     'O comprovante precisa ser uma foto enviada pelo app.',
   );
 
+/** Cores do banner de destaques: as mesmas capas do tema do app. */
+export const CAMPAIGN_BANNER_COLORS = ['coral', 'turquoise', 'caramel', 'green', 'blue'] as const;
+export type CampaignBannerColor = (typeof CAMPAIGN_BANNER_COLORS)[number];
+const bannerColor = z.enum(CAMPAIGN_BANNER_COLORS);
+
 const cents = (max: number) => z.number().int().positive().max(max);
 
 function addDays(day: string, days: number): string {
@@ -47,13 +52,16 @@ export function campaignCreateSchemaAt(now: Date = new Date()) {
   return z
     .object({
       title: z.string().trim().min(6).max(80),
-      /** A justificativa: para que é o dinheiro e por que esse valor. */
-      purpose: z.string().trim().min(30).max(2000),
+      /** A justificativa: para que é o dinheiro e por que esse valor. Sem mínimo de letras. */
+      purpose: z.string().trim().min(1).max(2000),
       goalCents: cents(MAX_GOAL_CENTS).min(MIN_GOAL_CENTS),
       deadline: calendarDay,
       pixKey: z.string().trim().min(3).max(120),
       animalId: z.string().uuid().optional(),
       postId: z.string().uuid().optional(),
+      /** Foto do banner de destaques (envio do app). Sem foto, o banner usa a cor. */
+      bannerKey: receiptKey.optional(),
+      bannerColor: bannerColor.optional(),
       clientKey,
     })
     .strict()
@@ -72,10 +80,13 @@ export function campaignUpdateSchemaAt(now: Date = new Date()) {
   return z
     .object({
       title: z.string().trim().min(6).max(80).optional(),
-      purpose: z.string().trim().min(30).max(2000).optional(),
+      purpose: z.string().trim().min(1).max(2000).optional(),
       goalCents: cents(MAX_GOAL_CENTS).min(MIN_GOAL_CENTS).optional(),
       deadline: calendarDay.optional(),
       pixKey: z.string().trim().min(3).max(120).optional(),
+      /** null tira a foto do banner. */
+      bannerKey: receiptKey.nullable().optional(),
+      bannerColor: bannerColor.optional(),
       reason: z.string().trim().min(10).max(300),
     })
     .strict()
@@ -86,7 +97,15 @@ export function campaignUpdateSchemaAt(now: Date = new Date()) {
           context.addIssue({ code: z.ZodIssueCode.custom, path: ['deadline'], message: issue });
         }
       }
-      const changes = ['title', 'purpose', 'goalCents', 'deadline', 'pixKey'] as const;
+      const changes = [
+        'title',
+        'purpose',
+        'goalCents',
+        'deadline',
+        'pixKey',
+        'bannerKey',
+        'bannerColor',
+      ] as const;
       if (!changes.some((field) => value[field] !== undefined)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -166,6 +185,24 @@ export const campaignListQuerySchema = z
   })
   .strict();
 
+/** A equipe decide toda campanha aberta pelo app antes de ela ir ao ar. */
+export const campaignReviewSchema = z
+  .object({
+    action: z.enum(['approve', 'reject']),
+    reason: z.string().trim().max(500).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.action === 'reject' && (value.reason ?? '').length < 5) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'Escreva o motivo da recusa: ele vai para quem pediu.',
+      });
+    }
+  });
+
+export type CampaignReviewStatus = 'pending' | 'published' | 'rejected';
 export type CampaignStatus = 'active' | 'closed' | 'suspended';
 /** O que a pessoa vê: ativa, prazo acabou, encerrada pelo responsável ou suspensa pela equipe. */
 export type CampaignPhase = 'active' | 'ended' | 'closed' | 'suspended';

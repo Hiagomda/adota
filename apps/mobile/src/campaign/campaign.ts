@@ -6,6 +6,22 @@
 
 export type CampaignPhase = 'active' | 'ended' | 'closed' | 'suspended';
 export type EntryStatus = 'pending' | 'confirmed' | 'rejected' | 'voided';
+/** pending: esperando a equipe aprovar; rejected: a equipe pediu correção. APIs antigas não mandam. */
+export type CampaignReviewStatus = 'pending' | 'published' | 'rejected';
+export type CampaignBannerColor = 'coral' | 'turquoise' | 'caramel' | 'green' | 'blue';
+
+/** Cores que dá para escolher para o banner de destaques, na ordem em que aparecem. */
+export const bannerColorChoices: { value: CampaignBannerColor; label: string }[] = [
+  { value: 'coral', label: 'Coral' },
+  { value: 'turquoise', label: 'Turquesa' },
+  { value: 'caramel', label: 'Caramelo' },
+  { value: 'green', label: 'Verde' },
+  { value: 'blue', label: 'Azul' },
+];
+
+export function isBannerColor(value: unknown): value is CampaignBannerColor {
+  return bannerColorChoices.some((choice) => choice.value === value);
+}
 
 export interface CampaignSummary {
   id: string;
@@ -18,6 +34,9 @@ export interface CampaignSummary {
   animalId: string | null;
   postId: string | null;
   coverUrl: string | null;
+  reviewStatus?: CampaignReviewStatus;
+  bannerUrl?: string | null;
+  bannerColor?: string | null;
   owner: { name: string; handle: string; verified: boolean; avatarUrl: string | null };
   createdAt: string;
 }
@@ -51,8 +70,15 @@ export interface CampaignDetail {
   createdAt: string;
   updatedAt: string;
   pixKey: string | null;
+  /** A chave como o responsável cadastrou, para ele e a equipe, mesmo antes da aprovação. */
+  ownerPixKey?: string | null;
+  pixReceiver?: { name: string; city: string } | null;
   paymentNotice: string;
   coverUrl: string | null;
+  reviewStatus?: CampaignReviewStatus;
+  reviewNote?: string | null;
+  bannerUrl?: string | null;
+  bannerColor?: string | null;
   owner: { name: string; handle: string; verified: boolean; avatarUrl: string | null };
   animal: { id: string; name: string | null; species: string } | null;
   post: { id: string; approxLabel: string; type: string } | null;
@@ -170,9 +196,7 @@ export function campaignFormError(input: {
   today: string;
 }): string | null {
   if (input.title.trim().length < 6) return 'Dê um título com pelo menos 6 letras.';
-  if (input.purpose.trim().length < 30) {
-    return 'Explique para que é o dinheiro e por que esse valor (pelo menos 30 letras).';
-  }
+  if (input.purpose.trim().length === 0) return 'Conte para que é o dinheiro.';
   if (input.goalCents === null) return 'A meta precisa ser um valor, por exemplo 1.500,00.';
   if (input.goalCents < MIN_GOAL_CENTS) return 'A meta mínima é R$ 10,00.';
   if (input.goalCents > MAX_GOAL_CENTS) return 'A meta passou do limite.';

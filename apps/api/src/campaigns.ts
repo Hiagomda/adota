@@ -150,13 +150,18 @@ interface CampaignRow {
   closing_note: string | null;
   closed_at: Date | null;
   suspended_reason: string | null;
+  review_status: 'pending' | 'published' | 'rejected';
+  review_note: string | null;
+  banner_key: string | null;
+  banner_color: string | null;
   created_at: Date;
   updated_at: Date;
 }
 
 const campaignColumns = `c.id, c.owner_id, c.animal_id, c.post_id, c.title, c.purpose, c.goal_cents,
   to_char(c.deadline, 'YYYY-MM-DD') AS deadline, c.pix_key, c.status, c.closing_note, c.closed_at,
-  c.suspended_reason, c.created_at, c.updated_at`;
+  c.suspended_reason, c.review_status, c.review_note, c.banner_key, c.banner_color,
+  c.created_at, c.updated_at`;
 
 async function lockCampaign(client: PoolClient, id: string): Promise<CampaignRow> {
   const found = await client.query<CampaignRow>(
@@ -171,6 +176,13 @@ async function lockCampaign(client: PoolClient, id: string): Promise<CampaignRow
 function assertOwner(campaign: CampaignRow, user: SessionUser): void {
   if (campaign.owner_id !== user.id) {
     throw new HttpError(403, 'Só o responsável pela campanha pode fazer isso.');
+  }
+}
+
+/** Campanha aberta pelo app só recebe doação e lançamento depois que a equipe aprova. */
+function assertPublished(campaign: CampaignRow): void {
+  if (campaign.review_status !== 'published') {
+    throw new HttpError(409, 'A campanha ainda espera a aprovação da equipe.');
   }
 }
 
@@ -249,7 +261,11 @@ export async function listCampaigns(
     const user = requireUser(viewer);
     conditions.push(`c.owner_id = ${add(user.id)}`);
   } else {
-    conditions.push(`c.status <> 'suspended'`, 'ou.suspended = false');
+    conditions.push(
+      `c.status <> 'suspended'`,
+      `c.review_status = 'published'`,
+      'ou.suspended = false',
+    );
     const day = add(today);
     conditions.push(
       query.status === 'open'
@@ -298,6 +314,9 @@ export async function listCampaigns(
         animalId: row.animal_id,
         postId: row.post_id,
         coverUrl: row.cover ? publicMediaUrl(env, row.cover, 'thumb') : null,
+        reviewStatus: row.review_status,
+        bannerUrl: row.banner_key ? publicMediaUrl(env, row.banner_key, 'full') : null,
+        bannerColor: row.banner_color,
         owner: {
           name: row.owner_name,
           handle: row.owner_handle,
@@ -343,11 +362,23 @@ const fieldLabels: Record<string, string> = {
   goalCents: 'meta',
   deadline: 'prazo',
   pixKey: 'chave Pix',
+  bannerColor: 'cor do banner',
+  bannerKey: 'foto do banner',
+};
+
+const colorNames: Record<string, string> = {
+  coral: 'coral',
+  turquoise: 'turquesa',
+  caramel: 'caramelo',
+  green: 'verde',
+  blue: 'azul',
 };
 
 function describeValue(field: string, value: unknown): string {
   if (field === 'goalCents' && typeof value === 'number') return formatCents(value);
   if (field === 'deadline' && typeof value === 'string') return formatDay(value);
+  if (field === 'bannerColor')
+    return typeof value === 'string' ? (colorNames[value] ?? value) : 'padrão';
   return typeof value === 'string' ? value : '';
 }
 
@@ -369,7 +400,11 @@ export function describeEvent(row: {
         .map((field) =>
           field === 'purpose'
             ? 'justificativa reescrita'
-            : `${fieldLabels[field]} de ${describeValue(field, before[field])} para ${describeValue(field, after[field])}`,
+            : field === 'bannerKey'
+              ? after.bannerKey
+                ? 'foto do banner trocada'
+                : 'foto do banner retirada'
+              : `${fieldLabels[field]} de ${describeValue(field, before[field])} para ${describeValue(field, after[field])}`,
         );
       return `Campanha editada: ${parts.join('; ')}`;
     }
@@ -391,6 +426,12 @@ export function describeEvent(row: {
       return 'Suspensa pela equipe para conferência';
     case 'reinstated':
       return 'Liberada pela equipe depois da conferência';
+    case 'submitted':
+      return 'Pedido enviado para a equipe aprovar';
+    case 'approved':
+      return 'Aprovada pela equipe e no ar';
+    case 'rejected':
+      return 'Recusada pela equipe';
     default:
       return 'Atualização';
   }
@@ -425,6 +466,10 @@ export async function loadCampaign(pool: Pool, env: Env, id: string, viewer: Ses
   if (!campaign) throw new HttpError(404, 'Essa campanha não existe.');
   const isOwner = viewer !== null && viewer.id === campaign.owner_id;
   const staff = isFinanceStaff(viewer);
+  // Esperando a equipe ou recusada: só quem pediu e a equipe enxergam.
+  if (campaign.review_status !== 'published' && !isOwner && !staff) {
+    throw new HttpError(404, 'Essa campanha não existe.');
+  }
   const today = belemToday();
   const phase = campaignPhase(campaign.status, campaign.deadline, today);
 
@@ -490,11 +535,11 @@ export async function loadCampaign(pool: Pool, env: Env, id: string, viewer: Ses
   const visibleIds = new Set(visible.map((row) => row.id));
   const allIds = new Set(allEntries.map((row) => row.id));
 
+  // A aprovação da equipe é o que libera o Pix. Antes era o selo de verificado, e a campanha
+  // aberta pelo painel em nome da conta da equipe (sem selo) ficava sem Pix.
+  const published = campaign.review_status === 'published';
   const pixVisible =
-    phase === 'active' &&
-    campaign.owner_verified &&
-    !campaign.owner_suspended &&
-    !campaign.owner_deleted;
+    phase === 'active' && published && !campaign.owner_suspended && !campaign.owner_deleted;
 
   return {
     id: campaign.id,
@@ -509,8 +554,15 @@ export async function loadCampaign(pool: Pool, env: Env, id: string, viewer: Ses
     createdAt: campaign.created_at.toISOString(),
     updatedAt: campaign.updated_at.toISOString(),
     pixKey: pixVisible ? campaign.pix_key : null,
+    ownerPixKey: isOwner || staff ? campaign.pix_key : null,
+    /** Nome e cidade que vão no QR code do Pix (o banco mostra o dono real da chave). */
+    pixReceiver: pixVisible ? { name: campaign.owner_name, city: 'Belem' } : null,
     paymentNotice:
-      'O app não recebe nem repassa dinheiro. O Pix vai direto para o responsável verificado, e só conta no progresso o que ele confirmar com comprovante.',
+      'O app não recebe nem repassa dinheiro. O Pix vai direto para o responsável, e só conta no progresso o que ele confirmar com comprovante. A equipe do Égua, adota! aprovou esta campanha antes de ela ir ao ar.',
+    reviewStatus: campaign.review_status,
+    reviewNote: isOwner || staff ? campaign.review_note : null,
+    bannerUrl: campaign.banner_key ? publicMediaUrl(env, campaign.banner_key, 'full') : null,
+    bannerColor: campaign.banner_color,
     coverUrl: cover.rows[0] ? publicMediaUrl(env, cover.rows[0].url, 'full') : null,
     owner: {
       name: campaign.owner_name,
@@ -579,10 +631,10 @@ export async function loadCampaign(pool: Pool, env: Env, id: string, viewer: Ses
       isOwner,
       isStaff: staff,
       canEdit: isOwner && campaign.status === 'active',
-      canAddEntries: isOwner && campaign.status === 'active',
-      canClose: isOwner && campaign.status === 'active',
+      canAddEntries: isOwner && campaign.status === 'active' && published,
+      canClose: isOwner && campaign.status === 'active' && published,
       canPledge: viewer !== null && !isOwner && pixVisible,
-      canReport: viewer !== null && !isOwner,
+      canReport: viewer !== null && !isOwner && published,
     },
   };
 }
@@ -690,6 +742,61 @@ export async function notifyCampaignSuspension(
 }
 
 /**
+ * A equipe aprova (vai ao ar com o Pix) ou recusa (com motivo) uma campanha pedida pelo app.
+ * Só decide o que está esperando: aprovar duas vezes não repete aviso.
+ */
+export async function reviewCampaign(
+  client: PoolClient,
+  input: { campaignId: string; actorId: string; approve: boolean; reason: string | null },
+): Promise<{ ownerId: string; title: string; changed: boolean } | null> {
+  const campaign = await client.query<{ owner_id: string; title: string; review_status: string }>(
+    `SELECT owner_id, title, review_status FROM campaigns WHERE id = $1 FOR UPDATE`,
+    [input.campaignId],
+  );
+  const row = campaign.rows[0];
+  if (!row) return null;
+  const next = input.approve ? 'published' : 'rejected';
+  if (row.review_status === next)
+    return { ownerId: row.owner_id, title: row.title, changed: false };
+  if (row.review_status === 'published') {
+    throw new HttpError(409, 'Essa campanha já está no ar. Para tirar do ar, use Suspender.');
+  }
+  await client.query(
+    `UPDATE campaigns SET review_status = $2, review_note = $3, reviewed_by = $4,
+            reviewed_at = now(), updated_at = now()
+     WHERE id = $1`,
+    [input.campaignId, next, input.reason, input.actorId],
+  );
+  await logCampaignEvent(client, {
+    campaignId: input.campaignId,
+    actorId: input.actorId,
+    actorKind: 'staff',
+    action: input.approve ? 'approved' : 'rejected',
+    before: { reviewStatus: row.review_status },
+    after: { reviewStatus: next },
+    note: input.reason,
+  });
+  return { ownerId: row.owner_id, title: row.title, changed: true };
+}
+
+export async function notifyCampaignReview(
+  pool: Pool,
+  env: Env,
+  campaignId: string,
+  result: { ownerId: string; title: string },
+  approved: boolean,
+  reason: string | null,
+): Promise<void> {
+  await notifyPeople(pool, env, [result.ownerId], 'campaign', {
+    title: approved ? 'Campanha aprovada e no ar' : 'Campanha não aprovada',
+    body: approved
+      ? `"${result.title}" já aparece no app com o seu Pix. Confirme as doações com comprovante.`
+      : `A equipe não aprovou "${result.title}"${reason ? `: ${reason}` : '.'} Você pode corrigir e mandar de novo.`,
+    route: `/campanha/${campaignId}`,
+  });
+}
+
+/**
  * Abre uma campanha em nome do responsável (dono do Pix). O app chama com a própria pessoa; o
  * painel da equipe chama com o responsável escolhido e registra a equipe como autora no histórico.
  */
@@ -698,7 +805,8 @@ export async function createCampaign(
   owner: { id: string },
   input: CampaignCreateInput,
   actor: { id: string; kind: CampaignActor },
-): Promise<{ id: string; repeated: boolean }> {
+  reviewStatus: 'pending' | 'published' = 'published',
+): Promise<{ id: string; repeated: boolean; reviewStatus: string }> {
   const title = clean(input.title);
   const purpose = clean(input.purpose);
   const pixKey = clean(input.pixKey);
@@ -710,7 +818,7 @@ export async function createCampaign(
       `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
       [owner.id, input.clientKey],
     );
-    if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true };
+    if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true, reviewStatus };
   }
   const links = await resolveLinks(pool, input);
   try {
@@ -731,8 +839,12 @@ export async function createCampaign(
       }
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO campaigns
-             (owner_id, animal_id, post_id, title, purpose, goal_cents, deadline, pix_key, client_key)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+             (owner_id, animal_id, post_id, title, purpose, goal_cents, deadline, pix_key, client_key,
+              review_status, banner_key, banner_color, reviewed_by, reviewed_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                   CASE WHEN $10 = 'published' THEN $13::uuid END,
+                   CASE WHEN $10 = 'published' THEN now() END)
+           RETURNING id`,
         [
           owner.id,
           links.animalId,
@@ -743,6 +855,10 @@ export async function createCampaign(
           input.deadline,
           pixKey,
           input.clientKey ?? null,
+          reviewStatus,
+          input.bannerKey ?? null,
+          input.bannerColor ?? null,
+          actor.id,
         ],
       );
       const campaignId = inserted.rows[0]?.id;
@@ -754,16 +870,24 @@ export async function createCampaign(
         action: 'created',
         after: { title, goalCents: input.goalCents, deadline: input.deadline },
       });
+      if (reviewStatus === 'pending') {
+        await logCampaignEvent(client, {
+          campaignId,
+          actorId: actor.id,
+          actorKind: actor.kind,
+          action: 'submitted',
+        });
+      }
       return campaignId;
     });
-    return { id, repeated: false };
+    return { id, repeated: false, reviewStatus };
   } catch (error) {
     if (input.clientKey && isUniqueViolation(error)) {
       const replay = await pool.query<{ id: string }>(
         `SELECT id FROM campaigns WHERE owner_id = $1 AND client_key = $2`,
         [owner.id, input.clientKey],
       );
-      if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true };
+      if (replay.rows[0]) return { id: replay.rows[0].id, repeated: true, reviewStatus };
     }
     throw error;
   }
@@ -792,18 +916,20 @@ export function registerCampaignRoutes(
 
   app.post('/campaigns', publishLimit, async (request, reply) => {
     const user = requireUser(request.user);
-    if (!user.verified && !isOperator(user.role)) {
-      throw new HttpError(
-        403,
-        'Só ONGs e protetores verificados abrem campanha. Peça a verificação no seu perfil.',
-      );
-    }
     const input = parse(campaignCreateSchema, request.body);
-    const created = await createCampaign(pool, { id: user.id }, input, {
-      id: user.id,
-      kind: 'owner',
-    });
-    return reply.code(created.repeated ? 200 : 201).send({ id: created.id });
+    if (input.bannerKey) await checkReceipt(user.id, input.bannerKey);
+    // Qualquer conta pede; a equipe aprova no painel antes de ir ao ar (pedido do Hiago em
+    // 12/11/2026). Só a própria equipe abre direto.
+    const created = await createCampaign(
+      pool,
+      { id: user.id },
+      input,
+      { id: user.id, kind: 'owner' },
+      isOperator(user.role) ? 'published' : 'pending',
+    );
+    return reply
+      .code(created.repeated ? 200 : 201)
+      .send({ id: created.id, reviewStatus: created.reviewStatus });
   });
 
   app.patch('/campaigns/:id', writeLimit, async (request) => {
@@ -816,6 +942,9 @@ export function registerCampaignRoutes(
     if (input.pixKey !== undefined) next.pixKey = clean(input.pixKey);
     if (input.goalCents !== undefined) next.goalCents = input.goalCents;
     if (input.deadline !== undefined) next.deadline = input.deadline;
+    if (input.bannerColor !== undefined) next.bannerColor = input.bannerColor;
+    if (input.bannerKey !== undefined) next.bannerKey = input.bannerKey ?? '';
+    if (input.bannerKey) await checkReceipt(user.id, input.bannerKey);
     if (
       (typeof next.title === 'string' && looksLikeAnimalSale(next.title)) ||
       (typeof next.purpose === 'string' && looksLikeAnimalSale(next.purpose))
@@ -836,6 +965,8 @@ export function registerCampaignRoutes(
         pixKey: campaign.pix_key,
         goalCents: campaign.goal_cents,
         deadline: campaign.deadline,
+        bannerColor: campaign.banner_color ?? '',
+        bannerKey: campaign.banner_key ?? '',
       };
       const before: Record<string, string | number> = {};
       const after: Record<string, string | number> = {};
@@ -845,6 +976,8 @@ export function registerCampaignRoutes(
         after[field] = value;
       }
       if (Object.keys(after).length === 0) return { changed: false };
+      // Recusada e corrigida volta para a fila da equipe.
+      const resubmit = campaign.review_status === 'rejected';
       await client.query(
         `UPDATE campaigns SET
            title = COALESCE($2, title),
@@ -852,6 +985,10 @@ export function registerCampaignRoutes(
            pix_key = COALESCE($4, pix_key),
            goal_cents = COALESCE($5, goal_cents),
            deadline = COALESCE($6::date, deadline),
+           banner_color = CASE WHEN $7::boolean THEN $8 ELSE banner_color END,
+           banner_key = CASE WHEN $9::boolean THEN NULLIF($10, '') ELSE banner_key END,
+           review_status = CASE WHEN $11::boolean THEN 'pending' ELSE review_status END,
+           review_note = CASE WHEN $11::boolean THEN NULL ELSE review_note END,
            updated_at = now()
          WHERE id = $1`,
         [
@@ -861,6 +998,11 @@ export function registerCampaignRoutes(
           after.pixKey ?? null,
           after.goalCents ?? null,
           after.deadline ?? null,
+          'bannerColor' in after,
+          after.bannerColor ?? null,
+          'bannerKey' in after,
+          after.bannerKey ?? '',
+          resubmit,
         ],
       );
       await logCampaignEvent(client, {
@@ -872,7 +1014,15 @@ export function registerCampaignRoutes(
         after,
         note: reason,
       });
-      return { changed: true };
+      if (resubmit) {
+        await logCampaignEvent(client, {
+          campaignId: id,
+          actorId: user.id,
+          actorKind: 'owner',
+          action: 'submitted',
+        });
+      }
+      return { changed: true, reviewStatus: resubmit ? 'pending' : campaign.review_status };
     });
   });
 
@@ -890,6 +1040,7 @@ export function registerCampaignRoutes(
         const campaign = await lockCampaign(client, id);
         assertOwner(campaign, user);
         assertNotSuspended(campaign);
+        assertPublished(campaign);
         if (campaign.status !== 'active') {
           throw new HttpError(409, 'A campanha já foi encerrada com a prestação de contas.');
         }
@@ -948,12 +1099,12 @@ export function registerCampaignRoutes(
         if (campaign.owner_id === user.id) {
           throw new HttpError(400, 'Doação que você recebeu entra como lançamento do responsável.');
         }
-        const owner = await client.query<{ verified: boolean; ok: boolean }>(
-          `SELECT verified, (deleted_at IS NULL AND suspended = false) AS ok FROM users WHERE id = $1`,
+        const owner = await client.query<{ ok: boolean }>(
+          `SELECT (deleted_at IS NULL AND suspended = false) AS ok FROM users WHERE id = $1`,
           [campaign.owner_id],
         );
         const phase = campaignPhase(campaign.status, campaign.deadline, belemToday());
-        if (phase !== 'active' || !owner.rows[0]?.verified || !owner.rows[0]?.ok) {
+        if (phase !== 'active' || campaign.review_status !== 'published' || !owner.rows[0]?.ok) {
           throw new HttpError(409, 'Esta campanha não está recebendo doações agora.');
         }
         const pending = await client.query<{ total: number }>(

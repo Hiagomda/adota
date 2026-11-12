@@ -14,6 +14,8 @@ import {
   type CampaignDetail,
   type CampaignEntry,
 } from '../../src/campaign/campaign';
+import { PixQr } from '../../src/campaign/PixQr';
+import { pixCopyPaste } from '../../src/campaign/pix';
 import { ConfirmSheet, EditSheet, EntrySheet, ReasonSheet } from '../../src/campaign/sheets';
 import {
   AppText,
@@ -162,7 +164,22 @@ export default function CampaignScreen() {
       .catch(logBestEffort('campaign:copy-pix'));
   }
 
+  function copyPixCode(code: string) {
+    void Clipboard.setStringAsync(code)
+      .then(() =>
+        toast.show('Pix copia e cola copiado. No banco, escolha "Pix copia e cola".', 'success'),
+      )
+      .catch(logBestEffort('campaign:copy-pix-code'));
+  }
+
   const pending = data?.entries.filter((entry) => entry.status === 'pending') ?? [];
+  const pixCode = data?.pixKey
+    ? pixCopyPaste({
+        key: data.pixKey,
+        name: data.pixReceiver?.name ?? data.owner.name,
+        city: data.pixReceiver?.city ?? 'Belem',
+      })
+    : null;
   const ledger = data?.entries.filter((entry) => entry.status !== 'pending') ?? [];
 
   return (
@@ -227,9 +244,25 @@ export default function CampaignScreen() {
                 </Touchable>
                 <View style={styles.chips}>
                   <InfoChip
-                    label={phaseLabels[data.phase]}
-                    icon={data.phase === 'active' ? 'clock' : 'lock'}
-                    tone={data.phase === 'suspended' ? 'warning' : 'neutral'}
+                    label={
+                      data.reviewStatus === 'pending'
+                        ? 'Esperando aprovação'
+                        : data.reviewStatus === 'rejected'
+                          ? 'Precisa de correção'
+                          : phaseLabels[data.phase]
+                    }
+                    icon={
+                      data.reviewStatus === 'pending' || data.reviewStatus === 'rejected'
+                        ? 'clock'
+                        : data.phase === 'active'
+                          ? 'clock'
+                          : 'lock'
+                    }
+                    tone={
+                      data.phase === 'suspended' || data.reviewStatus === 'rejected'
+                        ? 'warning'
+                        : 'neutral'
+                    }
                   />
                   <InfoChip
                     label={
@@ -241,6 +274,19 @@ export default function CampaignScreen() {
                   />
                 </View>
               </View>
+
+              {data.reviewStatus === 'pending' ? (
+                <Notice
+                  tone="info"
+                  message="Pedido enviado. A equipe do Égua, adota! confere a campanha e avisa você. Até lá ela não aparece para ninguém e o Pix fica escondido."
+                />
+              ) : null}
+              {data.reviewStatus === 'rejected' ? (
+                <Notice
+                  tone="warning"
+                  message={`A equipe não aprovou a campanha${data.reviewNote ? `: ${data.reviewNote}` : '.'} Toque em Editar, corrija e ela volta para a equipe conferir.`}
+                />
+              ) : null}
 
               {data.phase === 'suspended' ? (
                 <Notice
@@ -291,19 +337,48 @@ export default function CampaignScreen() {
                   <View style={styles.cardBody}>
                     <View style={styles.pixRow}>
                       <Icon name="heart" color={colors.onInfoSoft} />
+                      <AppText variant="h3" style={[styles.grow, { color: colors.onInfoSoft }]}>
+                        Doe pelo Pix
+                      </AppText>
+                    </View>
+                    <View style={[styles.pixKey, { borderColor: colors.onInfoSoft }]}>
+                      <AppText variant="caption" style={{ color: colors.onInfoSoft }}>
+                        Chave Pix
+                      </AppText>
                       <AppText
                         variant="bodyStrong"
-                        style={[styles.grow, { color: colors.onInfoSoft }]}
+                        style={{ color: colors.onInfoSoft }}
                         selectable
+                        accessibilityLabel={`Chave Pix: ${data.pixKey}`}
                       >
-                        Pix: {data.pixKey}
+                        {data.pixKey}
                       </AppText>
-                      <IconButton
-                        icon="copy"
-                        accessibilityLabel="Copiar a chave Pix"
-                        onPress={() => copyPix(data.pixKey ?? '')}
-                      />
                     </View>
+                    <Button
+                      title="Copiar chave Pix"
+                      icon="copy"
+                      fullWidth
+                      onPress={() => copyPix(data.pixKey ?? '')}
+                    />
+                    {pixCode ? (
+                      <View style={styles.qr}>
+                        <PixQr payload={pixCode} />
+                        <AppText
+                          variant="bodySmall"
+                          style={{ color: colors.onInfoSoft, textAlign: 'center' }}
+                        >
+                          No app do banco, escolha pagar com Pix e aponte a câmera. Você escolhe o
+                          valor lá.
+                        </AppText>
+                        <Button
+                          title="Copiar Pix copia e cola"
+                          icon="clipboard"
+                          variant="outline"
+                          fullWidth
+                          onPress={() => copyPixCode(pixCode)}
+                        />
+                      </View>
+                    ) : null}
                     <AppText variant="bodySmall" style={{ color: colors.onInfoSoft }}>
                       {data.paymentNotice}
                     </AppText>
@@ -722,6 +797,14 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
   stat: { flexGrow: 1, minWidth: 88, gap: 2 },
   pixRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pixKey: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 2,
+  },
+  qr: { gap: spacing.md, alignItems: 'stretch', paddingTop: spacing.sm },
   grow: { flex: 1, gap: 2 },
   actions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   entry: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, alignItems: 'flex-start' },

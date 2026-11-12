@@ -21,9 +21,13 @@ export function CampaignTile({
   const { colors } = useTheme();
   const progress = goalProgress(campaign.raisedCents, campaign.goalCents);
   const when =
-    campaign.phase === 'active'
-      ? deadlineLabel(campaign.deadline, belemToday())
-      : phaseLabels[campaign.phase];
+    campaign.reviewStatus === 'pending'
+      ? 'esperando a equipe aprovar'
+      : campaign.reviewStatus === 'rejected'
+        ? 'a equipe pediu correção'
+        : campaign.phase === 'active'
+          ? deadlineLabel(campaign.deadline, belemToday())
+          : phaseLabels[campaign.phase];
   return (
     <Touchable
       accessibilityRole="button"

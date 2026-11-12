@@ -7,6 +7,7 @@ import { createCampaign } from '../campaigns.js';
 import type { Env } from '../config.js';
 import { createCommunityEvent } from '../events.js';
 import { HttpError } from '../http.js';
+import { createStorage, publicMediaUrl, storeStaffImage, verifyUploadedImages } from '../media.js';
 import { notifyPeople } from '../notify.js';
 import { assertPermission } from './policy.js';
 import { clientIp, loadSession, userAgent, writeAudit } from './routes.js';
@@ -21,6 +22,9 @@ const ownerSchema = z.object({
     })
     .optional(),
 });
+
+const MAX_STAFF_UPLOAD = 3 * 1024 * 1024;
+const uploadSchema = z.object({ data: z.string().min(16).max(4_500_000) }).strict();
 
 function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.output<Schema> {
   const result = schema.safeParse(value);
@@ -44,6 +48,20 @@ export function registerStaffCreateRoutes(
   deps: { env: Env; pool: Pool },
 ): void {
   const { env, pool } = deps;
+  const storage = createStorage(env);
+
+  // Foto do banner de campanha escolhida no painel. O navegador já reduz a foto antes de mandar.
+  app.post('/admin/v1/uploads', { bodyLimit: 4 * 1024 * 1024 }, async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'campaigns.review');
+    const body = parse(uploadSchema, request.body);
+    const bytes = Buffer.from(body.data, 'base64');
+    if (bytes.length === 0 || bytes.length > MAX_STAFF_UPLOAD) {
+      throw new HttpError(400, 'A foto precisa ter até 3 MB.');
+    }
+    const key = await storeStaffImage(env, storage, session.user_id, bytes);
+    return { key, url: publicMediaUrl(env, key, 'full') };
+  });
 
   app.post('/admin/v1/events', async (request, reply) => {
     const session = await loadSession(pool, request);
@@ -80,6 +98,9 @@ export function registerStaffCreateRoutes(
     const { ownerHandle, ...campaignBody } = body;
     const owner = parse(ownerSchema, { ownerHandle }).ownerHandle;
     const input = parse(campaignCreateSchemaAt(), campaignBody);
+    if (input.bannerKey) {
+      await verifyUploadedImages(env, storage, session.user_id, [input.bannerKey]);
+    }
 
     let ownerId = session.user_id;
     if (owner) {

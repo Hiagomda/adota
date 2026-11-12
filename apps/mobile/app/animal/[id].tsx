@@ -38,7 +38,7 @@ import {
   healthKindLabel,
   type Passport,
 } from '../../src/passport/passport';
-import { isTeamRole, useSession } from '../../src/session';
+import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
 
 const timelineIcons: Record<Passport['timeline'][number]['kind'], IconName> = {
@@ -83,9 +83,8 @@ export default function PassportScreen() {
     queryFn: () => loadMe(token ?? ''),
     enabled: Boolean(token),
   });
-  const canOpenCampaign = Boolean(
-    data?.permissions.caretaker && me.data && (me.data.verified || isTeamRole(me.data.role)),
-  );
+  // Quem cuida do animal pede a campanha; a equipe aprova antes de ir ao ar.
+  const canOpenCampaign = Boolean(data?.permissions.caretaker && me.data);
 
   async function refresh() {
     await client.invalidateQueries({ queryKey: ['passport'] });

@@ -78,10 +78,14 @@ describe('transparent campaigns', () => {
   const post = (url: string, email: string, payload: Record<string, unknown> = {}) =>
     app.inject({ method: 'POST', url, headers: auth(email), payload });
 
+  /** Campanha pedida pelo app e já aprovada pela equipe (a aprovação tem teste próprio). */
   async function newCampaign(payload: Record<string, unknown> = {}): Promise<string> {
     const created = await create(ONG, payload);
     expect(created.statusCode).toBe(201);
-    return created.json().id as string;
+    expect(created.json().reviewStatus).toBe('pending');
+    const id = created.json().id as string;
+    await pool.query(`UPDATE campaigns SET review_status = 'published' WHERE id = $1`, [id]);
+    return id;
   }
 
   beforeAll(async () => {
@@ -108,9 +112,32 @@ describe('transparent campaigns', () => {
     await pool.end();
   });
 
-  it('only verified profiles open a campaign, and the Pix shows while it is open', async () => {
-    const refused = await create(OTHER);
-    expect(refused.statusCode).toBe(403);
+  it('anyone asks for a campaign, but it stays hidden and without Pix until the team approves', async () => {
+    const asked = await create(OTHER, { purpose: 'Ração' });
+    expect(asked.statusCode).toBe(201);
+    expect(asked.json().reviewStatus).toBe('pending');
+    const askedId = asked.json().id as string;
+    expect((await detail(askedId)).statusCode).toBe(404);
+    expect((await detail(askedId, DONOR)).statusCode).toBe(404);
+    const mine = await detail(askedId, OTHER);
+    expect(mine.statusCode).toBe(200);
+    expect(mine.json()).toMatchObject({
+      reviewStatus: 'pending',
+      pixKey: null,
+      permissions: { canAddEntries: false, canEdit: true },
+    });
+    expect((await pledge(askedId, DONOR)).statusCode).toBe(409);
+    const hiddenList = await app.inject({ method: 'GET', url: '/campaigns' });
+    expect(hiddenList.json().campaigns).toEqual([]);
+
+    // A equipe abre direto, mesmo sem selo de verificado, e o Pix aparece.
+    const team = await create(ADMIN, { bannerColor: 'green' });
+    expect(team.json().reviewStatus).toBe('published');
+    const teamView = await detail(team.json().id as string);
+    expect(teamView.json()).toMatchObject({ pixKey: 'pix@ong.org', bannerColor: 'green' });
+    expect(teamView.json().pixReceiver.name).toBe('equipe');
+    // Tira da lista pública para o resto do teste olhar só a campanha da ONG.
+    await pool.query(`UPDATE campaigns SET status = 'suspended' WHERE id = $1`, [team.json().id]);
 
     const id = await newCampaign();
     const open = await detail(id);
@@ -122,7 +149,9 @@ describe('transparent campaigns', () => {
       totals: { raisedCents: 0, spentCents: 0, pendingCount: null },
       permissions: { canPledge: false, isOwner: false },
     });
-    expect(open.json().history[0].summary).toBe('Campanha criada');
+    expect(open.json().history.map((item: { summary: string }) => item.summary)).toContain(
+      'Campanha criada',
+    );
 
     const list = await app.inject({ method: 'GET', url: '/campaigns' });
     expect(list.json().campaigns.map((item: { id: string }) => item.id)).toEqual([id]);
