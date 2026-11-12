@@ -2,8 +2,6 @@
   "version": "0.1.0",
   "androidVersionCode": 43,
   "notes": [
-    "Se o seu aplicativo é de antes de 10/11, desinstale e instale este (assinatura nova). Sua conta e seus posts continuam salvos.",
     "Novo e-mail de contato: contato@eguaadota.com.br, no Suporte e nos Termos."
-  ],
-  "reinstall": true
+  ]
 }
