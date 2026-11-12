@@ -241,7 +241,7 @@ export async function loadCentral(
       faces.push({
         name: firstName(person.name),
         handle: person.handle,
-        avatarUrl: person.avatar_url,
+        avatarUrl: person.avatar_url ? publicMediaUrl(env, person.avatar_url, 'thumb') : null,
       });
     }
     return {
@@ -347,7 +347,7 @@ interface OfferRow {
  * Ofertas de um resgate. Quem publicou e a equipe veem todas, com o recado; quem ofereceu vê a
  * própria; os outros veem só o primeiro nome e o tipo, porque o recado pode ter dado pessoal.
  */
-export async function listOffers(pool: Pool, postId: string, viewer: SessionUser | null) {
+export async function listOffers(pool: Pool, env: Env, postId: string, viewer: SessionUser | null) {
   const post = await rescueForOffers(pool, postId);
   const manager = viewer !== null && (viewer.id === post.author_id || isOperator(viewer.role));
   const found = await pool.query<OfferRow>(
@@ -379,7 +379,7 @@ export async function listOffers(pool: Pool, postId: string, viewer: SessionUser
         person: {
           name: full ? row.name : firstName(row.name),
           handle: row.handle,
-          avatarUrl: row.avatar_url,
+          avatarUrl: row.avatar_url ? publicMediaUrl(env, row.avatar_url, 'thumb') : null,
         },
       };
     }),
@@ -565,7 +565,7 @@ export function registerCentralRoutes(
 
   app.get('/posts/:id/help-offers', async (request) => {
     const { id } = parseParams(idParams, request.params, 'Esse resgate não existe.');
-    return listOffers(pool, id, request.user);
+    return listOffers(pool, env, id, request.user);
   });
 
   app.post('/posts/:id/help-offers', publishLimit, async (request, reply) => {

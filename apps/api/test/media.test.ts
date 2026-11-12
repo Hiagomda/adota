@@ -55,4 +55,18 @@ describe('public media url', () => {
       'https://cdn.example/a.jpg',
     );
   });
+
+  it('signs again a photo saved with the old imgproxy address', () => {
+    const source = Buffer.from('s3://patinha-media/uploads/u1/avatar.jpg').toString('base64url');
+    const old = `http://imgproxy-abc.1.2.3.4.sslip.io/oldsig/rs:fill:480:600/${source}`;
+    expect(publicMediaUrl(env, old, 'thumb')).toBe(
+      publicMediaUrl(env, 'uploads/u1/avatar.jpg', 'thumb'),
+    );
+  });
+
+  it('keeps an old address that points at another bucket', () => {
+    const source = Buffer.from('s3://outro/uploads/a.jpg').toString('base64url');
+    const old = `http://imgproxy.example/sig/rs:fill:480:600/${source}`;
+    expect(publicMediaUrl(env, old, 'thumb')).toBe(old);
+  });
 });
