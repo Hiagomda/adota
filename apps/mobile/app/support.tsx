@@ -3,11 +3,12 @@ import { useRouter } from 'expo-router';
 import { Linking, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Header, useToast } from '../src/components/ui';
+import { CONTACT_EMAIL } from '../src/contact';
 import { reportError } from '../src/crash/reporter';
 import { VersionMark } from '../src/diagnostics/VersionMark';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 
-const SUPPORT_EMAIL = 'contato@eguaadota.com.br';
+const SUPPORT_EMAIL = CONTACT_EMAIL;
 
 export default function SupportScreen() {
   const { colors } = useTheme();
@@ -32,8 +33,8 @@ export default function SupportScreen() {
         <Header title="Suporte" large onBack={() => router.back()} />
         <View style={styles.body}>
           <AppText selectable style={styles.center}>
-            Escreva para {SUPPORT_EMAIL}. A gente responde sobre conta, denúncia e verificação de
-            ONG.
+            Escreva para {SUPPORT_EMAIL}. A gente responde sobre conta, denúncia, verificação de ONG
+            e parcerias.
           </AppText>
           <Button title={SUPPORT_EMAIL} icon="mail" size="lg" onPress={writeEmail} />
           <Button

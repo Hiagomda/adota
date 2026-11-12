@@ -54,9 +54,14 @@ export function buildNumber(value: AppVersion = appVersion): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** "Alpha de teste · 0.1.0 (build 3)" */
+/** O que a pessoa vê: "versão 0.1.0". */
 export function formatAppVersion(value: AppVersion = appVersion): string {
-  return `Alpha de teste · ${value.version} (build ${value.build})`;
+  return `versão ${value.version}`;
+}
+
+/** Para diagnóstico e relato de erro: "0.1.0 (build 3)". */
+export function formatAppVersionDetailed(value: AppVersion = appVersion): string {
+  return `${value.version} (build ${value.build})`;
 }
 
 /** Release name shared with the crash reporter, e.g. "app.egua.adota@1.0.0+3". */
