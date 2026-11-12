@@ -122,9 +122,25 @@ async function verifyOneUpload(env: Env, storage: S3Client, url: string): Promis
   }
 }
 
+// Fotos salvas antes da troca de domínio guardaram o endereço inteiro do imgproxy antigo
+// (http://imgproxy-…sslip.io/…/<s3://bucket/chave em base64url>). O app web do iPhone é HTTPS e
+// o Safari barra esse endereço. Quando dá para tirar a chave do fim do endereço, ela é assinada de
+// novo com o imgproxy atual.
+function storedKeyFromImgproxyUrl(env: Env, stored: string): string | null {
+  const last = stored.split(/[?#]/)[0]?.split('/').pop() ?? '';
+  if (!/^[A-Za-z0-9_-]{8,}$/.test(last)) return null;
+  const decoded = Buffer.from(last, 'base64url').toString();
+  const prefix = `s3://${env.MINIO_BUCKET}/`;
+  if (!decoded.startsWith(prefix)) return null;
+  const key = decoded.slice(prefix.length);
+  return /^[\w./-]+$/.test(key) && !key.includes('..') ? key : null;
+}
+
 export function publicMediaUrl(env: Env, stored: string, variant: 'full' | 'thumb'): string {
   if (stored.startsWith('http://') || stored.startsWith('https://')) {
-    return stored;
+    const key = storedKeyFromImgproxyUrl(env, stored);
+    if (!key) return stored;
+    stored = key;
   }
   // Same pixel box as before. WebP at quality 80 is what imgproxy encodes; a local
   // re-encode of a live thumb went from 59 557 B JPEG to 48 156 B WebP.

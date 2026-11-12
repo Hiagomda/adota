@@ -302,7 +302,7 @@ export async function listCampaigns(
           name: row.owner_name,
           handle: row.owner_handle,
           verified: row.owner_verified,
-          avatarUrl: row.owner_avatar,
+          avatarUrl: row.owner_avatar ? publicMediaUrl(env, row.owner_avatar, 'thumb') : null,
         },
         createdAt: row.created_at.toISOString(),
       };
@@ -516,7 +516,7 @@ export async function loadCampaign(pool: Pool, env: Env, id: string, viewer: Ses
       name: campaign.owner_name,
       handle: campaign.owner_handle,
       verified: campaign.owner_verified,
-      avatarUrl: campaign.owner_avatar,
+      avatarUrl: campaign.owner_avatar ? publicMediaUrl(env, campaign.owner_avatar, 'thumb') : null,
     },
     animal: animal?.rows[0]
       ? { id: animal.rows[0].id, name: animal.rows[0].name, species: animal.rows[0].species }
