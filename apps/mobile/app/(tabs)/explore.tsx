@@ -4,7 +4,7 @@ import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { loadFeed, messageFrom } from '../../src/api';
+import { api, loadFeed, messageFrom } from '../../src/api';
 import {
   AppText,
   Button,
@@ -15,6 +15,8 @@ import {
   StatusPill,
   Touchable,
 } from '../../src/components/ui';
+import type { CommunityEvent, EventList } from '../../src/events/agenda';
+import { EventMapCard } from '../../src/events/EventMapCard';
 import { loadFeedPointsIn } from '../../src/feedPoints/api';
 import { FeedPointDetails } from '../../src/feedPoints/FeedPointDetails';
 import type { FeedPoint } from '../../src/feedPoints/feedPoints';
@@ -24,6 +26,7 @@ import { useMapAim } from '../../src/map/focusRequest';
 import { mergePaws } from '../../src/map/knownPaws';
 import { MapCanvas } from '../../src/map/MapCanvas';
 import { belemBounds, boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
+import { liveEvent } from '../../src/home/highlights';
 import { Mascot } from '../../src/mascot';
 import { countPartnerTap, loadPartnersIn } from '../../src/partners/api';
 import { PartnerDetails } from '../../src/partners/PartnerDetails';
@@ -68,6 +71,8 @@ export default function ExploreScreen() {
   const [partnerSelection, setPartnerSelection] = useState<Partner | null>(null);
   const [showFeedPoints, setShowFeedPoints] = useState(true);
   const [feedPointSelection, setFeedPointSelection] = useState<FeedPoint | null>(null);
+  const [showEvents, setShowEvents] = useState(true);
+  const [eventSelection, setEventSelection] = useState<CommunityEvent | null>(null);
   const closedAim = useRef<number | null>(null);
   const ignoreSelectUntil = useRef(0);
   const lastPin = useRef({ id: '', at: 0 });
@@ -105,6 +110,19 @@ export default function ExploreScreen() {
     () => (showFeedPoints ? (feedPointsQuery.data?.points ?? []) : []),
     [feedPointsQuery.data, showFeedPoints],
   );
+  // Eventos são poucos na cidade toda: uma lista só, sem depender da área do mapa.
+  const eventsQuery = useQuery({
+    queryKey: ['events', 'map', token],
+    queryFn: () => api<EventList>('/events', { token }),
+    enabled: showEvents,
+    staleTime: 5 * 60 * 1000,
+  });
+  const events = useMemo(() => {
+    if (!showEvents) return [];
+    // A hora da resposta basta: a lista recarrega a cada 5 minutos.
+    const at = eventsQuery.dataUpdatedAt;
+    return (eventsQuery.data?.events ?? []).filter((event) => liveEvent(event, at));
+  }, [eventsQuery.data, eventsQuery.dataUpdatedAt, showEvents]);
   // O cartão aberto acompanha o que o mapa recarregou (depois de "abasteci", por exemplo).
   const shownFeedPoint = feedPointSelection
     ? (feedPoints.find((point) => point.id === feedPointSelection.id) ?? feedPointSelection)
@@ -149,6 +167,7 @@ export default function ExploreScreen() {
     setSelection(null);
     setPartnerSelection(null);
     setFeedPointSelection(null);
+    setEventSelection(null);
   }, [aim]);
   const selectPartner = useCallback(
     (partner: Partner) => {
@@ -159,6 +178,7 @@ export default function ExploreScreen() {
       }
       countPartnerTap(partner.id, 'view', token);
       setFeedPointSelection(null);
+      setEventSelection(null);
       setPartnerSelection(partner);
     },
     [partnerSelection, token],
@@ -166,6 +186,7 @@ export default function ExploreScreen() {
   const selectFeedPoint = useCallback((point: FeedPoint) => {
     setSelection(null);
     setPartnerSelection(null);
+    setEventSelection(null);
     setFeedPointSelection((current) => (current?.id === point.id ? null : point));
   }, []);
   const selectPost = useCallback((post: { id: string }) => {
@@ -175,9 +196,20 @@ export default function ExploreScreen() {
     lastPin.current = { id: post.id, at: now };
     setPartnerSelection(null);
     setFeedPointSelection(null);
+    setEventSelection(null);
     setSelection((current) => (current === post.id ? null : post.id));
   }, []);
-  const cardOpen = selected !== null || partnerSelection !== null || shownFeedPoint !== null;
+  const selectEvent = useCallback((event: CommunityEvent) => {
+    setSelection(null);
+    setPartnerSelection(null);
+    setFeedPointSelection(null);
+    setEventSelection((current) => (current?.id === event.id ? null : event));
+  }, []);
+  const cardOpen =
+    selected !== null ||
+    partnerSelection !== null ||
+    shownFeedPoint !== null ||
+    eventSelection !== null;
   const controlsBottom =
     insets.bottom + (cardOpen ? spacing.giant * 4 : spacing.giant + spacing.lg);
 
@@ -195,6 +227,8 @@ export default function ExploreScreen() {
         onSelectPartner={selectPartner}
         feedPoints={feedPoints}
         onSelectFeedPoint={selectFeedPoint}
+        events={events}
+        onSelectEvent={selectEvent}
         selectedId={selection}
         tracking={focused}
         controlsBottom={controlsBottom}
@@ -332,6 +366,24 @@ export default function ExploreScreen() {
           </Card>
         </View>
       ) : null}
+      {eventSelection ? (
+        <View
+          style={[styles.cardWrap, { bottom: insets.bottom + CARD_BOTTOM_OFFSET }]}
+          pointerEvents="box-none"
+        >
+          <Card padding="md" elevation="md">
+            <View style={styles.cardBody}>
+              <View style={styles.cardHead}>
+                <IconButton icon="x" accessibilityLabel="Fechar" onPress={closeCard} />
+              </View>
+              <EventMapCard
+                event={eventSelection}
+                onOpen={(event) => router.push(`/evento/${event.id}`)}
+              />
+            </View>
+          </Card>
+        </View>
+      ) : null}
       {!cardOpen ? (
         <ScrollView
           horizontal
@@ -340,6 +392,12 @@ export default function ExploreScreen() {
           style={[styles.layerRow, { bottom: controlsBottom }]}
           contentContainerStyle={styles.layerChips}
         >
+          <Chip
+            label="Eventos"
+            icon="calendar"
+            selected={showEvents}
+            onPress={() => setShowEvents((value) => !value)}
+          />
           <Chip
             label="Ração e água"
             icon="droplet"

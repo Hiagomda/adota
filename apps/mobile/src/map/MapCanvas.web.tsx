@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+import { categoryLabels, type CommunityEvent } from '../events/agenda';
 import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
 import type { Post } from '../types';
 import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
-import { feedPointPinUri, partnerPinUri, pawUri } from './paw';
+import { eventPinUri, feedPointPinUri, partnerPinUri, pawUri } from './paw';
 
 function pinButton(label: string, uri: string, size: number): HTMLButtonElement {
   const element = document.createElement('button');
@@ -37,6 +38,8 @@ export function MapCanvas({
   onSelectPartner,
   feedPoints = [],
   onSelectFeedPoint,
+  events = [],
+  onSelectEvent,
   selectedId,
   tracking,
   onSelect,
@@ -49,6 +52,8 @@ export function MapCanvas({
   onSelectPartner?: (partner: Partner) => void;
   feedPoints?: FeedPoint[];
   onSelectFeedPoint?: (point: FeedPoint) => void;
+  events?: CommunityEvent[];
+  onSelectEvent?: (event: CommunityEvent) => void;
   selectedId: string | null;
   tracking: boolean;
   /** Native map uses this to clear the tab bar. The web preview has no floating locate button. */
@@ -66,6 +71,8 @@ export function MapCanvas({
   const onSelectPartnerRef = useRef(onSelectPartner);
   const feedPointsRef = useRef(feedPoints);
   const onSelectFeedPointRef = useRef(onSelectFeedPoint);
+  const eventsRef = useRef(events);
+  const onSelectEventRef = useRef(onSelectEvent);
   const selectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const onDismissRef = useRef(onDismiss);
@@ -78,6 +85,8 @@ export function MapCanvas({
     onSelectPartnerRef.current = onSelectPartner;
     feedPointsRef.current = feedPoints;
     onSelectFeedPointRef.current = onSelectFeedPoint;
+    eventsRef.current = events;
+    onSelectEventRef.current = onSelectEvent;
     selectedRef.current = selectedId;
     onSelectRef.current = onSelect;
     onDismissRef.current = onDismiss;
@@ -119,7 +128,7 @@ export function MapCanvas({
     const draw = () => {
       if (!map.isStyleLoaded()) return;
       markers.current.forEach((marker) => marker.remove());
-      // Pontos solidários e parceiros primeiro, para as patas ficarem por cima.
+      // Pontos solidários, parceiros e eventos primeiro, para as patas ficarem por cima.
       const feedMarkers = feedPointsRef.current.map((point) => {
         const element = pinButton(point.kindLabel, feedPointPinUri(point.kind), 44);
         element.onclick = (event) => {
@@ -140,6 +149,20 @@ export function MapCanvas({
           .setLngLat([partner.location.longitude, partner.location.latitude])
           .addTo(map);
       });
+      const eventMarkers = eventsRef.current.map((item) => {
+        const element = pinButton(
+          `${categoryLabels[item.category]}: ${item.title}`,
+          eventPinUri(item.category),
+          52,
+        );
+        element.onclick = (event) => {
+          event.stopPropagation();
+          onSelectEventRef.current?.(item);
+        };
+        return new maplibregl.Marker({ element, anchor: 'bottom' })
+          .setLngLat([item.location.longitude, item.location.latitude])
+          .addTo(map);
+      });
       const postMarkers = postsRef.current.map((post) => {
         const selected = post.id === selectedRef.current;
         const element = pinButton(post.approxLabel, pawUri(post.urgency), selected ? 72 : 64);
@@ -151,7 +174,7 @@ export function MapCanvas({
           .setLngLat([post.location.longitude, post.location.latitude])
           .addTo(map);
       });
-      markers.current = [...feedMarkers, ...partnerMarkers, ...postMarkers];
+      markers.current = [...feedMarkers, ...partnerMarkers, ...eventMarkers, ...postMarkers];
     };
 
     let started = false;
@@ -185,7 +208,7 @@ export function MapCanvas({
     )
     .join('|')}:${partners.map((partner) => `${partner.id}:${partner.kind}`).join('|')}:${feedPoints
     .map((point) => `${point.id}:${point.kind}`)
-    .join('|')}`;
+    .join('|')}:${events.map((item) => `${item.id}:${item.category}`).join('|')}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
