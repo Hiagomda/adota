@@ -2,6 +2,7 @@ import {
   Camera,
   CircleLayer,
   Images,
+  FillLayer,
   LineLayer,
   Logger,
   MapView,
@@ -49,8 +50,8 @@ import {
   type BoundsOrigin,
   type MapBounds,
 } from './geo';
-import { mapColors } from './layerColors';
-import { insideServiceArea, serviceCamera, serviceOutline } from './serviceArea';
+import { mapColors, serviceLimit } from './layerColors';
+import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 
 const pawImages = {
   pawHigh: require('../../assets/paw-high.png') as number,
@@ -88,9 +89,14 @@ const NEUTRAL_STOP = { animationDuration: 0, animationMode: 'moveTo' } as const;
 // nativo, que redesenha as patas no meio do arrasto.
 const outlineStyle: ComponentProps<typeof LineLayer>['style'] = {
   lineColor: mapColors.areaOutline,
-  lineWidth: 3,
+  lineWidth: serviceLimit.lineWidth,
+  lineOpacity: serviceLimit.lineOpacity,
   lineJoin: 'round',
   lineCap: 'round',
+};
+const maskStyle: ComponentProps<typeof FillLayer>['style'] = {
+  fillColor: mapColors.outsideArea,
+  fillOpacity: serviceLimit.maskOpacity,
 };
 // Área de toque sobre a cabeça da gota, que fica acima do ponto (scripts/paw-pins.mjs).
 const hitStyle: ComponentProps<typeof CircleLayer>['style'] = {
@@ -652,6 +658,9 @@ export function MapCanvas({
         onRegionDidChange={onRegionDidChange}
       >
         <StableCamera cameraRef={camera} />
+        <ShapeSource id="service-mask" shape={serviceMask}>
+          <FillLayer id="service-mask-fill" style={maskStyle} />
+        </ShapeSource>
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer id="service-outline-line" style={outlineStyle} />
         </ShapeSource>

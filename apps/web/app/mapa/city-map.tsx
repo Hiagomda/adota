@@ -68,14 +68,15 @@ export function CityMap({ posts }: { posts: MapPost[] }) {
               id: 'service-mask',
               type: 'fill',
               source: 'service-mask',
-              paint: { 'fill-color': '#E23B3B', 'fill-opacity': 0.45 },
+              paint: { 'fill-color': '#1B2B2B', 'fill-opacity': 0.22 },
             });
             map.addSource('service-outline', { type: 'geojson', data: serviceOutline });
             map.addLayer({
               id: 'service-outline',
               type: 'line',
               source: 'service-outline',
-              paint: { 'line-color': '#1F8F4E', 'line-width': 3 },
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: { 'line-color': '#1F8F4E', 'line-width': 2, 'line-opacity': 0.85 },
             });
           };
           map.on('load', paintLimit);
