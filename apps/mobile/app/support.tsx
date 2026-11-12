@@ -7,7 +7,7 @@ import { reportError } from '../src/crash/reporter';
 import { VersionMark } from '../src/diagnostics/VersionMark';
 import { screenColumn, spacing, useTheme } from '../src/theme';
 
-const SUPPORT_EMAIL = 'contato@eguaadota.app';
+const SUPPORT_EMAIL = 'contato@eguaadota.com.br';
 
 export default function SupportScreen() {
   const { colors } = useTheme();
