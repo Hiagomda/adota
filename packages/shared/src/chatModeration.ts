@@ -85,11 +85,21 @@ interface Rule {
 
 const animal =
   '(?:o|a|um|uma|esse|essa|este|esta|meu|minha|filhot\\w*|cachorr\\w*|gat\\w*|cao|caes|bicho|pet)';
+/** O bicho em si, com ou sem artigo antes: "vendo o filhote", "vendo filhote". */
+const animalNoun =
+  '(?:(?:o|a|os|as|um|uma|esse|essa|este|esta|meu|minha|meus|minhas)\\s+)?(?:filhot\\w*|cachorr\\w*|gat\\w*|cao|caes|bicho\\w*|pet|pets|animal|animais)';
+/** "Estou vendo", "tô vendo": é enxergar, não vender. */
+const seeing = '(?<!\\b(?:estou|to|tou|ta|esta|estamos|estao|tava|estava|tamo|fiquei|ando)\\s)';
 
 /** Procuradas no texto de palavras (`wordText`). */
 const wordRules: Rule[] = [
-  // Venda: barrada. "Vendo" sozinho é "estou vendo", então só conta com o animal logo depois.
-  { flag: 'sale', pattern: new RegExp(`\\bvend(?:o|e|emos|endo)\\s+${animal}\\b`), block: true },
+  // Venda: barrada. "Vendo a foto" é ver: só conta com o bicho logo depois, e não depois de "estou"/"tô".
+  {
+    flag: 'sale',
+    pattern: new RegExp(`${seeing}\\bvend(?:o|e|emos)\\s+${animalNoun}\\b`),
+    block: true,
+  },
+  { flag: 'sale', pattern: new RegExp(`\\bvendendo\\s+${animal}\\b`), block: true },
   {
     flag: 'sale',
     pattern: new RegExp(`\\bvender\\s+(?:ele|ela|eles|elas|${animal})\\b`),
@@ -181,7 +191,7 @@ const wordRules: Rule[] = [
   {
     flag: 'harassment',
     pattern:
-      /\b(?:nudes?|nud|pelad[oa]|gostos[oa]|sexo|transar|safad[oa]|manda\s+(?:uma\s+)?foto\s+(?:sua|tua)|namorar\s+comigo|ficar\s+comigo|sair\s+comigo)\b/,
+      /\b(?:nudes?|nud|pelad[oa]|(?:voce|vc|tu)\s+(?:e|eh|ta|esta)\s+gostos[oa]|gostos[oa]\s+(?:voce|vc)|fazer\s+sexo|sexo\s+(?:comigo|com\s+voce|com\s+vc)|transar|safad[oa]|manda\s+(?:uma\s+)?foto\s+(?:sua|tua)|namorar\s+comigo|ficar\s+comigo|sair\s+comigo)\b/,
   },
 ];
 

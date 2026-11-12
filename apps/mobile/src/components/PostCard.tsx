@@ -3,14 +3,13 @@ import { memo, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
 import Animated, { BounceIn, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
-import { siteUrl } from '../api';
+import { sharePost } from '../post/sharePost';
 import { animalHeadline, neighborhoodOf } from '../animalLabels';
 import { reportError } from '../crash/reporter';
 import { distanceLabel, formatWhen } from '../format';
@@ -78,10 +77,8 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
   const ring = post.status === 'open' && post.urgency === 'high' ? 'story' : undefined;
 
   function share() {
-    Share.share({
-      message: `${animalHeadline(post.animal)} em ${post.approxLabel} no Égua, adota! ${siteUrl}/p/${post.id}`,
-      url: `${siteUrl}/p/${post.id}`,
-    }).catch((error: unknown) => {
+    // Mesmo compartilhamento do detalhe: o link vai para a página de download com ?post=.
+    sharePost(post).catch((error: unknown) => {
       reportError(error, { source: 'handled', where: 'feed:share' });
     });
   }

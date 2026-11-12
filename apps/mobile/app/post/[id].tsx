@@ -103,6 +103,8 @@ export default function PostScreen() {
   const { colors, dark, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // Aberto direto pelo link (iPhone, recarregar a página) não tem tela anterior: volta ao Início.
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const token = useSession((state) => state.token);
   const here = useViewerLocation();
   const user = useSession((state) => state.user);
@@ -260,7 +262,7 @@ export default function PostScreen() {
   if (post.isError) {
     return (
       <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
-        <Header title="Resgate" onBack={() => router.back()} />
+        <Header title="Resgate" onBack={() => goBack()} />
         <ErrorState
           title="Não encontrei este resgate"
           body={messageFrom(post.error)}
@@ -286,7 +288,7 @@ export default function PostScreen() {
             icon="arrow-left"
             variant="glass"
             accessibilityLabel="Voltar"
-            onPress={() => router.back()}
+            onPress={() => goBack()}
           />
         </View>
       </View>
@@ -1237,7 +1239,7 @@ export default function PostScreen() {
                 variant="ghost"
                 onPress={() => {
                   void act(`/users/${item.author.id}/block`).then((ok) => {
-                    if (ok) router.back();
+                    if (ok) goBack();
                   });
                 }}
               />
@@ -1271,7 +1273,7 @@ export default function PostScreen() {
           icon="arrow-left"
           variant={solidBar ? 'ghost' : 'glass'}
           accessibilityLabel="Voltar"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
         />
         {solidBar ? (
           <AppText variant="h3" numberOfLines={1} style={styles.topTitle}>
@@ -1396,7 +1398,7 @@ export default function PostScreen() {
         onConfirm={() => {
           setDeleteOpen(false);
           void act(`/posts/${item.id}`, 'DELETE').then((ok) => {
-            if (ok) router.back();
+            if (ok) goBack();
           });
         }}
       />
