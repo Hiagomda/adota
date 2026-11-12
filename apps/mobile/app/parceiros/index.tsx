@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, messageFrom } from '../../src/api';
+import { CONTACT_EMAIL } from '../../src/contact';
 import {
   AppText,
   Badge,
@@ -219,6 +220,9 @@ export default function PartnersScreen() {
                 permitida.
               </AppText>
             </View>
+            <AppText variant="bodySmall" color="textSecondary" selectable style={styles.contact}>
+              Outra ideia de parceria ou alguma dúvida? Escreva para {CONTACT_EMAIL}.
+            </AppText>
 
             {token ? (
               mine.isLoading ? (
@@ -412,6 +416,7 @@ function Stat({
 const STEP_DOT = 32;
 
 const styles = StyleSheet.create({
+  contact: { textAlign: 'center' },
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,

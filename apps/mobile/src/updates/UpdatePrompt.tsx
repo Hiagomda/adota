@@ -111,7 +111,7 @@ export function UpdatePrompt() {
           ? needsPermission
             ? 'O Android precisa da sua permissão para instalar a atualização por aqui.'
             : 'Não consegui concluir a atualização. Tente de novo daqui a pouco.'
-          : `Alpha de teste · versão ${offer?.version ?? ''}`}
+          : `Versão ${offer?.version ?? ''}`}
       </AppText>
       {offer && offer.notes.length > 0 ? (
         <ScrollView style={styles.notesScroll} contentContainerStyle={styles.notes}>

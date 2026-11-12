@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../src/api';
+import { CONTACT_EMAIL } from '../src/contact';
 import {
   AppText,
   Avatar,
@@ -374,7 +375,8 @@ export default function SettingsScreen() {
               <AppText variant="h3">Ajuda e privacidade</AppText>
               <Card padding="none" elevation="none">
                 <ListItem
-                  title="Suporte"
+                  title="Suporte e parcerias"
+                  subtitle={CONTACT_EMAIL}
                   icon="life-buoy"
                   showChevron
                   onPress={() => router.push('/support')}
