@@ -13,7 +13,7 @@ jobs:
           const p = await ctx.newPage();
           p.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('console', m.type(), m.text().slice(0, 300)); });
           p.on('pageerror', e => console.log('pageerror', e.message));
-          p.on('response', r => { const u = r.url(); if (r.status() >= 400 || u.includes('/api/')) console.log('resp', r.status(), u.slice(0, 160)); });
+          p.on('response', r => { const u = r.url(); if (r.status() >= 400 || (u.includes('/api/')||u.includes('/img/')||u.includes('eguaadota'))&&!u.includes('_expo')) console.log('resp', r.status(), u.slice(0, 160)); });
           p.on('requestfailed', r => console.log('failed', r.url().slice(0, 160), r.failure()?.errorText));
           await p.goto('https://app.eguaadota.com.br/app/', { waitUntil: 'networkidle', timeout: 60000 });
           await p.waitForTimeout(8000);
@@ -21,7 +21,10 @@ jobs:
           console.log('TEXT', (await p.innerText('body')).slice(0, 1500).replace(/\n+/g, ' | '));
           for (const t of ['Pular', 'Entrar sem conta', 'Continuar sem conta', 'Explorar', 'Agora não']) {
             const l = p.getByText(t, { exact: false }).first();
-            if (await l.isVisible().catch(() => false)) { console.log('click', t); await l.click(); await p.waitForTimeout(6000); await p.screenshot({ path: '2-depois-' + t.replace(/ /g,'-') + '.png' }); console.log('TEXT2', (await p.innerText('body')).slice(0, 1200).replace(/\n+/g, ' | ')); break; }
+            if (await l.isVisible().catch(() => false)) { console.log('click', t); await l.click(); await p.waitForTimeout(6000); await p.screenshot({ path: '2-depois-' + t.replace(/ /g,'-') + '.png' }); console.log('TEXT2', (await p.innerText('body')).slice(0, 1200).replace(/\n+/g, ' | ')); 
+            for (const t2 of ['Entendi','Agora não','Permitir']) { const l2 = p.getByText(t2).first(); if (await l2.isVisible().catch(()=>false)) { await l2.click(); console.log('click', t2); await p.waitForTimeout(10000); } }
+            await p.screenshot({ path: '3-inicio.png' }); console.log('TEXT3', (await p.innerText('body')).slice(0, 1500).replace(/\n+/g, ' | '));
+            break; }
           }
           await b.close();
           JS
