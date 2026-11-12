@@ -324,6 +324,8 @@ const personalTables = [
   'sightings',
   'rescue_help_offers',
   'partners',
+  'feed_point_reports',
+  'feed_points',
   'likes',
   'saves',
   'story_views',

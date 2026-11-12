@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, IconButton } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { ensureDeviceWatch, readDeviceFix } from '../place/deviceLocation';
+import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permissions';
 import type { Post } from '../types';
@@ -59,6 +60,10 @@ const pawImages = {
   partnerPin: require('../../assets/partner-pin.png') as number,
   partnerPetshop: require('../../assets/partner-pin-petshop.png') as number,
   partnerVet: require('../../assets/partner-pin-vet.png') as number,
+  // Pontos solidários de ração e água (scripts/feed-point-pins.mjs).
+  feedFood: require('../../assets/feed-point-food.png') as number,
+  feedWater: require('../../assets/feed-point-water.png') as number,
+  feedBoth: require('../../assets/feed-point-both.png') as number,
 };
 
 const cameraBounds = {
@@ -137,6 +142,21 @@ const partnerPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
   iconIgnorePlacement: true,
 };
 
+// Pontos solidários ficam ainda menores: são muitos e não podem esconder os resgates.
+const feedPointHitStyle: ComponentProps<typeof CircleLayer>['style'] = {
+  circleRadius: 22,
+  circleColor: mapColors.hitArea,
+  circleOpacity: 0.01,
+  circleTranslate: [0, -30],
+};
+const feedPointPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
+  iconImage: ['match', ['get', 'kind'], 'food', 'feedFood', 'water', 'feedWater', 'feedBoth'],
+  iconSize: 0.42,
+  iconAnchor: 'bottom',
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+};
+
 const PUCK_DISTANCE_M = 25;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
@@ -180,6 +200,8 @@ export function MapCanvas({
   posts,
   partners = [],
   onSelectPartner,
+  feedPoints = [],
+  onSelectFeedPoint,
   selectedId,
   tracking,
   controlsBottom,
@@ -192,6 +214,9 @@ export function MapCanvas({
   /** Parceiros do Cupu (casinha turquesa), desenhados por baixo das patas. */
   partners?: Partner[];
   onSelectPartner?: (partner: Partner) => void;
+  /** Pontos solidários de ração e água (plaquinha), desenhados por baixo de tudo. */
+  feedPoints?: FeedPoint[];
+  onSelectFeedPoint?: (point: FeedPoint) => void;
   selectedId: string | null;
   tracking: boolean;
   /** Espaço da barra de abas, ou do card do animal selecionado quando ele está aberto. */
@@ -436,6 +461,31 @@ export function MapCanvas({
     [partnerKey],
   );
 
+  const feedPointKey = feedPoints
+    .map(
+      (point) =>
+        `${point.id}:${point.kind}:${point.location.longitude.toFixed(5)}:${point.location.latitude.toFixed(5)}`,
+    )
+    .sort()
+    .join('|');
+  const feedPointShape = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: 'FeatureCollection',
+      features: feedPoints.map((point) => ({
+        type: 'Feature',
+        id: point.id,
+        properties: { feedPointId: point.id, kind: point.kind },
+        geometry: {
+          type: 'Point',
+          coordinates: [point.location.longitude, point.location.latitude],
+        },
+      })),
+    }),
+    // O feedPointKey já lista todos os campos desenhados no mapa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [feedPointKey],
+  );
+
   const onRegionDidChange = useCallback<
     NonNullable<ComponentProps<typeof MapView>['onRegionDidChange']>
   >(
@@ -512,6 +562,18 @@ export function MapCanvas({
       onSelectPartner(partner);
     },
     [onSelectPartner, partners],
+  );
+
+  const onFeedPointPress = useCallback(
+    (event: OnPressEvent) => {
+      const id = event.features[0]?.properties?.feedPointId;
+      if (typeof id !== 'string') return;
+      const point = feedPoints.find((item) => item.id === id);
+      if (!point || !onSelectFeedPoint) return;
+      pressedPin.current = true;
+      onSelectFeedPoint(point);
+    },
+    [onSelectFeedPoint, feedPoints],
   );
 
   const onMapPress = useCallback(() => {
@@ -595,6 +657,17 @@ export function MapCanvas({
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         {styleReady ? <Images key={sprite} images={pawImages} /> : null}
+        {pinsReady ? (
+          <ShapeSource
+            key={`feed-points-${sprite}`}
+            id="feed-points"
+            shape={feedPointShape}
+            onPress={onFeedPointPress}
+          >
+            <CircleLayer id="feed-point-hit" style={feedPointHitStyle} />
+            <SymbolLayer id="feed-point-pins" style={feedPointPinStyle} />
+          </ShapeSource>
+        ) : null}
         {pinsReady ? (
           <ShapeSource
             key={`partners-${sprite}`}

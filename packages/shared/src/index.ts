@@ -259,6 +259,26 @@ export {
   type PartnerUpdateInput,
 } from './partner.js';
 export {
+  FEED_POINT_ADDRESS_MAX,
+  FEED_POINT_GONE_LIMIT,
+  FEED_POINT_NOTE_MAX,
+  MAX_PENDING_FEED_POINTS,
+  feedPointKindSchema,
+  feedPointMapQuerySchema,
+  feedPointRelationSchema,
+  feedPointReportSchema,
+  feedPointRequestSchema,
+  feedPointReviewSchema,
+  feedPointStatusSchema,
+  nextFeedPointStatus,
+  type FeedPointKind,
+  type FeedPointReport,
+  type FeedPointRelation,
+  type FeedPointRequestInput,
+  type FeedPointReviewInput,
+  type FeedPointStatus,
+} from './feedPoint.js';
+export {
   missingReason,
   openNeedKinds,
   planApplies,
