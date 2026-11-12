@@ -65,6 +65,17 @@ const installHint = `<div id="egua-instalar" style="display:none;position:fixed;
           aviso.remove();
           try { localStorage.setItem('egua.instalar.fechado', '1'); } catch (e) {}
         };
+        // O aviso fica por cima dos botões do rodapé (Entendi, abas). Some sozinho depois de uns
+        // segundos ou no primeiro toque fora dele, e volta na próxima vez que o app for aberto.
+        function esconder() {
+          if (aviso.parentNode) aviso.remove();
+          document.removeEventListener('pointerdown', foraDoAviso, true);
+        }
+        function foraDoAviso(evento) {
+          if (!aviso.contains(evento.target)) esconder();
+        }
+        setTimeout(esconder, 12000);
+        setTimeout(function () { document.addEventListener('pointerdown', foraDoAviso, true); }, 1500);
       })();
     </script>`;
 
