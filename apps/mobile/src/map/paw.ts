@@ -1,4 +1,5 @@
 import { Image, type ImageSourcePropType } from 'react-native';
+import type { FeedPointKind } from '../feedPoints/feedPoints';
 import type { PartnerPinKind } from '../partners/partners';
 
 export type Urgency = 'low' | 'medium' | 'high';
@@ -22,6 +23,17 @@ export const partnerPinSources: Record<PartnerPinKind, ImageSourcePropType> = {
   petshop: require('../../assets/partner-pin-petshop.png'),
   vet: require('../../assets/partner-pin-vet.png'),
 };
+
+/** Plaquinha dos pontos solidários (scripts/feed-point-pins.mjs): potinho, gota ou os dois. */
+export const feedPointPinSources: Record<FeedPointKind, ImageSourcePropType> = {
+  food: require('../../assets/feed-point-food.png'),
+  water: require('../../assets/feed-point-water.png'),
+  both: require('../../assets/feed-point-both.png'),
+};
+
+export function feedPointPinUri(kind: FeedPointKind): string {
+  return imageUri(feedPointPinSources[kind]);
+}
 
 export function pawUri(urgency: Urgency): string {
   return imageUri(pawSource[urgency]);

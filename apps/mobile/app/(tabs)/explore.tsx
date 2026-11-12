@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadFeed, messageFrom } from '../../src/api';
 import {
@@ -15,6 +15,9 @@ import {
   StatusPill,
   Touchable,
 } from '../../src/components/ui';
+import { loadFeedPointsIn } from '../../src/feedPoints/api';
+import { FeedPointDetails } from '../../src/feedPoints/FeedPointDetails';
+import type { FeedPoint } from '../../src/feedPoints/feedPoints';
 import { distanceLabel, formatWhen } from '../../src/format';
 import { useViewerLocation } from '../../src/place/deviceLocation';
 import { useMapAim } from '../../src/map/focusRequest';
@@ -27,7 +30,7 @@ import { PartnerDetails } from '../../src/partners/PartnerDetails';
 import { PartnerInvite } from '../../src/partners/PartnerInvite';
 import type { Partner } from '../../src/partners/partners';
 import { useSession } from '../../src/session';
-import { motion, radius, spacing, useTheme } from '../../src/theme';
+import { motion, radius, size, spacing, useTheme } from '../../src/theme';
 import type { Post } from '../../src/types';
 
 const speciesLabel: Record<string, string> = {
@@ -63,6 +66,8 @@ export default function ExploreScreen() {
   const [selection, setSelection] = useState<string | null>(null);
   const [showPartners, setShowPartners] = useState(true);
   const [partnerSelection, setPartnerSelection] = useState<Partner | null>(null);
+  const [showFeedPoints, setShowFeedPoints] = useState(true);
+  const [feedPointSelection, setFeedPointSelection] = useState<FeedPoint | null>(null);
   const closedAim = useRef<number | null>(null);
   const ignoreSelectUntil = useRef(0);
   const lastPin = useRef({ id: '', at: 0 });
@@ -89,6 +94,21 @@ export default function ExploreScreen() {
     () => (showPartners ? (partnersQuery.data?.partners ?? []) : []),
     [partnersQuery.data, showPartners],
   );
+  const feedPointsQuery = useQuery({
+    queryKey: ['feed-points', 'map', search],
+    queryFn: () => loadFeedPointsIn(view),
+    placeholderData: keepPreviousData,
+    enabled: showFeedPoints,
+    staleTime: 2 * 60 * 1000,
+  });
+  const feedPoints = useMemo(
+    () => (showFeedPoints ? (feedPointsQuery.data?.points ?? []) : []),
+    [feedPointsQuery.data, showFeedPoints],
+  );
+  // O cartão aberto acompanha o que o mapa recarregou (depois de "abasteci", por exemplo).
+  const shownFeedPoint = feedPointSelection
+    ? (feedPoints.find((point) => point.id === feedPointSelection.id) ?? feedPointSelection)
+    : null;
   const refetchMap = feed.refetch;
   useEffect(() => {
     if (!focused) return;
@@ -128,6 +148,7 @@ export default function ExploreScreen() {
     if (aim) closedAim.current = aim.token;
     setSelection(null);
     setPartnerSelection(null);
+    setFeedPointSelection(null);
   }, [aim]);
   const selectPartner = useCallback(
     (partner: Partner) => {
@@ -137,19 +158,26 @@ export default function ExploreScreen() {
         return;
       }
       countPartnerTap(partner.id, 'view', token);
+      setFeedPointSelection(null);
       setPartnerSelection(partner);
     },
     [partnerSelection, token],
   );
+  const selectFeedPoint = useCallback((point: FeedPoint) => {
+    setSelection(null);
+    setPartnerSelection(null);
+    setFeedPointSelection((current) => (current?.id === point.id ? null : point));
+  }, []);
   const selectPost = useCallback((post: { id: string }) => {
     const now = Date.now();
     if (now < ignoreSelectUntil.current) return;
     if (lastPin.current.id === post.id && now - lastPin.current.at < 250) return;
     lastPin.current = { id: post.id, at: now };
     setPartnerSelection(null);
+    setFeedPointSelection(null);
     setSelection((current) => (current === post.id ? null : post.id));
   }, []);
-  const cardOpen = selected !== null || partnerSelection !== null;
+  const cardOpen = selected !== null || partnerSelection !== null || shownFeedPoint !== null;
   const controlsBottom =
     insets.bottom + (cardOpen ? spacing.giant * 4 : spacing.giant + spacing.lg);
 
@@ -165,6 +193,8 @@ export default function ExploreScreen() {
         posts={posts}
         partners={partners}
         onSelectPartner={selectPartner}
+        feedPoints={feedPoints}
+        onSelectFeedPoint={selectFeedPoint}
         selectedId={selection}
         tracking={focused}
         controlsBottom={controlsBottom}
@@ -283,8 +313,40 @@ export default function ExploreScreen() {
           </Card>
         </View>
       ) : null}
+      {shownFeedPoint ? (
+        <View
+          style={[styles.cardWrap, { bottom: insets.bottom + CARD_BOTTOM_OFFSET }]}
+          pointerEvents="box-none"
+        >
+          <Card padding="md" elevation="md">
+            <View style={styles.cardBody}>
+              <View style={styles.cardHead}>
+                <IconButton icon="x" accessibilityLabel="Fechar" onPress={closeCard} />
+              </View>
+              <FeedPointDetails
+                point={shownFeedPoint}
+                compact
+                onHidden={() => setFeedPointSelection(null)}
+              />
+            </View>
+          </Card>
+        </View>
+      ) : null}
       {!cardOpen ? (
-        <View style={[styles.layerRow, { bottom: controlsBottom }]} pointerEvents="box-none">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={[styles.layerRow, { bottom: controlsBottom }]}
+          contentContainerStyle={styles.layerChips}
+        >
+          <Chip
+            label="Ração e água"
+            icon="droplet"
+            selected={showFeedPoints}
+            onPress={() => setShowFeedPoints((value) => !value)}
+          />
+          <Chip label="Adicionar ponto" icon="plus" onPress={() => router.push('/pontos')} />
           <Chip
             label="Parceiros"
             icon="home"
@@ -292,7 +354,7 @@ export default function ExploreScreen() {
             onPress={() => setShowPartners((value) => !value)}
           />
           <Chip label="Anuncie aqui" icon="volume-2" onPress={() => router.push('/parceiros')} />
-        </View>
+        </ScrollView>
       ) : null}
       <PartnerInvite active={focused && !cardOpen} />
     </View>
@@ -313,13 +375,15 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   cardHead: { alignItems: 'flex-end' },
+  // Rola de lado e para antes do botão "Minha localização", à direita.
   layerRow: {
     position: 'absolute',
-    left: spacing.lg,
-    flexDirection: 'row',
-    gap: spacing.sm,
+    left: 0,
+    right: spacing.lg + size.touch + spacing.sm,
+    flexGrow: 0,
     zIndex: 20,
   },
+  layerChips: { paddingLeft: spacing.lg, paddingRight: spacing.sm, gap: spacing.sm },
   cardBody: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   photo: { width: PHOTO_WIDTH, height: PHOTO_HEIGHT, borderRadius: radius.md },
