@@ -5,13 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          B=https://app.eguaadota.com.br
-          for u in $B/app $B/app/ $B/app/manifest.webmanifest $B/app/pwa/icon-180.png $B/api/health $B/version.json "$B/api/posts?limit=1" "$B/api/stats/live"; do
-            echo "=== $u"; curl -sS -m 20 -o /tmp/b -w 'HTTP %{http_code} %{content_type} %{size_download}B\n' "$u"; head -c 400 /tmp/b | tr -d '\0' ; echo
-          done
-          curl -sS $B/app/ | grep -o -e 'apple-[a-z-]*' -e 'manifest[^"]*' -e '_expo/static/js/web/[^"]*' | sort -u
-      - run: |
-          mkdir t && cd t && npm init -y >/dev/null && npm i playwright@1.48.2 >/dev/null && npx playwright install --with-deps webkit >/dev/null 2>&1
+          mkdir t && cd t && npm init -y >/dev/null && npm i playwright@1.48.2 2>&1 | tail -3 && npx playwright install --with-deps webkit 2>&1 | tail -5
           cat > t.mjs <<'JS'
           import { webkit, devices } from 'playwright';
           const b = await webkit.launch();
