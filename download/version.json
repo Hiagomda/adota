@@ -1,11 +1,11 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 41,
+  "androidVersionCode": 42,
   "notes": [
     "Se o seu aplicativo é de antes de 10/11, desinstale e instale este (assinatura nova). Sua conta e seus posts continuam salvos.",
-    "Banner em destaque no Início com as campanhas de arrecadação e os eventos e mutirões que vêm por aí.",
-    "Toque no destaque para ajudar uma campanha ou se inscrever no evento.",
-    "Correção das cores das capas no app do iPhone."
+    "Pontos solidários de ração e água no mapa: cadastre um ponto que você cuida ou conhece.",
+    "Conversa de adoção mais justa: o filtro não barra mais frases comuns como \"estou vendo a foto\".",
+    "Correções no compartilhar, no botão Voltar, nas fotos antigas e no aviso do iPhone."
   ],
   "reinstall": true
 }
