@@ -326,6 +326,7 @@ const personalTables = [
   'partners',
   'feed_point_reports',
   'feed_points',
+  'bug_reports',
   'likes',
   'saves',
   'story_views',

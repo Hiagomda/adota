@@ -11,6 +11,7 @@ import { registerModerationRoutes } from './moderation.js';
 import { registerStalledCaseRoutes } from './stalled.js';
 import { registerChatModerationRoutes } from './chats.js';
 import { registerFeedPointModerationRoutes } from './feedPoints.js';
+import { registerBugReportModerationRoutes } from './bugReports.js';
 import { registerPartnerModerationRoutes } from './partners.js';
 import { registerStaffCreateRoutes } from './create.js';
 import { decoyHash, verifyPassword } from './password.js';
@@ -487,6 +488,7 @@ export async function registerStaffRoutes(
   registerEventModerationRoutes(app, { env, pool });
   registerPartnerModerationRoutes(app, { env, pool });
   registerFeedPointModerationRoutes(app, { env, pool });
+  registerBugReportModerationRoutes(app, { pool });
   registerStalledCaseRoutes(app, { env, pool });
   registerChatModerationRoutes(app, { env, pool });
   registerStaffCreateRoutes(app, { env, pool });

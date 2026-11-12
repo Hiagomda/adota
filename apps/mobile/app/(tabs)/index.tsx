@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
+import { BugButton } from '../../src/bugReport/BugButton';
 import { animalHeadline, neighborhoodOf, placeOf } from '../../src/animalLabels';
 import { PostCard } from '../../src/components/PostCard';
 import {
@@ -496,6 +497,8 @@ export default function HomeScreen() {
               {me.data?.name ? `${greeting()}, ${firstName(me.data.name)}` : greeting()}
             </AppText>
           </View>
+          {/* O app está em pleno desenvolvimento: o besourinho abre o aviso de bug. */}
+          <BugButton />
           <IconButton
             icon={searchOpen ? 'x' : 'search'}
             accessibilityLabel={searchOpen ? 'Fechar busca' : 'Buscar'}
