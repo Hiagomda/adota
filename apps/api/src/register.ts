@@ -102,6 +102,13 @@ const reportSchema = z.object({
   targetId: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
 });
+/** Tabela de cada tipo de denúncia, para conferir que o alvo existe (nomes fixos, nunca do corpo). */
+const reportTargetTables = {
+  post: 'posts',
+  comment: 'comments',
+  user: 'users',
+  campaign: 'campaigns',
+} as const;
 const fosterSchema = z.object({
   capacity: z.number().int().positive().max(20),
   speciesAccepted: z.array(z.enum(['dog', 'cat', 'other'])).min(1),
@@ -732,6 +739,13 @@ export async function registerRoutes(
         [body.targetId, user.id],
       );
       if ((thread.rowCount ?? 0) === 0) throw new HttpError(404, 'Essa conversa não existe.');
+    } else {
+      // Denúncia de alvo que não existe só enche a fila da equipe.
+      const table = reportTargetTables[body.targetType];
+      const target = await pool.query(`SELECT 1 FROM ${table} WHERE id = $1`, [body.targetId]);
+      if ((target.rowCount ?? 0) === 0) {
+        throw new HttpError(404, 'Não encontrei o que você quer denunciar.');
+      }
     }
     // A mesma pessoa denunciando o mesmo alvo de novo não abre outra fila para a equipe.
     await pool.query(

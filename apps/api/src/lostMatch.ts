@@ -25,6 +25,10 @@ import { HttpError } from './http.js';
 import { publicMediaUrl } from './media.js';
 import { notifyPeople } from './notify.js';
 
+/** Perdido que ainda procura: aberto, com alguém indo atrás ou não achado no lugar. */
+const STILL_LOST_STATUSES: readonly string[] = ['open', 'on_the_way', 'not_found'];
+const STILL_LOST = `('open', 'on_the_way', 'not_found')`;
+
 type RouteLimit = { config: object };
 
 /** Animais encontrados: alerta de resgate (achado na rua) e adoção (alguém está com ele). */
@@ -98,7 +102,7 @@ async function candidatePairs(
        FROM posts p
        JOIN animals a ON a.id = p.animal_id
        JOIN users u ON u.id = p.author_id
-       WHERE p.type = 'lost' AND p.status = 'open' AND p.parent_post_id IS NULL
+       WHERE p.type = 'lost' AND p.status IN ${STILL_LOST} AND p.parent_post_id IS NULL
          AND p.hidden = false AND p.review_status = 'published' AND u.deleted_at IS NULL
          AND ($1::uuid IS NULL OR p.id = $1)
      ),
@@ -484,7 +488,7 @@ async function listMatches(pool: Pool, env: Env, postId: string, type: string) {
      JOIN animals a ON a.id = l.animal_id
      JOIN users u ON u.id = l.author_id
      WHERE m.found_post_id = $1 AND m.status <> 'dismissed'
-       AND l.hidden = false AND l.status = 'open' AND u.deleted_at IS NULL
+       AND l.hidden = false AND l.status IN ${STILL_LOST} AND u.deleted_at IS NULL
      ORDER BY (m.status = 'confirmed') DESC, m.score DESC, m.created_at DESC
      LIMIT ${LIST_LIMIT}`,
     [postId],
@@ -684,7 +688,7 @@ export function registerLostMatchRoutes(
     return {
       side,
       // Perdido que já voltou para casa não procura mais.
-      searching: side === 'found' || post.status === 'open',
+      searching: side === 'found' || STILL_LOST_STATUSES.includes(post.status),
       matches: await listMatches(pool, env, id, post.type),
     };
   });
@@ -796,7 +800,7 @@ export function registerLostMatchRoutes(
          SELECT min(ST_Distance(pt.location, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography)) AS meters
          FROM (${pointsOf('p')}) pt
        ) d
-       WHERE p.type = 'lost' AND p.status = 'open' AND p.parent_post_id IS NULL
+       WHERE p.type = 'lost' AND p.status IN ${STILL_LOST} AND p.parent_post_id IS NULL
          AND p.hidden = false AND p.review_status = 'published' AND u.deleted_at IS NULL
          AND a.species = $1
          AND p.created_at > now() - interval '120 days'

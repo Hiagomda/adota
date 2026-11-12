@@ -83,6 +83,18 @@ export async function startFollowup(
   tutorId: string,
   responsibleId: string | null,
 ): Promise<boolean> {
+  // Quem adotou passa a cuidar do animal: o passaporte (saúde, guarda) é dele daqui em diante.
+  await pool.query(
+    `UPDATE animals a SET current_owner_id = $2
+     FROM posts p WHERE p.id = $1 AND a.id = p.animal_id AND a.status = 'adopted'`,
+    [postId, tutorId],
+  );
+  await pool.query(
+    `UPDATE animal_custody c SET user_id = $2
+     FROM posts p
+     WHERE p.id = $1 AND c.animal_id = p.animal_id AND c.kind = 'adoption' AND c.ended_at IS NULL`,
+    [postId, tutorId],
+  );
   if (responsibleId === tutorId) return false;
   await pool.query(
     `INSERT INTO adoption_followups (post_id, tutor_id, responsible_id)

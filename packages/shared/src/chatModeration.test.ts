@@ -9,6 +9,11 @@ describe('scanChatMessage', () => {
       'Posso conhecer ele no sábado de manhã?',
       'Moro em casa com quintal murado e tenho dois gatos castrados.',
       'Ele tem 2 anos e é muito dócil com criança',
+      'Estou vendo a foto dele, que lindo',
+      'tô vendo o cachorro no seu perfil',
+      'vendo o perfil dela agora',
+      'Qual o sexo dele?',
+      'ele é gostoso de abraçar',
     ]) {
       expect(scanChatMessage(text)).toEqual({ flags: [], blocked: false });
     }
@@ -16,6 +21,8 @@ describe('scanChatMessage', () => {
 
   it('barra venda e Pix, mesmo disfarçados', () => {
     expect(scanChatMessage('vendo o filhote, chama')).toMatchObject({ blocked: true });
+    expect(scanChatMessage('vendo filhote de pinscher')).toMatchObject({ blocked: true });
+    expect(scanChatMessage('to vendendo um gatinho')).toMatchObject({ blocked: true });
     expect(scanChatMessage('Quanto custa?')).toMatchObject({ blocked: true });
     expect(scanChatMessage('sai por R$ 150')).toMatchObject({ blocked: true });
     expect(scanChatMessage('são 200 reais')).toMatchObject({ blocked: true });
@@ -48,6 +55,7 @@ describe('scanChatMessage', () => {
     ]);
     expect(scanChatMessage('quero cruzar ele com minha cadela').flags).toEqual(['abuse']);
     expect(scanChatMessage('manda uma foto sua').flags).toEqual(['harassment']);
+    expect(scanChatMessage('você é gostosa').flags).toEqual(['harassment']);
   });
 
   it('não confunde número de idade ou data com telefone', () => {
