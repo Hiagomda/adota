@@ -18,11 +18,13 @@ jobs:
           await p.goto('https://app.eguaadota.com.br/app/', { waitUntil: 'networkidle', timeout: 60000 });
           await p.waitForTimeout(8000);
           await p.screenshot({ path: '1-abertura.png' });
+          await p.locator('#egua-instalar button').click(); console.log('fechou aviso');
           console.log('TEXT', (await p.innerText('body')).slice(0, 1500).replace(/\n+/g, ' | '));
           for (const t of ['Pular', 'Entrar sem conta', 'Continuar sem conta', 'Explorar', 'Agora não']) {
             const l = p.getByText(t, { exact: false }).first();
             if (await l.isVisible().catch(() => false)) { console.log('click', t); await l.click(); await p.waitForTimeout(6000); await p.screenshot({ path: '2-depois-' + t.replace(/ /g,'-') + '.png' }); console.log('TEXT2', (await p.innerText('body')).slice(0, 1200).replace(/\n+/g, ' | ')); 
-            for (const t2 of ['Entendi','Agora não','Permitir']) { const l2 = p.getByText(t2).first(); if (await l2.isVisible().catch(()=>false)) { await l2.click(); console.log('click', t2); await p.waitForTimeout(10000); } }
+            for (const t2 of ['Entendi','Agora não','Permitir']) { const l2 = p.getByText(t2).first(); if (await l2.isVisible().catch(()=>false)) { await l2.click(); console.log('click', t2); await p.waitForTimeout(12000); } }
+            await p.mouse.wheel(0, 900); await p.waitForTimeout(4000); await p.screenshot({ path: '4-rolando.png' });
             await p.screenshot({ path: '3-inicio.png' }); console.log('TEXT3', (await p.innerText('body')).slice(0, 1500).replace(/\n+/g, ' | '));
             break; }
           }
@@ -30,4 +32,5 @@ jobs:
           JS
           node t.mjs
       - uses: actions/upload-artifact@v4
-        with: { name: prints, path: t/*.png }
+        with: { name: prints, path: t/*.png
+      - run: cd t && for f in *.png; do echo "IMG $f"; base64 -w0 $f; echo; done }
