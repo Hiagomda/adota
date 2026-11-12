@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, IconButton } from '../components/ui';
 import { reportError } from '../crash/reporter';
 import { ensureDeviceWatch, readDeviceFix } from '../place/deviceLocation';
+import type { CommunityEvent } from '../events/agenda';
 import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permissions';
@@ -65,6 +66,12 @@ const pawImages = {
   feedFood: require('../../assets/feed-point-food.png') as number,
   feedWater: require('../../assets/feed-point-water.png') as number,
   feedBoth: require('../../assets/feed-point-both.png') as number,
+  // Calendarzinho dos eventos da agenda (scripts/event-pins.mjs), um desenho por tipo.
+  eventVaccination: require('../../assets/event-pin-vaccination.png') as number,
+  eventNeutering: require('../../assets/event-pin-neutering.png') as number,
+  eventAdoptionFair: require('../../assets/event-pin-adoption-fair.png') as number,
+  eventFundraising: require('../../assets/event-pin-fundraising.png') as number,
+  eventCommunity: require('../../assets/event-pin-community.png') as number,
 };
 
 const cameraBounds = {
@@ -163,6 +170,33 @@ const feedPointPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
   iconIgnorePlacement: true,
 };
 
+// Eventos no tamanho dos parceiros: são poucos e cada um junta muita gente.
+const eventHitStyle: ComponentProps<typeof CircleLayer>['style'] = {
+  circleRadius: 26,
+  circleColor: mapColors.hitArea,
+  circleOpacity: 0.01,
+  circleTranslate: [0, -36],
+};
+const eventPinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
+  iconImage: [
+    'match',
+    ['get', 'category'],
+    'vaccination',
+    'eventVaccination',
+    'neutering',
+    'eventNeutering',
+    'adoption_fair',
+    'eventAdoptionFair',
+    'fundraising',
+    'eventFundraising',
+    'eventCommunity',
+  ],
+  iconSize: 0.5,
+  iconAnchor: 'bottom',
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+};
+
 const PUCK_DISTANCE_M = 25;
 
 type GpsHud = 'loading' | 'ready' | 'denied' | 'blocked' | 'disabled' | 'timeout';
@@ -208,6 +242,8 @@ export function MapCanvas({
   onSelectPartner,
   feedPoints = [],
   onSelectFeedPoint,
+  events = [],
+  onSelectEvent,
   selectedId,
   tracking,
   controlsBottom,
@@ -223,6 +259,9 @@ export function MapCanvas({
   /** Pontos solidários de ração e água (plaquinha), desenhados por baixo de tudo. */
   feedPoints?: FeedPoint[];
   onSelectFeedPoint?: (point: FeedPoint) => void;
+  /** Eventos da agenda (calendarzinho com o desenho do tipo), entre os parceiros e as patas. */
+  events?: CommunityEvent[];
+  onSelectEvent?: (event: CommunityEvent) => void;
   selectedId: string | null;
   tracking: boolean;
   /** Espaço da barra de abas, ou do card do animal selecionado quando ele está aberto. */
@@ -492,6 +531,31 @@ export function MapCanvas({
     [feedPointKey],
   );
 
+  const eventKey = events
+    .map(
+      (item) =>
+        `${item.id}:${item.category}:${item.location.longitude.toFixed(5)}:${item.location.latitude.toFixed(5)}`,
+    )
+    .sort()
+    .join('|');
+  const eventShape = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: 'FeatureCollection',
+      features: events.map((item) => ({
+        type: 'Feature',
+        id: item.id,
+        properties: { eventId: item.id, category: item.category },
+        geometry: {
+          type: 'Point',
+          coordinates: [item.location.longitude, item.location.latitude],
+        },
+      })),
+    }),
+    // O eventKey já lista todos os campos desenhados no mapa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eventKey],
+  );
+
   const onRegionDidChange = useCallback<
     NonNullable<ComponentProps<typeof MapView>['onRegionDidChange']>
   >(
@@ -580,6 +644,18 @@ export function MapCanvas({
       onSelectFeedPoint(point);
     },
     [onSelectFeedPoint, feedPoints],
+  );
+
+  const onEventPress = useCallback(
+    (event: OnPressEvent) => {
+      const id = event.features[0]?.properties?.eventId;
+      if (typeof id !== 'string') return;
+      const item = events.find((entry) => entry.id === id);
+      if (!item || !onSelectEvent) return;
+      pressedPin.current = true;
+      onSelectEvent(item);
+    },
+    [onSelectEvent, events],
   );
 
   const onMapPress = useCallback(() => {
@@ -686,6 +762,17 @@ export function MapCanvas({
           >
             <CircleLayer id="partner-hit" style={partnerHitStyle} />
             <SymbolLayer id="partner-pins" style={partnerPinStyle} />
+          </ShapeSource>
+        ) : null}
+        {pinsReady ? (
+          <ShapeSource
+            key={`events-${sprite}`}
+            id="events"
+            shape={eventShape}
+            onPress={onEventPress}
+          >
+            <CircleLayer id="event-hit" style={eventHitStyle} />
+            <SymbolLayer id="event-pins" style={eventPinStyle} />
           </ShapeSource>
         ) : null}
         {pinsReady ? (

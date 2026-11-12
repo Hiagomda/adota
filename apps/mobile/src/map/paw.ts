@@ -1,4 +1,5 @@
 import { Image, type ImageSourcePropType } from 'react-native';
+import type { EventCategory } from '../events/agenda';
 import type { FeedPointKind } from '../feedPoints/feedPoints';
 import type { PartnerPinKind } from '../partners/partners';
 
@@ -30,6 +31,19 @@ export const feedPointPinSources: Record<FeedPointKind, ImageSourcePropType> = {
   water: require('../../assets/feed-point-water.png'),
   both: require('../../assets/feed-point-both.png'),
 };
+
+/** Calendarzinho dos eventos da agenda (scripts/event-pins.mjs), um desenho por tipo. */
+export const eventPinSources: Record<EventCategory, ImageSourcePropType> = {
+  vaccination: require('../../assets/event-pin-vaccination.png'),
+  neutering: require('../../assets/event-pin-neutering.png'),
+  adoption_fair: require('../../assets/event-pin-adoption-fair.png'),
+  fundraising: require('../../assets/event-pin-fundraising.png'),
+  community: require('../../assets/event-pin-community.png'),
+};
+
+export function eventPinUri(category: EventCategory): string {
+  return imageUri(eventPinSources[category]);
+}
 
 export function feedPointPinUri(kind: FeedPointKind): string {
   return imageUri(feedPointPinSources[kind]);

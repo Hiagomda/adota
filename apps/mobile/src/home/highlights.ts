@@ -16,7 +16,8 @@ export const EVENT_WINDOW_DAYS = 30;
 
 const DAY_MS = 86_400_000;
 
-function liveEvent(event: CommunityEvent, now: number): boolean {
+/** Evento publicado que ainda não acabou e começa nos próximos 30 dias (banner e mapa). */
+export function liveEvent(event: CommunityEvent, now: number): boolean {
   if (event.reviewStatus !== 'published') return false;
   if (event.state !== 'scheduled' && event.state !== 'happening') return false;
   const starts = Date.parse(event.startsAt);
