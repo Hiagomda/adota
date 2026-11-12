@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   campaignCreateSchemaAt,
+  campaignReviewSchema,
   campaignEntrySchemaAt,
   campaignPhase,
   campaignPledgeSchemaAt,
@@ -41,8 +42,14 @@ describe('campaign create', () => {
     expect(schema.safeParse({ ...base, goalCents: 500 }).success).toBe(false);
   });
 
-  it('refuses a short reason', () => {
-    expect(schema.safeParse({ ...base, purpose: 'Ajuda' }).success).toBe(false);
+  it('accepts a short reason but not an empty one', () => {
+    expect(schema.safeParse({ ...base, purpose: 'Ajuda' }).success).toBe(true);
+    expect(schema.safeParse({ ...base, purpose: '   ' }).success).toBe(false);
+  });
+
+  it('takes an optional banner color from the palette', () => {
+    expect(schema.safeParse({ ...base, bannerColor: 'green' }).success).toBe(true);
+    expect(schema.safeParse({ ...base, bannerColor: 'pink' }).success).toBe(false);
   });
 });
 
@@ -108,5 +115,15 @@ describe('phase', () => {
     expect(campaignPhase('active', '2026-10-26', '2026-10-27')).toBe('ended');
     expect(campaignPhase('closed', '2026-12-01', '2026-10-27')).toBe('closed');
     expect(campaignPhase('suspended', '2026-12-01', '2026-10-27')).toBe('suspended');
+  });
+});
+
+describe('campaign review', () => {
+  it('needs a reason only to reject', () => {
+    expect(campaignReviewSchema.safeParse({ action: 'approve' }).success).toBe(true);
+    expect(campaignReviewSchema.safeParse({ action: 'reject' }).success).toBe(false);
+    expect(
+      campaignReviewSchema.safeParse({ action: 'reject', reason: 'Pix de outra pessoa' }).success,
+    ).toBe(true);
   });
 });

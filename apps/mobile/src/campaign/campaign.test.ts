@@ -50,7 +50,8 @@ test('valida a campanha com as regras do servidor', () => {
     today: '2026-10-27',
   };
   assert.equal(campaignFormError(base), null);
-  assert.match(campaignFormError({ ...base, purpose: 'Ajuda' }) ?? '', /30 letras/);
+  assert.equal(campaignFormError({ ...base, purpose: 'Ajuda' }), null);
+  assert.match(campaignFormError({ ...base, purpose: '  ' }) ?? '', /para que é o dinheiro/);
   assert.match(campaignFormError({ ...base, goalCents: 500 }) ?? '', /mínima/);
   assert.match(campaignFormError({ ...base, deadline: '2026-10-26' }) ?? '', /passado/);
   assert.match(campaignFormError({ ...base, deadline: '2027-12-01' }) ?? '', /um ano/);

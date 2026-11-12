@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { campaignReviewSchema } from '@patinha/shared';
 import type { Env } from '../config.js';
 import { HttpError } from '../http.js';
 import { publicMediaUrl } from '../media.js';
@@ -10,7 +11,13 @@ import {
   notifyVerificationDecision,
   type createQueue,
 } from '../notify.js';
-import { formatCents, notifyCampaignSuspension, setCampaignSuspended } from '../campaigns.js';
+import {
+  formatCents,
+  notifyCampaignReview,
+  notifyCampaignSuspension,
+  reviewCampaign,
+  setCampaignSuspended,
+} from '../campaigns.js';
 import { rowsOf } from '../session.js';
 import { assertPermission, isStaffRole } from './policy.js';
 import { clientIp, loadSession, userAgent, writeAudit } from './routes.js';
@@ -50,7 +57,9 @@ const visibilitySchema = z
   .strict();
 
 const campaignListSchema = z
-  .object({ filter: z.enum(['reported', 'active', 'suspended', 'all']).default('reported') })
+  .object({
+    filter: z.enum(['pending', 'reported', 'active', 'suspended', 'all']).default('reported'),
+  })
   .strict();
 
 const campaignStatusSchema = z
@@ -381,14 +390,16 @@ export function registerModerationRoutes(
     assertPermission(session.role, 'campaigns.review');
     const query = parse(campaignListSchema, request.query ?? {});
     const where =
-      query.filter === 'reported'
-        ? `EXISTS (SELECT 1 FROM reports r WHERE r.target_type = 'campaign'
+      query.filter === 'pending'
+        ? `c.review_status = 'pending'`
+        : query.filter === 'reported'
+          ? `EXISTS (SELECT 1 FROM reports r WHERE r.target_type = 'campaign'
              AND r.target_id = c.id AND r.status = 'open')`
-        : query.filter === 'active'
-          ? `c.status = 'active'`
-          : query.filter === 'suspended'
-            ? `c.status = 'suspended'`
-            : 'true';
+          : query.filter === 'active'
+            ? `c.status = 'active' AND c.review_status = 'published'`
+            : query.filter === 'suspended'
+              ? `c.status = 'suspended'`
+              : 'true';
     const result = await pool.query<{
       id: string;
       title: string;
@@ -402,9 +413,19 @@ export function registerModerationRoutes(
       spent: string;
       pending: number;
       open_reports: number;
+      purpose: string;
+      pix_key: string;
+      review_status: string;
+      review_note: string | null;
+      banner_key: string | null;
+      banner_color: string | null;
+      owner_verified: boolean;
+      owner_role: string;
     }>(
       `SELECT c.id, c.title, c.status, c.goal_cents, to_char(c.deadline, 'YYYY-MM-DD') AS deadline,
               c.created_at, u.handle AS owner_handle, u.name AS owner_name,
+              c.purpose, c.pix_key, c.review_status, c.review_note, c.banner_key, c.banner_color,
+              u.verified AS owner_verified, u.role AS owner_role,
               COALESCE(sum(e.amount_cents) FILTER (WHERE e.kind = 'donation' AND e.status = 'confirmed'), 0)::text AS raised,
               COALESCE(sum(e.amount_cents) FILTER (WHERE e.kind = 'expense' AND e.status = 'confirmed'), 0)::text AS spent,
               count(e.id) FILTER (WHERE e.status = 'pending')::int AS pending,
@@ -415,7 +436,7 @@ export function registerModerationRoutes(
        LEFT JOIN campaign_entries e ON e.campaign_id = c.id
        WHERE ${where}
        GROUP BY c.id, u.id
-       ORDER BY open_reports DESC, c.updated_at DESC
+       ORDER BY (c.review_status = 'pending') DESC, open_reports DESC, c.updated_at DESC
        LIMIT 100`,
     );
     return {
@@ -432,9 +453,64 @@ export function registerModerationRoutes(
         deadline: row.deadline,
         ownerHandle: row.owner_handle,
         ownerName: row.owner_name,
+        ownerVerified: row.owner_verified,
+        ownerIsNgo: row.owner_role === 'ngo',
+        purpose: row.purpose,
+        pixKey: row.pix_key,
+        reviewStatus: row.review_status,
+        reviewNote: row.review_note,
+        bannerUrl: row.banner_key ? publicMediaUrl(env, row.banner_key, 'thumb') : null,
+        bannerColor: row.banner_color,
         createdAt: row.created_at.toISOString(),
       })),
     };
+  });
+
+  // Campanha pedida pelo app: a equipe aprova (vai ao ar com o Pix) ou recusa com motivo.
+  app.post('/admin/v1/campaigns/:id/review', async (request) => {
+    const session = await loadSession(pool, request);
+    assertPermission(session.role, 'campaigns.review');
+    const id = parse(idSchema, request.params).id;
+    const body = parse(campaignReviewSchema, request.body);
+    const approve = body.action === 'approve';
+    const reason = body.reason ? body.reason : null;
+    const client = await pool.connect();
+    let result: Awaited<ReturnType<typeof reviewCampaign>> = null;
+    try {
+      await client.query('BEGIN');
+      result = await reviewCampaign(client, {
+        campaignId: id,
+        actorId: session.user_id,
+        approve,
+        reason,
+      });
+      if (!result) throw new HttpError(404, 'Campanha não encontrada.');
+      if (result.changed) {
+        await writeAudit(client, {
+          actorId: session.user_id,
+          action: approve ? 'campaign.approve' : 'campaign.reject',
+          targetType: 'campaign',
+          targetId: id,
+          after: { reviewStatus: approve ? 'published' : 'rejected', reason },
+          ...trail(request),
+        });
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    if (result.changed) {
+      await notifyCampaignReview(pool, env, id, result, approve, reason).catch((error: unknown) => {
+        request.log.error(
+          { err: error, where: 'notify:campaign-review' },
+          'best-effort step failed',
+        );
+      });
+    }
+    return { reviewStatus: approve ? 'published' : 'rejected', changed: result.changed };
   });
 
   app.post('/admin/v1/campaigns/:id/status', async (request) => {

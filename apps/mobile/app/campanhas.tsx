@@ -31,7 +31,9 @@ export default function CampaignsScreen() {
     queryFn: () => loadMe(token ?? ''),
     enabled: Boolean(token),
   });
-  const canCreate = Boolean(me.data && (me.data.verified || isTeamRole(me.data.role)));
+  // Qualquer conta pede uma campanha; a equipe aprova antes de ir ao ar.
+  const canCreate = Boolean(me.data);
+  const team = Boolean(me.data && isTeamRole(me.data.role));
   const list = useQuery({
     queryKey: ['campaigns', tab, token],
     queryFn: () => api<{ campaigns: CampaignSummary[] }>(`/campaigns?status=${tab}`, { token }),
@@ -67,7 +69,7 @@ export default function CampaignsScreen() {
             </AppText>
             {canCreate ? (
               <Button
-                title="Abrir campanha"
+                title={team ? 'Abrir campanha' : 'Pedir uma campanha'}
                 icon="plus"
                 variant="secondary"
                 fullWidth

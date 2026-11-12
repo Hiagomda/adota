@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadMe, messageFrom } from '../../src/api';
-import { campaignFormError, parseMoneyInput } from '../../src/campaign/campaign';
+import { BannerPicker } from '../../src/campaign/BannerPicker';
+import {
+  campaignFormError,
+  parseMoneyInput,
+  type CampaignBannerColor,
+} from '../../src/campaign/campaign';
 import {
   AppText,
   Button,
@@ -37,10 +42,13 @@ export default function NewCampaignScreen() {
   const [goal, setGoal] = useState('');
   const [deadline, setDeadline] = useState('');
   const [pixKey, setPixKey] = useState('');
+  const [bannerColor, setBannerColor] = useState<CampaignBannerColor>('coral');
+  const [bannerKey, setBannerKey] = useState<string | null>(null);
   const [clientKey] = useState(newClientKey);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const allowed = Boolean(me.data && (me.data.verified || isTeamRole(me.data.role)));
+  // Qualquer conta pede; a equipe aprova antes de ir ao ar. Só a própria equipe publica direto.
+  const team = Boolean(me.data && isTeamRole(me.data.role));
 
   async function create() {
     if (saving) return;
@@ -61,7 +69,7 @@ export default function NewCampaignScreen() {
     setSaving(true);
     setError(null);
     try {
-      const created = await api<{ id: string }>('/campaigns', {
+      const created = await api<{ id: string; reviewStatus?: string }>('/campaigns', {
         method: 'POST',
         token,
         body: {
@@ -72,11 +80,18 @@ export default function NewCampaignScreen() {
           pixKey: pixKey.trim(),
           animalId: params.animalId || undefined,
           postId: params.postId || undefined,
+          bannerColor,
+          bannerKey: bannerKey ?? undefined,
           clientKey,
         },
       });
       await client.invalidateQueries({ queryKey: ['campaigns'] });
-      toast.show('Campanha aberta.', 'success');
+      toast.show(
+        created.reviewStatus === 'pending'
+          ? 'Pedido enviado. A equipe confere e avisa você.'
+          : 'Campanha aberta.',
+        'success',
+      );
       router.replace(`/campanha/${created.id}`);
     } catch (failure) {
       setError(messageFrom(failure));
@@ -88,7 +103,10 @@ export default function NewCampaignScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.column}>
-        <Header title="Abrir campanha" onBack={() => router.back()} />
+        <Header
+          title={team || !me.data ? 'Abrir campanha' : 'Pedir campanha'}
+          onBack={() => router.back()}
+        />
       </View>
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -106,10 +124,14 @@ export default function NewCampaignScreen() {
             />
           ) : me.isLoading ? (
             <SkeletonRows />
-          ) : !allowed ? (
-            <Notice message="Só ONGs e protetores verificados abrem campanha. Peça a verificação na tela de ONG do seu perfil." />
           ) : (
             <View style={styles.form}>
+              {team ? null : (
+                <Notice
+                  tone="info"
+                  message="A equipe do Égua, adota! confere cada campanha antes de ela aparecer no app. Você recebe um aviso quando for aprovada."
+                />
+              )}
               {params.animalId || params.postId ? (
                 <Notice
                   tone="info"
@@ -157,13 +179,21 @@ export default function NewCampaignScreen() {
                 maxLength={120}
                 helper="O pagamento acontece fora do app, direto para você."
               />
+              <BannerPicker
+                token={token}
+                color={bannerColor}
+                onColor={setBannerColor}
+                bannerKey={bannerKey}
+                onBanner={setBannerKey}
+                onError={setError}
+              />
               <AppText variant="bodySmall" color="textSecondary">
                 O progresso só soma o que você confirmar com comprovante. Lance também as despesas
                 com nota ou recibo: quem doou acompanha tudo no extrato e no histórico.
               </AppText>
               {error ? <Notice tone="error" message={error} /> : null}
               <Button
-                title="Abrir campanha"
+                title={team ? 'Abrir campanha' : 'Pedir aprovação'}
                 icon="heart"
                 size="lg"
                 fullWidth

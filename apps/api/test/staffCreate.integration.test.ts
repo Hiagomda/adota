@@ -143,6 +143,59 @@ describe('staff create', () => {
     expect(own.statusCode).toBe(201);
   });
 
+  it('approves or rejects a campaign asked for in the app', async () => {
+    const adminId = await insertUser('equipe.hiago', 'superadmin');
+    const ownerId = await insertUser('ong.sem.selo', 'ngo');
+    const token = await staffToken(adminId);
+    const asked = await app.inject({
+      method: 'POST',
+      url: '/campaigns',
+      headers: { authorization: 'Bearer dev:ong.sem.selo@egua.local' },
+      payload: { ...campaign(), purpose: 'Ração' },
+    });
+    expect(asked.statusCode).toBe(201);
+    const id = asked.json().id as string;
+
+    const queue = await app.inject({
+      method: 'GET',
+      url: '/admin/v1/campaigns?filter=pending',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(queue.json().campaigns).toMatchObject([
+      { id, reviewStatus: 'pending', pixKey: 'ong@egua.local', ownerVerified: false },
+    ]);
+
+    expect(
+      (await post(token, `/admin/v1/campaigns/${id}/review`, { action: 'reject' })).statusCode,
+    ).toBe(400);
+    const rejected = await post(token, `/admin/v1/campaigns/${id}/review`, {
+      action: 'reject',
+      reason: 'Falta dizer qual clínica.',
+    });
+    expect(rejected.json()).toMatchObject({ reviewStatus: 'rejected', changed: true });
+
+    // Corrigir no app manda de volta para a fila.
+    const edited = await app.inject({
+      method: 'PATCH',
+      url: `/campaigns/${id}`,
+      headers: { authorization: 'Bearer dev:ong.sem.selo@egua.local' },
+      payload: { purpose: 'Ração da clínica Bicho Feliz', reason: 'Disse a clínica' },
+    });
+    expect(edited.json()).toMatchObject({ changed: true, reviewStatus: 'pending' });
+
+    const approved = await post(token, `/admin/v1/campaigns/${id}/review`, { action: 'approve' });
+    expect(approved.json()).toMatchObject({ reviewStatus: 'published', changed: true });
+    const open = await app.inject({ method: 'GET', url: `/campaigns/${id}` });
+    expect(open.json()).toMatchObject({ pixKey: 'ong@egua.local', reviewStatus: 'published' });
+    const notices = await pool.query(`SELECT 1 FROM notifications WHERE user_id = $1`, [ownerId]);
+    expect(notices.rowCount).toBe(2);
+    const again = await post(token, `/admin/v1/campaigns/${id}/review`, {
+      action: 'reject',
+      reason: 'tarde demais',
+    });
+    expect(again.statusCode).toBe(409);
+  });
+
   it('blocks campaign creation without the finance permission', async () => {
     const modId = await insertUser('equipe.mod', 'moderator');
     const token = await staffToken(modId);

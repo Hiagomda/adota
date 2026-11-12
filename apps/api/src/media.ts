@@ -74,6 +74,29 @@ export async function presignUploads(
   return uploads;
 }
 
+/** Foto enviada pelo painel da equipe (o navegador manda os bytes; não há link assinado). */
+export async function storeStaffImage(
+  env: Env,
+  storage: S3Client,
+  userId: string,
+  bytes: Uint8Array,
+): Promise<string> {
+  const kind = sniffImage(bytes);
+  if (!kind) throw new HttpError(400, 'Envie uma foto em JPG, PNG ou WebP.');
+  const contentType = `image/${kind}`;
+  const key = `uploads/${userId}/${randomUUID()}.${extensions[contentType] ?? 'jpg'}`;
+  await storage.send(
+    new PutObjectCommand({
+      Bucket: env.MINIO_BUCKET,
+      Key: key,
+      Body: bytes,
+      ContentType: contentType,
+      ContentLength: bytes.length,
+    }),
+  );
+  return key;
+}
+
 /**
  * In production, read the first bytes of each upload and reject anything that is not a real image.
  * Tests skip the storage read so they do not need MinIO; the key still has to belong to the account.

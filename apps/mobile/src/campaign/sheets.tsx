@@ -7,10 +7,13 @@ import { spacing } from '../theme';
 import {
   campaignFormError,
   entryFormError,
+  isBannerColor,
   moneyInputValue,
   parseMoneyInput,
+  type CampaignBannerColor,
   type CampaignDetail,
 } from './campaign';
+import { BannerPicker } from './BannerPicker';
 import { ReceiptPicker } from './ReceiptPicker';
 
 /**
@@ -269,7 +272,12 @@ export function EditSheet({
   const [purpose, setPurpose] = useState(campaign.purpose);
   const [goal, setGoal] = useState(moneyInputValue(campaign.goalCents));
   const [deadline, setDeadline] = useState(dayInputValue(campaign.deadline));
-  const [pixKey, setPixKey] = useState(campaign.pixKey ?? '');
+  const [pixKey, setPixKey] = useState(campaign.ownerPixKey ?? campaign.pixKey ?? '');
+  const [bannerColor, setBannerColor] = useState<CampaignBannerColor>(
+    isBannerColor(campaign.bannerColor) ? campaign.bannerColor : 'coral',
+  );
+  // undefined: a foto não mudou; null: tirou a foto; texto: foto nova enviada.
+  const [bannerKey, setBannerKey] = useState<string | null | undefined>(undefined);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -300,7 +308,10 @@ export function EditSheet({
     if (purpose.trim() !== campaign.purpose) body.purpose = purpose.trim();
     if (goalCents !== campaign.goalCents) body.goalCents = goalCents;
     if (day !== campaign.deadline) body.deadline = day;
-    if (pixKey.trim() && pixKey.trim() !== campaign.pixKey) body.pixKey = pixKey.trim();
+    const currentPix = campaign.ownerPixKey ?? campaign.pixKey;
+    if (pixKey.trim() && pixKey.trim() !== currentPix) body.pixKey = pixKey.trim();
+    if (bannerColor !== (campaign.bannerColor ?? 'coral')) body.bannerColor = bannerColor;
+    if (bannerKey !== undefined) body.bannerKey = bannerKey;
     if (Object.keys(body).length === 1) {
       setError('Nada mudou na campanha.');
       return;
@@ -348,6 +359,15 @@ export function EditSheet({
           onChangeText={setPixKey}
           autoCapitalize="none"
           maxLength={120}
+        />
+        <BannerPicker
+          token={token}
+          color={bannerColor}
+          onColor={setBannerColor}
+          bannerKey={bannerKey === undefined ? (campaign.bannerUrl ? 'atual' : null) : bannerKey}
+          onBanner={setBannerKey}
+          onError={setError}
+          initialPreview={campaign.bannerUrl ?? null}
         />
         <Input
           label="Motivo da mudança"

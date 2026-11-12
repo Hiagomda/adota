@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useScreenReader } from '../a11y/useScreenReader';
-import { deadlineLabel, formatCents, goalProgress } from '../campaign/campaign';
+import { deadlineLabel, formatCents, goalProgress, isBannerColor } from '../campaign/campaign';
 import { AppText, HeroSurface, Icon, Photo, Touchable, type IconName } from '../components/ui';
 import { categoryIcons, categoryLabels, spotsLabel } from '../events/agenda';
 import { fairWhen } from '../events/fairs';
@@ -51,7 +51,7 @@ function dayAndMonth(instant: string): { day: string; month: string } {
 
 function Slide({
   item,
-  hero,
+  hero: baseHero,
   width,
   position,
   count,
@@ -64,9 +64,21 @@ function Slide({
   count: number;
   onOpen: (item: Highlight) => void;
 }) {
+  let hero = baseHero;
+  const { colors } = useTheme();
   const label = `Destaque ${position + 1} de ${count}`;
   if (item.kind === 'campaign') {
     const { campaign } = item;
+    // Foto escolhida por quem abriu a campanha: texto branco sobre um véu escuro.
+    const photo = campaign.bannerUrl ?? null;
+    if (photo) {
+      hero = {
+        ...hero,
+        text: colors.onMedia,
+        muted: colors.onMedia,
+        glass: colors.onMediaMuted,
+      };
+    }
     const progress = goalProgress(campaign.raisedCents, campaign.goalCents);
     const left = deadlineLabel(campaign.deadline, belemToday());
     return (
@@ -84,6 +96,20 @@ function Slide({
           patternColor={hero.glass}
           style={styles.surface}
         >
+          {photo ? (
+            <>
+              <Photo
+                uri={photo}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                accessibilityLabel=""
+              />
+              <View
+                style={[StyleSheet.absoluteFill, { backgroundColor: colors.mediaScrim }]}
+                pointerEvents="none"
+              />
+            </>
+          ) : null}
           <View style={styles.row}>
             <View style={styles.copy}>
               <View style={[styles.tag, { backgroundColor: hero.glass }]}>
@@ -107,7 +133,7 @@ function Slide({
                 {`${shortMoney(campaign.raisedCents)} de ${shortMoney(campaign.goalCents)}`}
               </AppText>
             </View>
-            {campaign.coverUrl ? (
+            {campaign.coverUrl && !photo ? (
               <Photo
                 uri={campaign.coverUrl}
                 style={[styles.art, { borderColor: hero.glass }]}
@@ -255,7 +281,15 @@ export function HighlightBanner({
               <Slide
                 key={item.id}
                 item={item}
-                hero={item.kind === 'campaign' ? heroes.coral : heroes.turquoise}
+                hero={
+                  item.kind === 'campaign'
+                    ? heroes[
+                        isBannerColor(item.campaign.bannerColor)
+                          ? item.campaign.bannerColor
+                          : 'coral'
+                      ]
+                    : heroes.turquoise
+                }
                 width={width}
                 position={position}
                 count={count}
