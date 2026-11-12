@@ -32,5 +32,5 @@ jobs:
           JS
           node t.mjs
       - uses: actions/upload-artifact@v4
-        with: { name: prints, path: t/*.png
-      - run: cd t && for f in *.png; do echo "IMG $f"; base64 -w0 $f; echo; done }
+        with: { name: prints, path: t/*.png }
+      - run: cd t && for f in *.png; do echo "IMG $f"; base64 -w0 $f; echo; done
