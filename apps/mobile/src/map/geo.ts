@@ -108,3 +108,21 @@ export function accuracyPolygon(point: MapPoint, radiusM: number) {
     geometry: { type: 'Polygon' as const, coordinates: [ring] },
   };
 }
+
+/**
+ * Raio do círculo de "local aproximado". A API arredonda o ponto numa grade de 0,005° (cerca de
+ * 555 m de lado em Belém), então o lugar real fica a no máximo uns 390 m do ponto recebido.
+ */
+export const APPROX_RADIUS_M = 400;
+
+/** Círculos das patas cujo ponto veio arredondado (quem vê não é o dono, a equipe nem quem ajuda). */
+export function approxAreas(
+  posts: readonly { id: string; location: MapPoint & { exact: boolean } }[],
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: posts
+      .filter((post) => !post.location.exact)
+      .map((post) => ({ ...accuracyPolygon(post.location, APPROX_RADIUS_M), id: post.id })),
+  };
+}

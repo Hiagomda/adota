@@ -43,6 +43,7 @@ import {
   type LngLat,
 } from './cameraPolicy';
 import {
+  approxAreas,
   belem,
   boundsMoved,
   cameraFramesPoint,
@@ -101,6 +102,17 @@ const outlineStyle: ComponentProps<typeof LineLayer>['style'] = {
   lineOpacity: serviceLimit.lineOpacity,
   lineJoin: 'round',
   lineCap: 'round',
+};
+// Local aproximado: círculo claro em volta da pata, para ela não parecer um ponto exato.
+const approxFillStyle: ComponentProps<typeof FillLayer>['style'] = {
+  fillColor: mapColors.approxArea,
+  fillOpacity: 0.12,
+};
+const approxLineStyle: ComponentProps<typeof LineLayer>['style'] = {
+  lineColor: mapColors.approxArea,
+  lineWidth: 1.5,
+  lineOpacity: 0.5,
+  lineDasharray: [2, 2],
 };
 const maskStyle: ComponentProps<typeof FillLayer>['style'] = {
   fillColor: mapColors.outsideArea,
@@ -460,7 +472,7 @@ export function MapCanvas({
   const pinKey = posts
     .map(
       (post) =>
-        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
+        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}:${post.location.exact ? 1 : 0}`,
     )
     .sort()
     .join('|');
@@ -481,6 +493,8 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pinKey],
   );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const approxShape = useMemo(() => approxAreas(posts), [pinKey]);
 
   const partnerKey = partners
     .map(
@@ -740,6 +754,10 @@ export function MapCanvas({
         </ShapeSource>
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer id="service-outline-line" style={outlineStyle} />
+        </ShapeSource>
+        <ShapeSource id="approx-areas" shape={approxShape}>
+          <FillLayer id="approx-areas-fill" style={approxFillStyle} />
+          <LineLayer id="approx-areas-line" style={approxLineStyle} />
         </ShapeSource>
         {gps === 'ready' ? <UserPuck visible={tracking} /> : null}
         {styleReady ? <Images key={sprite} images={pawImages} /> : null}

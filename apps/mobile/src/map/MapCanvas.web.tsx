@@ -19,7 +19,7 @@ import { categoryLabels, type CommunityEvent } from '../events/agenda';
 import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
 import type { Post } from '../types';
-import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
+import { approxAreas, belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
 import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { eventPinUri, feedPointPinUri, partnerPinUri, pawUri } from './paw';
@@ -156,6 +156,30 @@ export function MapCanvas({
     // `isStyleLoaded` basta para projetar o pino na tela.
     const draw = () => {
       if (!map.isStyleLoaded()) return;
+      // Local aproximado: círculo claro em volta da pata (ver approxAreas).
+      const areas = approxAreas(postsRef.current);
+      const areaSource = map.getSource('approx-areas') as maplibregl.GeoJSONSource | undefined;
+      if (areaSource) areaSource.setData(areas);
+      else {
+        map.addSource('approx-areas', { type: 'geojson', data: areas });
+        map.addLayer({
+          id: 'approx-areas-fill',
+          type: 'fill',
+          source: 'approx-areas',
+          paint: { 'fill-color': mapColors.approxArea, 'fill-opacity': 0.12 },
+        });
+        map.addLayer({
+          id: 'approx-areas-line',
+          type: 'line',
+          source: 'approx-areas',
+          paint: {
+            'line-color': mapColors.approxArea,
+            'line-width': 1.5,
+            'line-opacity': 0.5,
+            'line-dasharray': [2, 2],
+          },
+        });
+      }
       markers.current.forEach((marker) => marker.remove());
       // Pontos solidários, parceiros e eventos primeiro, para as patas ficarem por cima.
       const feedMarkers = feedPointsRef.current.map((point) => {
@@ -300,7 +324,7 @@ export function MapCanvas({
   const pinKey = `${selectedId ?? ''}:${posts
     .map(
       (post) =>
-        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}`,
+        `${post.id}:${post.location.longitude.toFixed(5)}:${post.location.latitude.toFixed(5)}:${post.urgency}:${post.location.exact ? 1 : 0}`,
     )
     .join('|')}:${partners.map((partner) => `${partner.id}:${partner.kind}`).join('|')}:${feedPoints
     .map((point) => `${point.id}:${point.kind}`)

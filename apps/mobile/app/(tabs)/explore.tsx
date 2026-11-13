@@ -321,7 +321,11 @@ export default function ExploreScreen() {
                     {selected.referencePoint || selected.addressText || selected.approxLabel}
                   </AppText>
                   <AppText variant="caption" color="textSecondary">
-                    {[formatWhen(selected.createdAt), distanceLabel(here, selected.location)]
+                    {[
+                      formatWhen(selected.createdAt),
+                      distanceLabel(here, selected.location),
+                      selected.location.exact ? null : 'local aproximado',
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </AppText>
