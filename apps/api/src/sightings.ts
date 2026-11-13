@@ -7,7 +7,6 @@ import type { Env } from './config.js';
 import { reverseNeighborhood } from './geocode.js';
 import { HttpError } from './http.js';
 import { notifySighting } from './notify.js';
-import { canSeeExactPlace } from './privacy.js';
 import type { SessionUser } from './session.js';
 import { stripControls } from './text.js';
 
@@ -72,8 +71,6 @@ interface SightingRow {
   handle: string;
   exact_lat: number;
   exact_lng: number;
-  approx_lat: number;
-  approx_lng: number;
 }
 
 export function registerSightingRoutes(
@@ -183,13 +180,9 @@ export function registerSightingRoutes(
     );
     const gate = post.rows[0];
     if (!gate) return { sightings: [] };
-    // Same rule as the rescue pin: the exact point only for who is going, the author and the team.
-    const exact = canSeeExactPlace(viewer, gate.author_id, gate.viewer_will_help);
     const result = await pool.query<SightingRow>(
       `SELECT s.id, s.approx_label, s.note, s.created_at, u.name, u.handle,
-              ST_Y(s.location::geometry) AS exact_lat, ST_X(s.location::geometry) AS exact_lng,
-              ST_Y(ST_SnapToGrid(s.location::geometry, 0.005)::geometry) AS approx_lat,
-              ST_X(ST_SnapToGrid(s.location::geometry, 0.005)::geometry) AS approx_lng
+              ST_Y(s.location::geometry) AS exact_lat, ST_X(s.location::geometry) AS exact_lng
        FROM sightings s JOIN users u ON u.id = s.user_id
        WHERE s.post_id = $1 AND u.deleted_at IS NULL AND u.suspended = false
        ORDER BY s.created_at DESC
