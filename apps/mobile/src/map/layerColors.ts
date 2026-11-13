@@ -8,6 +8,9 @@ export const mapColors = {
   outsideArea: '#1B2B2B',
   areaOutline: lightColors.success,
   accuracy: lightColors.secondary,
+  /** Ponto de quem usa o app, no mapa do navegador (o nativo usa o do MapLibre). */
+  userDot: lightColors.info,
+  userDotRing: lightColors.surface,
   /** Área de toque invisível (opacidade quase zero) sobre os marcadores. */
   hitArea: lightColors.shadow,
 } as const;

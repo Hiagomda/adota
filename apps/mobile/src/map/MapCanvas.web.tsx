@@ -1,6 +1,20 @@
-import { useEffect, useRef } from 'react';
+import * as Location from 'expo-location';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+import { IconButton } from '../components/ui';
+import { reportError } from '../crash/reporter';
+import { ensureDeviceWatch, readDeviceFix, useViewerLocation } from '../place/deviceLocation';
+import { permissionOutcome } from '../permissions';
+import { radius, size, spacing, useTheme } from '../theme';
+import {
+  initialCameraState,
+  reduceCamera,
+  type CameraEvent,
+  type CameraState,
+} from './cameraPolicy';
+import { mapColors } from './layerColors';
+import { insideServiceArea } from './serviceArea';
 import { categoryLabels, type CommunityEvent } from '../events/agenda';
 import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
@@ -42,6 +56,7 @@ export function MapCanvas({
   onSelectEvent,
   selectedId,
   tracking,
+  controlsBottom = spacing.giant,
   onSelect,
   onDismiss,
   onCommitBounds,
@@ -56,7 +71,7 @@ export function MapCanvas({
   onSelectEvent?: (event: CommunityEvent) => void;
   selectedId: string | null;
   tracking: boolean;
-  /** Native map uses this to clear the tab bar. The web preview has no floating locate button. */
+  /** Espaço da barra de abas, ou do card aberto, para o botão "Minha localização". */
   controlsBottom?: number;
   onSelect: (post: Post) => void;
   onDismiss?: () => void;
@@ -78,6 +93,20 @@ export function MapCanvas({
   const onDismissRef = useRef(onDismiss);
   const onBoundsRef = useRef(onCommitBounds);
   const trackingRef = useRef(tracking);
+  const { colors, shadows } = useTheme();
+  const policy = useRef<CameraState>(initialCameraState);
+  const userMarker = useRef<Marker | null>(null);
+  const [gpsReady, setGpsReady] = useState(false);
+  const here = useViewerLocation();
+
+  /** A mesma regra de câmera do app Android: centraliza na pessoa uma vez, depois é dela. */
+  const apply = useCallback((event: CameraEvent) => {
+    const step = reduceCamera(policy.current, event);
+    policy.current = step.state;
+    if (step.move) {
+      mapRef.current?.easeTo({ center: step.move.center, zoom: step.move.zoom, duration: 600 });
+    }
+  }, []);
 
   useEffect(() => {
     postsRef.current = posts;
@@ -188,6 +217,12 @@ export function MapCanvas({
     if (map.isStyleLoaded()) start();
     map.on('styledata', start);
     map.on('click', () => onDismissRef.current?.());
+    // Arrasto, pinça ou roda do mouse: a câmera passa a ser da pessoa.
+    const handOver = (event: { originalEvent?: unknown }) => {
+      if (event.originalEvent) apply({ type: 'gesture' });
+    };
+    map.on('dragstart', handOver);
+    map.on('zoomstart', handOver);
     // Only gestures carry the browser event; our own moves and redraws do not.
     map.on('moveend', (event) => {
       draw();
@@ -196,10 +231,71 @@ export function MapCanvas({
     return () => {
       markers.current.forEach((marker) => marker.remove());
       markers.current = [];
+      userMarker.current?.remove();
+      userMarker.current = null;
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [apply]);
+
+  // Antes o mapa do navegador nunca pedia a localização: abria sempre em Belém e não mostrava
+  // onde a pessoa estava, diferente do Android.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        let permission = await Location.getForegroundPermissionsAsync();
+        if (!active) return;
+        if (!permission.granted && permission.canAskAgain) {
+          permission = await Location.requestForegroundPermissionsAsync();
+        }
+        if (!active) return;
+        if (permissionOutcome(permission) !== 'granted') {
+          apply({ type: 'gpsUnavailable' });
+          return;
+        }
+        ensureDeviceWatch();
+        const found = await readDeviceFix((fix) => {
+          if (!active) return;
+          setGpsReady(true);
+          apply({
+            type: 'gps',
+            point: [fix.longitude, fix.latitude],
+            inside: insideServiceArea(fix),
+          });
+        });
+        if (active && !found) apply({ type: 'gpsUnavailable' });
+      } catch (error) {
+        if (!active) return;
+        reportError(error, { source: 'handled', where: 'map:gps-web' });
+        apply({ type: 'gpsUnavailable' });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [apply]);
+
+  // O ponto azul acompanha a vigia do aparelho (alta precisão no navegador).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !here) return;
+    policy.current = { ...policy.current, user: [here.longitude, here.latitude] };
+    if (!userMarker.current) {
+      const dot = document.createElement('div');
+      dot.setAttribute('aria-label', 'Você está aqui');
+      dot.style.width = '18px';
+      dot.style.height = '18px';
+      dot.style.borderRadius = '999px';
+      dot.style.background = mapColors.userDot;
+      dot.style.border = `3px solid ${mapColors.userDotRing}`;
+      dot.style.boxShadow = '0 0 0 6px rgba(42, 100, 174, 0.2)';
+      dot.style.boxSizing = 'border-box';
+      dot.style.pointerEvents = 'none';
+      userMarker.current = new maplibregl.Marker({ element: dot, anchor: 'center' });
+    }
+    userMarker.current.setLngLat([here.longitude, here.latitude]).addTo(map);
+  }, [here]);
 
   const pinKey = `${selectedId ?? ''}:${posts
     .map(
@@ -217,24 +313,47 @@ export function MapCanvas({
 
   useEffect(() => {
     if (!focus || !tracking) return;
-    const move = () => mapRef.current?.easeTo({ center: focus, zoom: 15, duration: 600 });
+    // Pela regra de câmera: o pino pedido vence o centro do GPS, que chega depois.
+    const move = () => apply({ type: 'pin', point: focus });
     move();
     const timers = [600, 1400].map((delay) => setTimeout(move, delay));
     return () => {
       for (const timer of timers) clearTimeout(timer);
     };
-  }, [focus, tracking]);
+  }, [apply, focus, tracking]);
 
   return (
-    <View
-      ref={(node) => {
-        host.current = node as unknown as HTMLElement | null;
-      }}
-      style={styles.map}
-    />
+    <View style={styles.map}>
+      <View
+        ref={(node) => {
+          host.current = node as unknown as HTMLElement | null;
+        }}
+        style={styles.map}
+      />
+      {gpsReady ? (
+        <View pointerEvents="box-none" style={[styles.locate, { bottom: controlsBottom }]}>
+          <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
+            <IconButton
+              icon="crosshair"
+              variant="tonal"
+              accessibilityLabel="Minha localização"
+              onPress={() => apply({ type: 'locate' })}
+            />
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   map: { flex: 1, overflow: 'hidden' },
+  locate: { position: 'absolute', right: spacing.lg },
+  locateButton: {
+    width: size.touch,
+    height: size.touch,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

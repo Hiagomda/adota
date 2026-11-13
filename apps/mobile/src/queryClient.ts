@@ -1,4 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClient } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
 import { isRetryableError, setWriteHandler } from './api';
 import { logBestEffort } from './crash/bestEffort';
 import { listsAfterWrite } from './postLists';
@@ -22,3 +23,15 @@ setWriteHandler((method, path) => {
     void queryClient.invalidateQueries({ queryKey }).catch(logBestEffort('cache:after-write'));
   }
 });
+
+// No navegador o TanStack já recarrega o que está velho quando a aba volta. No Android não havia
+// nada parecido: voltar ao app mostrava a lista antiga, e o iPhone (web) via outra coisa. Agora a
+// volta ao app também recarrega o que passou dos 30 s.
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((handleFocus) => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      handleFocus(state === 'active');
+    });
+    return () => subscription.remove();
+  });
+}
