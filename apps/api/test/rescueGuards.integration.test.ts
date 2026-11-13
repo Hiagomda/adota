@@ -251,4 +251,62 @@ describe('proteções do resgate e da adoção', () => {
     const reports = await pool.query(`SELECT count(*)::int AS total FROM reports`);
     expect(reports.rows[0]?.total).toBe(1);
   });
+  it('quem publicou não diz "vou ajudar" no próprio resgate', async () => {
+    const authorId = await insertUser('autor@egua.local', 'autor');
+    const postId = await publish('autor@egua.local', authorId, 'rescue_alert');
+    const own = await respond(postId, 'autor@egua.local');
+    expect(own.statusCode).toBe(400);
+    expect(own.json().message).toContain('O animal já está seguro');
+    const post = await pool.query<{ status: string }>('SELECT status FROM posts WHERE id = $1', [
+      postId,
+    ]);
+    expect(post.rows[0]?.status).toBe('open');
+  });
+
+  it('quem ia ajudar e volta para aberto sai do resgate', async () => {
+    const authorId = await insertUser('autor@egua.local', 'autor');
+    await insertUser('um@egua.local', 'um');
+    await insertUser('dois@egua.local', 'dois');
+    const postId = await publish('autor@egua.local', authorId, 'rescue_alert');
+    expect((await respond(postId, 'um@egua.local')).statusCode).toBe(201);
+    expect((await respond(postId, 'dois@egua.local')).statusCode).toBe(201);
+    const status = async () =>
+      (await pool.query<{ status: string }>('SELECT status FROM posts WHERE id = $1', [postId]))
+        .rows[0]?.status;
+    const helpers = async () =>
+      (
+        await pool.query(`SELECT 1 FROM responses WHERE post_id = $1 AND kind = 'will_help'`, [
+          postId,
+        ])
+      ).rowCount;
+
+    // Ainda tem outra pessoa indo: o resgate continua a caminho, só "um" sai.
+    const first = await setStatus(postId, 'um@egua.local', 'open');
+    expect(first.statusCode).toBe(200);
+    expect(first.json().status).toBe('on_the_way');
+    expect(await status()).toBe('on_the_way');
+    expect(await helpers()).toBe(1);
+
+    // A última pessoa: volta a aberto e ninguém fica marcado como a caminho.
+    const last = await setStatus(postId, 'dois@egua.local', 'not_found');
+    expect(last.json().status).toBe('not_found');
+    expect(await status()).toBe('not_found');
+    expect(await helpers()).toBe(0);
+  });
+
+  it('conta suspensa recebe 403 com código, e o post dela não abre pelo link', async () => {
+    const authorId = await insertUser('susp@egua.local', 'susp');
+    const postId = await publish('susp@egua.local', authorId, 'rescue_alert');
+    await pool.query('UPDATE users SET suspended = true WHERE id = $1', [authorId]);
+    const me = await app.inject({ method: 'GET', url: '/me', headers: auth('susp@egua.local') });
+    expect(me.statusCode).toBe(403);
+    expect(me.json().code).toBe('account_suspended');
+    expect((await app.inject({ method: 'GET', url: `/posts/${postId}` })).statusCode).toBe(404);
+  });
+
+  it('cursor inválido responde 400, não erro do servidor', async () => {
+    const broken = Buffer.from('x|1|não é data|y').toString('base64url');
+    const response = await app.inject({ method: 'GET', url: `/posts?cursor=${broken}` });
+    expect(response.statusCode).toBe(400);
+  });
 });

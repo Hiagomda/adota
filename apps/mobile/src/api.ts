@@ -46,6 +46,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly kind: ApiErrorKind = 'http',
+    /** Código fixo da API, quando há (ex.: `account_suspended`). */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -157,9 +159,15 @@ export async function api<T>(path: string, init: ApiInit<T> = {}): Promise<T> {
   if (!response.ok) {
     if (response.status === 401 && init.token) onUnauthorized?.();
     const message = (payload as { message?: unknown } | null)?.message;
+    const code = (payload as { code?: unknown } | null)?.code;
+    if (response.status === 403 && code === 'account_suspended' && init.token) {
+      onSuspended?.(typeof message === 'string' ? message : messageForStatus(403));
+    }
     throw new ApiError(
       response.status,
       userFacingMessage(response.status, typeof message === 'string' ? message : undefined),
+      'http',
+      typeof code === 'string' ? code : undefined,
     );
   }
   if (method !== 'GET') onWrite?.(method, path);
@@ -201,6 +209,12 @@ function messageForStatus(status: number): string {
 }
 
 let onUnauthorized: (() => void) | null = null;
+let onSuspended: ((message: string) => void) | null = null;
+
+/** Chamado quando a API diz que a conta foi suspensa: o app desloga e mostra o motivo. */
+export function setSuspendedHandler(handler: (message: string) => void): void {
+  onSuspended = handler;
+}
 let onWrite: ((method: string, path: string) => void) | null = null;
 
 /** Avisado depois de cada escrita que deu certo, para quem guarda cache recarregar o que mudou. */

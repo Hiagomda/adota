@@ -65,7 +65,7 @@ import {
 } from './feed.js';
 import { ensureFirebaseApp, firebaseChecksRevocation, isTokenRejection } from './firebaseAdmin.js';
 import { reverseAddress } from './geocode.js';
-import { HttpError } from './http.js';
+import { ACCOUNT_SUSPENDED, HttpError } from './http.js';
 import {
   deleteUserUploads,
   publicMediaUrl,
@@ -459,14 +459,15 @@ export async function registerRoutes(
     const user = requireUser(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ status: animalStatusSchema }), request.body);
-    await changeStatus(pool, id, user, body.status);
-    await notifyStatusChange(pool, env, id, body.status).catch(
+    const result = await changeStatus(pool, id, user, body.status);
+    if (!result.changed) return { status: result.status };
+    await notifyStatusChange(pool, env, id, result.status).catch(
       bestEffort(request, 'notify:status'),
     );
-    await followupAfterStatus(pool, env, id, user, body.status).catch(
+    await followupAfterStatus(pool, env, id, user, result.status).catch(
       bestEffort(request, 'followup:status'),
     );
-    return { status: body.status };
+    return { status: result.status };
   });
 
   app.post('/posts/:id/responses', publishLimit, async (request, reply) => {
@@ -1030,7 +1031,9 @@ async function resolveUser(
   if (!authorization?.startsWith('Bearer ')) return null;
   const token = authorization.slice('Bearer '.length);
   if (env.authDevMode && token.startsWith('dev:')) {
-    return findUserByFirebaseUid(pool, token);
+    const user = await findUserByFirebaseUid(pool, token);
+    if (!user) await assertNotSuspended(pool, token);
+    return user;
   }
   if (!env.FIREBASE_PROJECT_ID) return null;
   await ensureFirebaseApp(env);
@@ -1047,6 +1050,7 @@ async function resolveUser(
   if (owner) await grantOwnerRole(pool, decoded.uid);
   const existing = await findUserByFirebaseUid(pool, decoded.uid);
   if (existing) return existing;
+  await assertNotSuspended(pool, decoded.uid);
   await createFirebaseUser(pool, {
     uid: decoded.uid,
     name: decoded.name,
@@ -1054,6 +1058,25 @@ async function resolveUser(
     role: owner ? 'admin' : 'user',
   });
   return findUserByFirebaseUid(pool, decoded.uid);
+}
+
+/**
+ * Conta suspensa respondia 401 como se a sessão tivesse vencido: o app renovava o token, levava
+ * 401 de novo e a pessoa nunca sabia o motivo. Agora é 403 com código próprio, e o app desloga
+ * mostrando o aviso.
+ */
+async function assertNotSuspended(pool: Pool, firebaseUid: string): Promise<void> {
+  const found = await pool.query(
+    `SELECT 1 FROM users WHERE firebase_uid = $1 AND deleted_at IS NULL AND suspended = true`,
+    [firebaseUid],
+  );
+  if ((found.rowCount ?? 0) > 0) {
+    throw new HttpError(
+      403,
+      'Sua conta foi suspensa pela equipe. Para entender o motivo, escreva para contato@eguaadota.com.br.',
+      ACCOUNT_SUSPENDED,
+    );
+  }
 }
 
 declare module 'fastify' {
