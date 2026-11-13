@@ -59,11 +59,6 @@ export function formatAppVersion(value: AppVersion = appVersion): string {
   return `versão ${value.version}`;
 }
 
-/** Para diagnóstico e relato de erro: "0.1.0 (build 3)". */
-export function formatAppVersionDetailed(value: AppVersion = appVersion): string {
-  return `${value.version} (build ${value.build})`;
-}
-
 /** Release name shared with the crash reporter, e.g. "app.egua.adota@1.0.0+3". */
 export function releaseName(value: AppVersion = appVersion): string {
   const id = value.applicationId ?? 'app.egua.adota';

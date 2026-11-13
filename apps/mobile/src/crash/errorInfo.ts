@@ -1,4 +1,4 @@
-import { formatAppVersionDetailed } from '../appVersion';
+import { formatAppVersion } from '../appVersion';
 
 export interface ErrorInfo {
   name: string;
@@ -50,7 +50,7 @@ export function errorCode(error: unknown): string {
 export function errorReportText(error: unknown, eventId: string | null): string {
   const info = describeError(error);
   const lines = [
-    `Égua, adota! ${formatAppVersionDetailed()}`,
+    `Égua, adota! ${formatAppVersion()}`,
     `Código: ${errorCode(error)}`,
     eventId ? `Evento: ${eventId}` : null,
     `${info.name}: ${info.message}`,

@@ -62,7 +62,7 @@ export function VersionMark() {
       <Touchable
         accessibilityRole="button"
         accessibilityLabel={`Versão ${formatAppVersion()}. Toque cinco vezes para o diagnóstico.`}
-        accessibilityHint="Cinco toques abrem o painel com build, aparelho e endereço da API"
+        accessibilityHint="Cinco toques abrem o painel com versão, aparelho e endereço da API"
         haptic={false}
         onPress={onTap}
         style={styles.hit}

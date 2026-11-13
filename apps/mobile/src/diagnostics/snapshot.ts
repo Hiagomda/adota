@@ -2,8 +2,7 @@ import { Platform } from 'react-native';
 import { apiUrl } from '../api';
 import {
   appVersion,
-  formatAppVersionDetailed,
-  releaseName,
+  formatAppVersion,
   type AppEnvironment,
 } from '../appVersion';
 import { sentryDsn } from '../crash/reporter';
@@ -58,8 +57,7 @@ export interface DiagnosticRow {
  */
 export function diagnosticRows(): DiagnosticRow[] {
   return [
-    { label: 'App', value: formatAppVersionDetailed() },
-    { label: 'Release', value: releaseName() },
+    { label: 'App', value: formatAppVersion() },
     { label: 'Ambiente', value: environmentLabel[appVersion.environment] },
     { label: 'Pacote', value: appVersion.applicationId ?? 'desconhecido' },
     { label: 'Commit', value: appVersion.commit ?? 'desconhecido' },
