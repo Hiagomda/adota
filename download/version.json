@@ -1,10 +1,9 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 46,
+  "androidVersionCode": 47,
   "notes": [
-    "No iPhone, sua posição no mapa agora vem do GPS e fica certinha.",
-    "Mapa mais limpo: um botão \"Camadas\" para mostrar eventos, ração e água e parceiros.",
-    "O mapa não afasta mais além de Belém.",
-    "Ao voltar para o app, as listas se atualizam sozinhas."
+    "A pata do animal agora aparece no lugar certo no mapa, igual no Android e no iPhone.",
+    "Seus dados continuam protegidos: endereço, referência e WhatsApp só para quem vai ajudar.",
+    "O botão agora diz \"Encontrou o animal\"."
   ]
 }
