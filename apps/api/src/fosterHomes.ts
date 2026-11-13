@@ -565,6 +565,9 @@ export function registerFosterHomeRoutes(
           );
         }
         const animalId = (await resolveAnimal(client, stay.animal_id)) ?? stay.animal_id;
+        // Trava o animal: duas Casas Amigas aceitando o mesmo animal no mesmo segundo passavam as
+        // duas pela conferência abaixo, porque a trava de cima é por casa, não por animal.
+        await client.query(`SELECT 1 FROM animals WHERE id = $1 FOR UPDATE`, [animalId]);
         const elsewhere = await client.query(
           `SELECT 1 FROM foster_stays WHERE animal_id = $1 AND status = 'approved' AND id <> $2`,
           [animalId, id],
