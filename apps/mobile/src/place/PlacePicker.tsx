@@ -8,6 +8,7 @@ import {
 } from '@maplibre/maplibre-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { MIN_MAP_ZOOM } from '../map/cameraPolicy';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
 import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from '../map/serviceArea';
 import { mapColors, serviceLimit } from '../map/layerColors';
@@ -85,7 +86,7 @@ export function PlacePicker({
       >
         <Camera
           ref={camera}
-          minZoomLevel={8.5}
+          minZoomLevel={MIN_MAP_ZOOM}
           maxBounds={{
             ne: [serviceCamera.east, serviceCamera.north],
             sw: [serviceCamera.west, serviceCamera.south],

@@ -8,6 +8,12 @@ export interface MapBounds {
   north: number;
 }
 
+/**
+ * O máximo que dá para afastar. Com 8,5 a pessoa puxava até ver o Pará inteiro, com Belém
+ * pequenininha e quase tudo coberto pelo véu de fora da área. 10 ainda mostra Belém, as ilhas
+ * e Mosqueiro numa tela de celular.
+ */
+export const MIN_MAP_ZOOM = 10;
 export const CITY_ZOOM = 12;
 export const USER_ZOOM = 14;
 export const PIN_ZOOM = 15;
