@@ -443,7 +443,7 @@ export default function PostScreen() {
               }
             : helpingNow
               ? {
-                  title: 'Encontrei o animal',
+                  title: 'Encontrou o animal',
                   icon: 'check',
                   variant: 'secondary',
                   onPress: () => setFoundOpen(true),

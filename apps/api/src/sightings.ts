@@ -203,9 +203,8 @@ export function registerSightingRoutes(
         note: row.note,
         createdAt: row.created_at.toISOString(),
         author: { name: row.name, handle: row.handle },
-        location: exact
-          ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }
-          : { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
+        // Exato para todos, como o ponto do resgate (decisão de 13/11/2026).
+        location: { latitude: row.exact_lat, longitude: row.exact_lng, exact: true },
       })),
     };
   });

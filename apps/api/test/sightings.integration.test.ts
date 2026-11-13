@@ -80,7 +80,7 @@ describe('sightings', () => {
     await pool.end();
   });
 
-  it('records a sighting, tells the author and shows the exact point only to them', async () => {
+  it('records a sighting, tells the author and shows the exact point to everyone', async () => {
     const postId = await rescue();
     await insertUser('passerby@egua.local', 'passerby');
     expect((await sight(postId, 'passerby@egua.local')).statusCode).toBe(201);
@@ -91,8 +91,7 @@ describe('sightings', () => {
     expect(forAuthor[0].location).toEqual({ ...seen, exact: true });
 
     const forAll = (await list(postId)).json().sightings;
-    expect(forAll[0].location.exact).toBe(false);
-    expect(forAll[0].location.latitude).not.toBe(seen.latitude);
+    expect(forAll[0].location).toEqual({ ...seen, exact: true });
 
     const notice = await pool.query(
       `SELECT payload FROM notifications n JOIN users u ON u.id = n.user_id

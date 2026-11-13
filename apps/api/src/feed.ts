@@ -965,9 +965,10 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
         // Cores do pelo (busca de perdidos). APKs antigos ignoram.
         colors: row.animal_colors ?? [],
       },
-      location: exact
-        ? { latitude: row.exact_lat, longitude: row.exact_lng, exact: true }
-        : { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
+      // Desde 13/11/2026 (decisão do Hiago) o ponto do animal é exato para todos: ele está na
+      // rua, e o ponto arredondado parecia errado no mapa. Endereço digitado, referência,
+      // precisão do GPS e WhatsApp continuam só para quem pode ver (publicPlace e contact).
+      location: { latitude: row.exact_lat, longitude: row.exact_lng, exact: true },
       accuracyM: place.accuracyM,
       addressText: place.addressText,
       referencePoint: place.referencePoint,

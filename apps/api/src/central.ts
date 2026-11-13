@@ -132,8 +132,8 @@ export async function loadCentral(
   const result = await pool.query<CaseRow>(
     `SELECT p.id, p.urgency, p.status, p.created_at, p.approx_label, p.author_id,
             a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.health_notes,
-            ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
-            ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
+            ST_Y(p.location::geometry) AS approx_lat,
+            ST_X(p.location::geometry) AS approx_lng,
             ${distance} AS distance_m,
             (SELECT count(*)::int FROM responses r WHERE r.post_id = p.id AND r.kind = 'will_help') AS going,
             -- Pedido de acolhimento numa Casa Amiga: aprovado vale mais que só pedido.
@@ -251,8 +251,8 @@ export async function loadCentral(
       createdAt: row.created_at.toISOString(),
       lastActivityAt: row.last_activity_at.toISOString(),
       approxLabel: row.approx_label,
-      // Sempre o ponto aproximado: o exato continua só para quem vai ajudar, no post.
-      location: { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
+      // Ponto exato para todos desde 13/11/2026 (decisão do Hiago); a coluna mantém o nome antigo.
+      location: { latitude: row.approx_lat, longitude: row.approx_lng, exact: true },
       distanceKm,
       animal: {
         id: row.animal_id,

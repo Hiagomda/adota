@@ -789,8 +789,8 @@ export function registerLostMatchRoutes(
       `SELECT p.id, p.created_at, p.approx_label, p.description,
               a.species, a.size, a.sex, a.colors, a.name, ${animalText('p', 'a')} AS text,
               d.meters,
-              ST_Y(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lat,
-              ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
+              ST_Y(p.location::geometry) AS approx_lat,
+              ST_X(p.location::geometry) AS approx_lng,
               (SELECT pm.url FROM post_media pm WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1)
                 AS photo
        FROM posts p
@@ -845,7 +845,7 @@ export function registerLostMatchRoutes(
             approxLabel: row.approx_label,
             createdAt: row.created_at.toISOString(),
             description: row.description.slice(0, 280),
-            location: { latitude: row.approx_lat, longitude: row.approx_lng, exact: false },
+            location: { latitude: row.approx_lat, longitude: row.approx_lng, exact: true },
             animal: {
               species: row.species,
               size: row.size,

@@ -25,7 +25,7 @@ export type OperationStep = 'depart' | 'arrive' | 'found' | 'summary' | 'done';
 export const operationSteps: { value: Exclude<OperationStep, 'done'>; title: string }[] = [
   { value: 'depart', title: 'Saí para ajudar' },
   { value: 'arrive', title: 'Cheguei ao local' },
-  { value: 'found', title: 'Encontrei o animal?' },
+  { value: 'found', title: 'Encontrou o animal?' },
   { value: 'summary', title: 'Resumo do atendimento' },
 ];
 

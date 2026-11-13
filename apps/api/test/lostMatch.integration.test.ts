@@ -238,7 +238,7 @@ describe('busca de animais perdidos', () => {
     expect(search.statusCode).toBe(200);
     const [first] = search.json().results;
     expect(first.post.id).toBe(lostId);
-    expect(first.post.location.exact).toBe(false);
+    expect(first.post.location.exact).toBe(true);
     expect(JSON.stringify(first)).not.toContain('98888');
     const cats = await app.inject({
       method: 'GET',
