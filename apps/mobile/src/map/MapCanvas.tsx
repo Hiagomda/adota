@@ -53,7 +53,7 @@ import {
   type MapBounds,
 } from './geo';
 import { mapColors, serviceLimit } from './layerColors';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
+import { insideServiceArea, serviceCenter, serviceMask, serviceOutline } from './serviceArea';
 
 const pawImages = {
   pawHigh: require('../../assets/paw-high.png') as number,
@@ -76,8 +76,8 @@ const pawImages = {
 };
 
 const cameraBounds = {
-  ne: [serviceCamera.east, serviceCamera.north] as [number, number],
-  sw: [serviceCamera.west, serviceCamera.south] as [number, number],
+  ne: [serviceCenter.east, serviceCenter.north] as [number, number],
+  sw: [serviceCenter.west, serviceCenter.south] as [number, number],
 };
 
 // Constante de módulo: um objeto novo a cada render faria a <Camera> renderizar de novo.
