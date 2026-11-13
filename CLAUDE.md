@@ -108,6 +108,13 @@ curl.exe -sS "https://api.eguaadota.com.br/health"
 
 Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, APK com `Content-Length` do release. Só então diga ao Hiago para fechar e reabrir o app.
 
+### Desenvolvimento x produção
+
+- `develop` = ambiente de teste. Trabalho novo sai de `develop` e volta por PR para `develop`. O workflow **Ambiente de teste** (`deploy-dev.yml`) compila o app web com os endereços de teste, publica no release `web-dev` e manda o Coolify fazer deploy do recurso de teste (`docker-compose.dev.yml`, banco/fotos/Redis próprios, sem backup, `SEED_IF_EMPTY`).
+- Endereços de teste: `dev.eguaadota.com.br` (site), `app.dev.` (download e /app), `api.dev.`, `img.dev.`, `media.dev.` e `admin.dev.` (painel do AdotaSite `develop`). Firebase é o mesmo projeto: a conta é a mesma, mas os dados no banco de teste são outros.
+- `master` = produção. Só recebe PR de `develop` (ou correção urgente, que depois volta para `develop`). O passo a passo do "suba tudo" abaixo continua valendo para o `master`.
+- O APK sempre aponta para a produção. Para testar no celular antes de publicar, use `https://app.dev.eguaadota.com.br/app`.
+
 ### Deploy (VPS) — referência rápida
 
 - Coolify sobe `docker-compose.coolify.yml` a partir do GitHub **`master`**.

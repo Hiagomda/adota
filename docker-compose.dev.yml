@@ -1,0 +1,162 @@
+# Ambiente de TESTE (homologação). Sobe a partir do branch `develop`, num recurso separado do Coolify,
+# com banco, Redis, fotos e cache próprios: nada aqui encosta nos dados da produção.
+# A produção continua em docker-compose.coolify.yml, a partir do `master`.
+# Endereços: dev.eguaadota.com.br (site), app.dev., api.dev., img.dev., media.dev. e admin.dev.
+# Sem backup diário (os dados de teste podem ser apagados) e com menos memória que a produção.
+
+name: egua-adota-dev
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    environment:
+      POSTGRES_USER: patinha
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_DB: patinha
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U patinha -d patinha']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    environment:
+      SERVICE_URL_MINIO_9000: https://media.dev.eguaadota.com.br
+      MINIO_SERVER_URL: https://media.dev.eguaadota.com.br
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MINIO}
+      MINIO_DEFAULT_BUCKETS: patinha-media
+    volumes:
+      - minio:/bitnami/minio/data
+    restart: unless-stopped
+    mem_limit: 384m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # O `imgproxy` é o cache (nginx) com o domínio público. Ele guarda as fotos já redimensionadas
+  # e só chama o imgproxy-origin na primeira vez.
+  imgproxy:
+    build:
+      context: .
+      dockerfile: docker/imgcache.Dockerfile
+    environment:
+      SERVICE_URL_IMGPROXY_8080: https://img.dev.eguaadota.com.br
+    volumes:
+      - imgcache:/var/cache/imgproxy
+    depends_on:
+      - imgproxy-origin
+    restart: unless-stopped
+    mem_limit: 128m
+
+  imgproxy-origin:
+    image: darthsim/imgproxy:v3.30.1
+    environment:
+      IMGPROXY_USE_S3: 'true'
+      IMGPROXY_S3_ENDPOINT: http://minio:9000
+      IMGPROXY_S3_REGION: us-east-1
+      IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE: 'true'
+      IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: 'true'
+      IMGPROXY_STRIP_METADATA: 'true'
+      IMGPROXY_ALLOWED_SOURCES: s3://patinha-media/
+      IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
+      IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
+      AWS_ACCESS_KEY_ID: ${SERVICE_USER_MINIO}
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_64_MINIO}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      SERVICE_URL_API_3010: https://api.dev.eguaadota.com.br
+      NODE_ENV: production
+      PORT: '3010'
+      DATABASE_URL: postgres://patinha:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/patinha
+      REDIS_URL: redis://redis:6379
+      AUTH_DEV_MODE: 'false'
+      FIREBASE_PROJECT_ID: egua-adota
+      OWNER_EMAILS: hiago.yan@hotmail.com
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: https://media.dev.eguaadota.com.br
+      MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
+      MINIO_SECRET_KEY: ${SERVICE_PASSWORD_64_MINIO}
+      MINIO_BUCKET: patinha-media
+      IMGPROXY_URL: https://img.dev.eguaadota.com.br
+      IMGPROXY_KEY: ${SERVICE_HEX_64_IMGPROXY}
+      IMGPROXY_SALT: ${SERVICE_HEX_64_IMGSALT}
+      WEB_ORIGIN: https://app.dev.eguaadota.com.br,https://dev.eguaadota.com.br
+      # Endereço do painel da equipe (repositório AdotaSite).
+      ADMIN_ORIGIN: https://admin.dev.eguaadota.com.br
+      SEED_IF_EMPTY: 'true'
+      # Sem Sentry no teste, para os erros de teste não se misturarem com os da produção.
+      SENTRY_DSN: ''
+    command:
+      - sh
+      - -c
+      - pnpm --filter @patinha/api db:migrate && pnpm --filter @patinha/api db:seed && pnpm --filter @patinha/api start
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 384m
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  download:
+    build:
+      context: .
+      dockerfile: docker/download.Dockerfile
+      args:
+        # App web do iPhone compilado do `develop` (workflow "App web de teste"), que chama a API de teste.
+        WEB_URL: https://github.com/Hiagomda/adota/releases/download/web-dev/egua-adota-web.tar.gz
+    environment:
+      SERVICE_URL_DOWNLOAD_80: https://app.dev.eguaadota.com.br
+      # O app web (/app) envia fotos por /media/ e o MinIO confere a assinatura com este host.
+      MINIO_PUBLIC_HOST: media.dev.eguaadota.com.br
+    volumes:
+      - apk:/apk
+    restart: unless-stopped
+    mem_limit: 64m
+
+volumes:
+  postgres:
+  minio:
+  apk:
+  imgcache:
