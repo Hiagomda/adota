@@ -1,0 +1,98 @@
+name: Ambiente de teste
+
+# Todo push no `develop` atualiza o ambiente de teste (dev.eguaadota.com.br e app.dev., api.dev., ...):
+#  1. compila o app web do iPhone apontando para a API de teste e publica no release `web-dev`;
+#  2. pede ao Coolify um deploy do recurso de teste, sem cache, para baixar o app web novo.
+# A produção (master, docker-compose.coolify.yml) não é tocada por este workflow.
+#
+# Secrets do repositório:
+#   MOBILE_ENV           o mesmo do Compilar APK (Firebase e Google são os mesmos nos dois ambientes)
+#   COOLIFY_DEV_DEPLOY   endereço "Deploy Webhook" do recurso de teste no Coolify (aba Webhooks)
+#   COOLIFY_API_TOKEN    token da API do Coolify (Keys & Tokens), com permissão de deploy
+# Sem os dois do Coolify o app web é publicado e o deploy fica para o botão do painel.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: App web de teste
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+      - name: Compilar o pacote compartilhado
+        run: pnpm --filter @patinha/shared build
+
+      - name: Escrever apps/mobile/.env
+        env:
+          MOBILE_ENV: ${{ secrets.MOBILE_ENV }}
+        run: |
+          set -eu
+          test -n "$MOBILE_ENV" || { echo "O secret MOBILE_ENV está vazio"; exit 1; }
+          printf '%s\n' "$MOBILE_ENV" > apps/mobile/.env
+
+      # Igual ao Compilar APK, mas com os endereços de teste. Os valores daqui ganham do .env.
+      - name: Exportar o app web
+        working-directory: apps/mobile
+        env:
+          EXPO_WEB_BASE_URL: /app
+          EXPO_PUBLIC_API_URL: /api
+          EXPO_PUBLIC_DOWNLOAD_URL: https://app.dev.eguaadota.com.br
+          EXPO_PUBLIC_WEB_PROXY_ROUTES: >-
+            https://img.dev.eguaadota.com.br=/img,https://media.dev.eguaadota.com.br=/media
+        run: |
+          set -eu
+          node --env-file=.env ../../node_modules/expo/bin/cli export --platform web --output-dir "$RUNNER_TEMP/web"
+          node scripts/web-pwa.mjs "$RUNNER_TEMP/web" /app
+          tar -czf "$RUNNER_TEMP/egua-adota-web.tar.gz" -C "$RUNNER_TEMP/web" .
+
+      - name: Publicar no release web-dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag=web-dev
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --prerelease --target "$GITHUB_SHA" \
+              --title "App web do ambiente de teste" \
+              --notes "Atualizado a cada push no develop. Não é versão para o público."
+          fi
+          gh release upload "$tag" "$RUNNER_TEMP/egua-adota-web.tar.gz" --clobber
+
+      - name: Deploy no Coolify (teste)
+        env:
+          DEPLOY_URL: ${{ secrets.COOLIFY_DEV_DEPLOY }}
+          TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+        run: |
+          set -eu
+          if [ -z "$DEPLOY_URL" ] || [ -z "$TOKEN" ]; then
+            echo "Sem COOLIFY_DEV_DEPLOY ou COOLIFY_API_TOKEN: faça o deploy do recurso de teste pelo painel."
+            exit 0
+          fi
+          # force=true: sem cache, para o container baixar o app web que acabou de ser publicado.
+          case "$DEPLOY_URL" in
+            *force=*) url="$DEPLOY_URL" ;;
+            *\?*) url="$DEPLOY_URL&force=true" ;;
+            *) url="$DEPLOY_URL?force=true" ;;
+          esac
+          curl -fsS -H "Authorization: Bearer $TOKEN" "$url"

@@ -1,5 +1,7 @@
 FROM nginx:1.27-alpine
 ARG APK_URL=https://github.com/Hiagomda/adota/releases/download/apk-0.1.0-47/egua-adota.apk
+# App web de outro lugar (o ambiente de teste usa o do release web-dev). Vazio = o do mesmo release do APK.
+ARG WEB_URL=
 # Vira /etc/nginx/conf.d/default.conf no entrypoint, com o host público do MinIO preenchido.
 COPY docker/download-nginx.conf /etc/nginx/templates/default.conf.template
 COPY docker/download-security-headers.conf /etc/nginx/snippets/security-headers.conf
@@ -18,7 +20,8 @@ RUN chmod +x /entrypoint.sh \
   && if [ -n "$APK_URL" ]; then \
     apk add --no-cache wget \
     && wget -O /opt/egua-adota.apk "$APK_URL" \
-    && if wget -O /tmp/web.tar.gz "${APK_URL%/*}/egua-adota-web.tar.gz"; then \
+    && web_url="${WEB_URL:-${APK_URL%/*}/egua-adota-web.tar.gz}" \
+    && if wget -O /tmp/web.tar.gz "$web_url"; then \
       tar -xzf /tmp/web.tar.gz -C /usr/share/nginx/html/app && rm /tmp/web.tar.gz; \
     else echo "Release sem egua-adota-web.tar.gz: o app web fica para o próximo build."; fi; \
   fi \
