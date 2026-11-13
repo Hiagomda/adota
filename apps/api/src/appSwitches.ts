@@ -20,8 +20,12 @@ export type AppSwitches = Record<AppSwitchName, boolean>;
 const defaults: AppSwitches = { partnerInvite: false };
 
 const names = Object.keys(appSwitchKeys) as AppSwitchName[];
-const nameSchema = z.object({ name: z.enum(names as [AppSwitchName, ...AppSwitchName[]]) });
-const bodySchema = z.object({ enabled: z.boolean() }).strict();
+const bodySchema = z
+  .object({
+    name: z.enum(names as [AppSwitchName, ...AppSwitchName[]]),
+    enabled: z.boolean(),
+  })
+  .strict();
 
 export async function loadAppSwitches(pool: Pool): Promise<AppSwitches> {
   const result = await pool.query<{ key: string; enabled: boolean }>(
@@ -50,15 +54,13 @@ export function registerAppSwitchRoutes(app: FastifyInstance, deps: { pool: Pool
     return { switches: await loadAppSwitches(pool) };
   });
 
-  app.put('/admin/v1/switches/:name', async (request) => {
+  // POST com o nome no corpo: o proxy do painel (AdotaSite) só repassa POST e ids em uuid.
+  app.post('/admin/v1/switches', async (request) => {
     const session = await loadSession(pool, request);
     assertPermission(session.role, 'posts.moderate');
-    const params = nameSchema.safeParse(request.params);
     const body = bodySchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new HttpError(400, 'Confira os dados e tente de novo.');
-    }
-    const name = params.data.name;
+    if (!body.success) throw new HttpError(400, 'Confira os dados e tente de novo.');
+    const name = body.data.name;
     const before = await loadAppSwitches(pool);
     await pool.query(
       `INSERT INTO app_switches (key, enabled, updated_by, updated_at)
