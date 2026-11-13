@@ -131,7 +131,7 @@ describe('rescue central', () => {
     expect(first?.reasons).toContain('Ninguém a caminho');
     expect(second?.goingCount).toBe(1);
     expect(second?.volunteers).toEqual([{ name: 'vizinho', handle: 'vizinho', avatarUrl: null }]);
-    expect(first?.location.exact).toBe(false);
+    expect(first?.location.exact).toBe(true);
     expect(first?.distanceKm).toBeGreaterThanOrEqual(0.5);
     expect(page.summary).toEqual({
       activeCases: 2,

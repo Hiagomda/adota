@@ -98,7 +98,7 @@ describe('posts', () => {
     expect(outside.json().posts).toHaveLength(0);
   });
 
-  it('hides the exact point until someone commits to help', async () => {
+  it('mostra o ponto exato do animal a todos e esconde o endereço até alguém ir ajudar', async () => {
     await insertUser('author@egua.local', 'author');
     await insertUser('helper@egua.local', 'helper');
     const created = await createAlert(app, 'author@egua.local', 'Filhote sozinho.');
@@ -106,8 +106,10 @@ describe('posts', () => {
 
     const stranger = await app.inject({ method: 'GET', url: `/posts/${postId}` });
     const publicLocation = stranger.json().location;
-    expect(publicLocation.exact).toBe(false);
-    expect(publicLocation.latitude).not.toBeCloseTo(-1.45234, 4);
+    // Desde 13/11/2026 o pin do animal é exato para todos; o resto do lugar continua escondido.
+    expect(publicLocation.exact).toBe(true);
+    expect(publicLocation.latitude).toBeCloseTo(-1.45234, 4);
+    expect(stranger.json().accuracyM).toBeNull();
 
     const author = await app.inject({
       method: 'GET',

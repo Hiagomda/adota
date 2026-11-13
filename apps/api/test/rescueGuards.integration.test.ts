@@ -103,7 +103,7 @@ describe('proteções do resgate e da adoção', () => {
       headers: auth('estranho@egua.local'),
     });
     expect(view.json().status).toBe('for_adoption');
-    expect(view.json().location.exact).toBe(false);
+    expect(view.json().location.exact).toBe(true);
     expect(view.json().author.phone).toBeNull();
   });
 
