@@ -36,6 +36,7 @@ import { registerOperationRoutes } from './operation.js';
 import { followupAfterStatus, registerFollowupRoutes } from './followups.js';
 import { registerLostMatchRoutes } from './lostMatch.js';
 import { registerFeedPointRoutes } from './feedPoints.js';
+import { registerAppSwitchRoutes } from './appSwitches.js';
 import { registerBugReportRoutes } from './bugReports.js';
 import { registerPartnerRoutes } from './partners.js';
 import { registerPassportRoutes } from './passport.js';
@@ -960,6 +961,7 @@ export async function registerRoutes(
   registerPartnerRoutes(app, { pool, writeLimit, strictLimit });
   registerFeedPointRoutes(app, { env, pool, storage, writeLimit, strictLimit });
   registerBugReportRoutes(app, { pool, writeLimit });
+  registerAppSwitchRoutes(app, { pool });
   await registerStaffRoutes(app, { env, pool, queue });
 }
 

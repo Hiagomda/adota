@@ -2,14 +2,13 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, messageFrom } from '../../src/api';
 import {
   AppText,
   Button,
   Card,
-  Chip,
   Icon,
   IconButton,
   StatusPill,
@@ -25,6 +24,8 @@ import { useViewerLocation } from '../../src/place/deviceLocation';
 import { useMapAim } from '../../src/map/focusRequest';
 import { mergePaws } from '../../src/map/knownPaws';
 import { MapCanvas } from '../../src/map/MapCanvas';
+import { MapLayersButton, MapLayersPanel } from '../../src/map/MapLayers';
+import { useAppSwitches } from '../../src/appSwitches';
 import { belemBounds, boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
 import { liveEvent } from '../../src/home/highlights';
 import { Mascot } from '../../src/mascot';
@@ -72,6 +73,8 @@ export default function ExploreScreen() {
   const [showFeedPoints, setShowFeedPoints] = useState(true);
   const [feedPointSelection, setFeedPointSelection] = useState<FeedPoint | null>(null);
   const [showEvents, setShowEvents] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const switches = useAppSwitches();
   const [eventSelection, setEventSelection] = useState<CommunityEvent | null>(null);
   const closedAim = useRef<number | null>(null);
   const ignoreSelectUntil = useRef(0);
@@ -168,6 +171,7 @@ export default function ExploreScreen() {
     setPartnerSelection(null);
     setFeedPointSelection(null);
     setEventSelection(null);
+    setLayersOpen(false);
   }, [aim]);
   const selectPartner = useCallback(
     (partner: Partner) => {
@@ -212,9 +216,8 @@ export default function ExploreScreen() {
     eventSelection !== null;
   const controlsBottom =
     insets.bottom + (cardOpen ? spacing.giant * 4 : spacing.giant + spacing.lg);
-  // A fileira de camadas ocupa a largura toda; o botão "Minha localização" fica logo acima dela.
-  const [layerRowHeight, setLayerRowHeight] = useState(0);
-  const locateBottom = cardOpen ? controlsBottom : controlsBottom + layerRowHeight + spacing.sm;
+  // O botão "Camadas" fica à esquerda, na mesma altura do "Minha localização" (à direita).
+  const locateBottom = controlsBottom;
 
   const bannerText = feed.isError
     ? messageFrom(feed.error)
@@ -388,37 +391,37 @@ export default function ExploreScreen() {
         </View>
       ) : null}
       {!cardOpen ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          style={[styles.layerRow, { bottom: controlsBottom }]}
-          contentContainerStyle={styles.layerChips}
-          onLayout={(event) => setLayerRowHeight(Math.round(event.nativeEvent.layout.height))}
-        >
-          <Chip
-            label="Eventos"
-            icon="calendar"
-            selected={showEvents}
-            onPress={() => setShowEvents((value) => !value)}
+        <View pointerEvents="box-none" style={[styles.layers, { bottom: controlsBottom }]}>
+          {layersOpen ? (
+            <MapLayersPanel
+              value={{ events: showEvents, feedPoints: showFeedPoints, partners: showPartners }}
+              onChange={(next) => {
+                setShowEvents(next.events);
+                setShowFeedPoints(next.feedPoints);
+                setShowPartners(next.partners);
+              }}
+              onAddFeedPoint={() => {
+                setLayersOpen(false);
+                router.push('/pontos');
+              }}
+              onAdvertise={
+                switches.partnerInvite
+                  ? () => {
+                      setLayersOpen(false);
+                      router.push('/parceiros');
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
+          <MapLayersButton
+            open={layersOpen}
+            hidden={[showEvents, showFeedPoints, showPartners].filter((on) => !on).length}
+            onPress={() => setLayersOpen((value) => !value)}
           />
-          <Chip
-            label="Ração e água"
-            icon="droplet"
-            selected={showFeedPoints}
-            onPress={() => setShowFeedPoints((value) => !value)}
-          />
-          <Chip label="Adicionar ponto" icon="plus" onPress={() => router.push('/pontos')} />
-          <Chip
-            label="Parceiros"
-            icon="home"
-            selected={showPartners}
-            onPress={() => setShowPartners((value) => !value)}
-          />
-          <Chip label="Anuncie aqui" icon="volume-2" onPress={() => router.push('/parceiros')} />
-        </ScrollView>
+        </View>
       ) : null}
-      <PartnerInvite active={focused && !cardOpen} />
+      {switches.partnerInvite ? <PartnerInvite active={focused && !cardOpen} /> : null}
     </View>
   );
 }
@@ -437,15 +440,14 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   cardHead: { alignItems: 'flex-end' },
-  // Rola de lado de uma borda à outra da tela, abaixo do botão "Minha localização".
-  layerRow: {
+  // Botão "Camadas" no canto de baixo à esquerda; o painel abre logo acima dele.
+  layers: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    flexGrow: 0,
+    left: spacing.lg,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     zIndex: 20,
   },
-  layerChips: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   cardBody: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   photo: { width: PHOTO_WIDTH, height: PHOTO_HEIGHT, borderRadius: radius.md },

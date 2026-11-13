@@ -35,6 +35,7 @@ import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permis
 import type { Post } from '../types';
 import { radius, size, spacing, useTheme } from '../theme';
 import {
+  MIN_MAP_ZOOM,
   initialCameraState,
   reduceCamera,
   type CameraEvent,
@@ -229,7 +230,7 @@ const StableCamera = memo(function StableCamera({
   return (
     <Camera
       ref={cameraRef}
-      minZoomLevel={8.5}
+      minZoomLevel={MIN_MAP_ZOOM}
       maxBounds={cameraBounds}
       defaultSettings={defaultCamera}
     />

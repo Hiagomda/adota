@@ -1,9 +1,10 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import { MIN_MAP_ZOOM } from './cameraPolicy';
 import { mapColors, serviceLimit } from './layerColors';
 import { serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 
 export function limitMapToBelem(map: MapLibreMap) {
-  map.setMinZoom(8.5);
+  map.setMinZoom(MIN_MAP_ZOOM);
   map.setMaxBounds([
     [serviceCamera.west, serviceCamera.south],
     [serviceCamera.east, serviceCamera.north],
