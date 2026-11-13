@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { MIN_MAP_ZOOM } from '../map/cameraPolicy';
 import { accuracyPolygon, belem, mapStyleUrl, type MapPoint } from '../map/geo';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from '../map/serviceArea';
+import { insideServiceArea, serviceCenter, serviceMask, serviceOutline } from '../map/serviceArea';
 import { mapColors, serviceLimit } from '../map/layerColors';
 import { radius, useTheme } from '../theme';
 import type { Urgency } from '../map/paw';
@@ -88,8 +88,8 @@ export function PlacePicker({
           ref={camera}
           minZoomLevel={MIN_MAP_ZOOM}
           maxBounds={{
-            ne: [serviceCamera.east, serviceCamera.north],
-            sw: [serviceCamera.west, serviceCamera.south],
+            ne: [serviceCenter.east, serviceCenter.north],
+            sw: [serviceCenter.west, serviceCenter.south],
           }}
           defaultSettings={{ centerCoordinate: belem, zoomLevel: 17 }}
         />
