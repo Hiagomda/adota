@@ -1,10 +1,10 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 45,
+  "androidVersionCode": 46,
   "notes": [
-    "Criar evento com o local marcado no mapa, e os eventos aparecem no mapa com o desenho de cada tipo.",
-    "Borda de Belém no mapa sem linha dupla.",
-    "Campanhas com foto no banner, Pix com copiar e QR code e aprovação da equipe.",
-    "Achou um bug? O besourinho manda o aviso direto para a equipe."
+    "No iPhone, sua posição no mapa agora vem do GPS e fica certinha.",
+    "Mapa mais limpo: um botão \"Camadas\" para mostrar eventos, ração e água e parceiros.",
+    "O mapa não afasta mais além de Belém.",
+    "Ao voltar para o app, as listas se atualizam sozinhas."
   ]
 }
