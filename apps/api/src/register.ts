@@ -52,6 +52,8 @@ import {
   updateProfile,
 } from './accounts.js';
 import { isOperator, requireAdmin, requireUser } from './authz.js';
+import { isStaffRole } from './staff/policy.js';
+import { clientIp, userAgent, writeAudit } from './staff/routes.js';
 import type { Env } from './config.js';
 import {
   addResponse,
@@ -764,6 +766,15 @@ export async function registerRoutes(
     return reply.code(201).send({ status: 'open' });
   });
 
+  /**
+   * Rotas antigas da equipe dentro do app (anteriores ao painel /admin/v1). Continuam para APKs
+   * antigos, mas com as mesmas travas do painel novo: não mexem em conta da equipe, não decidem
+   * de novo o que já foi decidido e tudo vai para a auditoria com `legacy: true`.
+   */
+  function legacyTrail(request: FastifyRequest) {
+    return { ip: clientIp(request), userAgent: userAgent(request) };
+  }
+
   app.get('/admin/reports', async (request) => {
     requireAdmin(request.user);
     const result = await pool.query(
@@ -774,16 +785,29 @@ export async function registerRoutes(
   });
 
   app.post('/admin/reports/:id', async (request) => {
-    requireAdmin(request.user);
+    const actor = requireAdmin(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['hide', 'dismiss']) }), request.body);
     const report = await pool.query<{
       target_type: string;
       target_id: string;
       reporter_id: string;
-    }>(`SELECT target_type, target_id, reporter_id FROM reports WHERE id = $1`, [id]);
+      status: string;
+    }>(`SELECT target_type, target_id, reporter_id, status FROM reports WHERE id = $1`, [id]);
     const target = report.rows[0];
     if (!target) throw new HttpError(404, 'Denúncia não encontrada.');
+    if (target.status !== 'open') {
+      throw new HttpError(409, 'Outra pessoa já analisou essa denúncia. Atualize a lista.');
+    }
+    if (body.action === 'hide' && target.target_type === 'user') {
+      const reported = await pool.query<{ role: string }>(`SELECT role FROM users WHERE id = $1`, [
+        target.target_id,
+      ]);
+      const role = reported.rows[0]?.role;
+      if (target.target_id === actor.id || (role !== undefined && isStaffRole(role))) {
+        throw new HttpError(403, 'Conta da equipe: decida essa denúncia pelo painel.');
+      }
+    }
     if (body.action === 'hide') {
       if (target.target_type === 'post') {
         await pool.query(`UPDATE posts SET hidden = true WHERE id = $1`, [target.target_id]);
@@ -811,6 +835,15 @@ export async function registerRoutes(
       id,
       body.action === 'hide' ? 'hidden' : 'dismissed',
     ]);
+    await writeAudit(pool, {
+      actorId: actor.id,
+      action: `report.${body.action}`,
+      targetType: target.target_type,
+      targetId: target.target_id,
+      before: { report: id, status: target.status },
+      after: { report: id, status: body.action === 'hide' ? 'hidden' : 'dismissed', legacy: true },
+      ...legacyTrail(request),
+    });
     await notifyReportResolved(pool, target.reporter_id, body.action).catch(
       bestEffort(request, 'notify:report'),
     );
@@ -856,7 +889,7 @@ export async function registerRoutes(
   });
 
   app.post('/admin/verifications/:id', async (request) => {
-    requireAdmin(request.user);
+    const actor = requireAdmin(request.user);
     const id = resourceId(request.params);
     const body = parse(
       z.object({
@@ -865,22 +898,59 @@ export async function registerRoutes(
       }),
       request.body,
     );
-    const requestRow = await pool.query<{ user_id: string }>(
-      `SELECT user_id FROM verification_requests WHERE id = $1`,
-      [id],
-    );
-    const userId = requestRow.rows[0]?.user_id;
-    if (!userId) throw new HttpError(404, 'Pedido não encontrado.');
-    if (body.action === 'approve') {
-      await pool.query(`UPDATE users SET verified = true, role = $2 WHERE id = $1`, [
-        userId,
-        body.role,
-      ]);
+    const status = body.action === 'approve' ? 'approved' : 'rejected';
+    const client = await pool.connect();
+    let userId: string;
+    try {
+      await client.query('BEGIN');
+      const requestRow = await client.query<{ user_id: string; status: string; role: string }>(
+        `SELECT v.user_id, v.status, u.role
+         FROM verification_requests v JOIN users u ON u.id = v.user_id
+         WHERE v.id = $1 FOR UPDATE OF v`,
+        [id],
+      );
+      const found = requestRow.rows[0];
+      if (!found) throw new HttpError(404, 'Pedido não encontrado.');
+      if (found.status !== 'pending') {
+        throw new HttpError(409, 'Outra pessoa já analisou esse pedido. Atualize a lista.');
+      }
+      userId = found.user_id;
+      if (body.action === 'approve') {
+        // Conta da equipe continua com o papel dela: só ganha o selo, como no painel.
+        if (isStaffRole(found.role)) {
+          await client.query(`UPDATE users SET verified = true WHERE id = $1`, [userId]);
+        } else {
+          await client.query(`UPDATE users SET verified = true, role = $2 WHERE id = $1`, [
+            userId,
+            body.role,
+          ]);
+        }
+      }
+      await client.query(
+        `UPDATE verification_requests SET status = $2, decided_at = now() WHERE id = $1`,
+        [id, status],
+      );
+      await writeAudit(client, {
+        actorId: actor.id,
+        action: `verification.${body.action}`,
+        targetType: 'user',
+        targetId: userId,
+        before: { request: id, role: found.role },
+        after: {
+          request: id,
+          status,
+          role: body.action === 'approve' && !isStaffRole(found.role) ? body.role : found.role,
+          legacy: true,
+        },
+        ...legacyTrail(request),
+      });
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-    await pool.query(
-      `UPDATE verification_requests SET status = $2, decided_at = now() WHERE id = $1`,
-      [id, body.action === 'approve' ? 'approved' : 'rejected'],
-    );
     await notifyVerificationDecision(pool, userId, body.action).catch((error: unknown) => {
       request.log.error({ err: error, where: 'notify:verification' }, 'best-effort step failed');
     });
@@ -888,7 +958,7 @@ export async function registerRoutes(
   });
 
   app.post('/admin/posts/:id/review', async (request) => {
-    requireAdmin(request.user);
+    const actor = requireAdmin(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['approve', 'reject']) }), request.body);
     const status = body.action === 'approve' ? 'published' : 'rejected';
@@ -898,6 +968,14 @@ export async function registerRoutes(
     );
     const post = updated.rows[0];
     if (!post) throw new HttpError(404, 'Essa publicação não existe mais.');
+    await writeAudit(pool, {
+      actorId: actor.id,
+      action: `post.${body.action}`,
+      targetType: 'post',
+      targetId: id,
+      after: { reviewStatus: status, legacy: true },
+      ...legacyTrail(request),
+    });
     if (status === 'published' && post.type === 'rescue_alert') {
       await enqueueRescueAlert(queue, id, post.urgency).catch(
         bestEffort(request, 'queue:rescue-alert'),
@@ -907,10 +985,29 @@ export async function registerRoutes(
   });
 
   app.post('/admin/users/:id/suspend', async (request) => {
-    requireAdmin(request.user);
+    const actor = requireAdmin(request.user);
     const id = resourceId(request.params);
     const body = parse(z.object({ suspended: z.boolean() }), request.body);
+    if (id === actor.id) throw new HttpError(403, 'Você não pode suspender a própria conta.');
+    const current = await pool.query<{ role: string; suspended: boolean }>(
+      `SELECT role, suspended FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    const target = current.rows[0];
+    if (!target) throw new HttpError(404, 'Essa conta não existe.');
+    if (isStaffRole(target.role)) {
+      throw new HttpError(403, 'Conta da equipe: mude o papel na tela Equipe do painel antes.');
+    }
     await pool.query(`UPDATE users SET suspended = $2 WHERE id = $1`, [id, body.suspended]);
+    await writeAudit(pool, {
+      actorId: actor.id,
+      action: body.suspended ? 'user.suspend' : 'user.unsuspend',
+      targetType: 'user',
+      targetId: id,
+      before: { suspended: target.suspended },
+      after: { suspended: body.suspended, legacy: true },
+      ...legacyTrail(request),
+    });
     return { suspended: body.suspended };
   });
 
