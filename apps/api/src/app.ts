@@ -13,6 +13,12 @@ import { captureServerError } from './monitoring.js';
 import { createQueue } from './notify.js';
 import { registerRoutes } from './register.js';
 
+/** Proxies da própria VPS: rede interna do Docker e loopback. Nunca um IP público. */
+const privateProxies = ['loopback', 'linklocal', 'uniquelocal'];
+
+/** Limite de tempo de cada consulta feita pela API (o worker usa outro pool, sem limite). */
+export const STATEMENT_TIMEOUT_MS = 15_000;
+
 export interface AppDependencies {
   env?: Env;
   database?: DatabaseClient;
@@ -36,6 +42,9 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
     new Pool({
       connectionString: env.DATABASE_URL,
       connectionTimeoutMillis: 2000,
+      // Nenhuma consulta de requisição prende uma conexão por minutos: com 10 conexões no pool,
+      // poucas consultas lentas derrubavam a API inteira (tudo respondia 500 por falta de conexão).
+      statement_timeout: STATEMENT_TIMEOUT_MS,
     });
   const redis = dependencies.redis ?? createRedis(env.REDIS_URL);
 
@@ -48,8 +57,11 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
   }
 
   const app = Fastify({
-    // Any positive hop count means the API is behind our proxy. 0 keeps the socket address.
-    trustProxy: env.TRUST_PROXY_HOPS > 0,
+    // Atrás do Traefik do Coolify (app) ou do nginx do download (app web), o IP de quem pediu é o
+    // primeiro endereço público do X-Forwarded-For lido da direita. Antes era `true`, que confia em
+    // tudo e pega o primeiro da esquerda: quem mandasse esse cabeçalho escolhia o próprio IP e
+    // escapava dos limites por IP (login do painel, cadastro, rotas sem conta). 0 usa o socket.
+    trustProxy: env.TRUST_PROXY_HOPS > 0 ? privateProxies : false,
     bodyLimit: 256 * 1024,
     logger:
       env.NODE_ENV === 'test'
