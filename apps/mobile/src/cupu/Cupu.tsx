@@ -151,7 +151,11 @@ export function Cupu({
 
   if (!interactive) {
     return (
-      <View accessible={Boolean(label)} accessibilityRole="image" accessibilityLabel={label}>
+      <View
+        accessible={label ? true : undefined}
+        accessibilityRole="image"
+        accessibilityLabel={label}
+      >
         {body}
       </View>
     );

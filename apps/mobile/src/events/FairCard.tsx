@@ -1,7 +1,7 @@
 import { Linking, StyleSheet, View } from 'react-native';
-import { AppText, Button, Card, Icon } from '../components/ui';
+import { AppText, Button, Card, Icon, Touchable } from '../components/ui';
 import { reportError } from '../crash/reporter';
-import { radius, spacing, useTheme } from '../theme';
+import { radius, size, spacing, useTheme } from '../theme';
 import { directionsUrl, fairWhen, happeningNow, type AdoptionFair } from './fairs';
 
 /** Uma feira de adoção: quando, onde, quem organiza e o caminho até lá no app de mapas. */
@@ -48,15 +48,17 @@ export function FairCard({
         </View>
       </View>
       {fair.description ? <AppText variant="bodySmall">{fair.description}</AppText> : null}
-      <AppText
-        variant="caption"
-        color="textSecondary"
+      <Touchable
         accessibilityRole="link"
+        accessibilityLabel={`Organizado por ${fair.organizer.name}${fair.organizer.verified ? ', perfil verificado' : ''}`}
         onPress={() => onOrganizer(fair.organizer.handle)}
+        style={styles.organizer}
       >
-        Organizado por {fair.organizer.name}
-        {fair.organizer.verified ? ' · perfil verificado' : ''}
-      </AppText>
+        <AppText variant="caption" color="textSecondary">
+          Organizado por {fair.organizer.name}
+          {fair.organizer.verified ? ' · perfil verificado' : ''}
+        </AppText>
+      </Touchable>
       <View style={styles.actions}>
         <Button
           title="Como chegar"
@@ -74,6 +76,8 @@ export function FairCard({
 }
 
 const styles = StyleSheet.create({
+  // Linha pequena, mas o toque precisa de 44 px.
+  organizer: { minHeight: size.touch, justifyContent: 'center', alignSelf: 'flex-start' },
   card: { alignSelf: 'stretch', gap: spacing.sm },
   top: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   badge: {

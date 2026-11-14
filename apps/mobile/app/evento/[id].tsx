@@ -18,6 +18,7 @@ import {
   Notice,
   ProgressBar,
   SkeletonRows,
+  Touchable,
   useToast,
   type IconName,
 } from '../../src/components/ui';
@@ -44,7 +45,7 @@ import {
 import { directionsUrl, fairWhen } from '../../src/events/fairs';
 import { formatWhen } from '../../src/format';
 import { useSession } from '../../src/session';
-import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
+import { radius, screenColumn, size, spacing, useTheme } from '../../src/theme';
 
 type Sheet = 'register' | 'participants' | 'cancel' | 'result' | 'report' | null;
 
@@ -232,15 +233,17 @@ export default function EventScreen() {
                   variant="outline"
                   onPress={openDirections}
                 />
-                <AppText
-                  variant="bodySmall"
-                  color="textSecondary"
+                <Touchable
                   accessibilityRole="link"
+                  accessibilityLabel={`Organizado por ${event.organizer.name}${event.organizer.verified ? ', perfil verificado' : ''}`}
                   onPress={() => router.push(`/user/${event.organizer.handle}`)}
+                  style={styles.organizer}
                 >
-                  Organizado por {event.organizer.name}
-                  {event.organizer.verified ? ' · perfil verificado' : ''}
-                </AppText>
+                  <AppText variant="bodySmall" color="textSecondary">
+                    Organizado por {event.organizer.name}
+                    {event.organizer.verified ? ' · perfil verificado' : ''}
+                  </AppText>
+                </Touchable>
               </Card>
 
               {open && event.reviewStatus === 'published' ? (
@@ -511,6 +514,7 @@ export default function EventScreen() {
 }
 
 const styles = StyleSheet.create({
+  organizer: { minHeight: size.touch, justifyContent: 'center', alignSelf: 'flex-start' },
   screen: { flex: 1 },
   scroll: { paddingBottom: spacing.xxxl },
   column: screenColumn,
