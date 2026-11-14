@@ -19,6 +19,7 @@ import { assertOwnedMedia, ownedMediaKey } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
 import { recordCustody } from './passport.js';
 import { assertHelpRequest, canSeeExactPlace, publicPixKey, publicPlace } from './privacy.js';
+import { queryNearby } from './nearbyQuery.js';
 import { rowsOf, type SessionUser } from './session.js';
 import { stripControls } from './text.js';
 
@@ -118,11 +119,13 @@ export async function listPosts(
       `EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = ${add(viewer.id)})`,
     );
   }
+  let nearby = false;
   if (
     query.latitude !== undefined &&
     query.longitude !== undefined &&
     query.radiusKm !== undefined
   ) {
+    nearby = true;
     where.push(
       `ST_DWithin(p.location, ST_SetSRID(ST_MakePoint(${add(query.longitude)}, ${add(query.latitude)}), 4326)::geography, ${add(query.radiusKm * 1000)})`,
     );
@@ -156,8 +159,7 @@ export async function listPosts(
   }
   const viewerId = add(viewer?.id ?? null);
   const limit = add(query.limit + 1);
-  const result = await pool.query(
-    `SELECT ${postColumns(viewerId)}
+  const sql = `SELECT ${postColumns(viewerId)}
      FROM posts p
      JOIN users u ON u.id = p.author_id
      JOIN animals a ON a.id = p.animal_id
@@ -166,9 +168,8 @@ export async function listPosts(
               p.boosted DESC,
               p.created_at DESC,
               p.id DESC
-     LIMIT ${limit}`,
-    params,
-  );
+     LIMIT ${limit}`;
+  const result = nearby ? await queryNearby(pool, sql, params) : await pool.query(sql, params);
   const rows = rowsOf<PostRow>(result);
   const page = rows.slice(0, query.limit);
   const posts = await hydrate(pool, env, page, viewer);

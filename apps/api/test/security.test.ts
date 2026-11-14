@@ -180,6 +180,26 @@ describe('http hardening', () => {
     await app.close();
   });
 
+  it('takes the client IP from the proxies of the VPS, not from a forged X-Forwarded-For', async () => {
+    const database: DatabaseClient = { query: async () => ({}), end: async () => {} };
+    const redis: RedisClient = { ping: async () => 'PONG', disconnect: () => {} };
+    const app = await buildApp({ env, database, redis });
+    app.get('/ip-de-teste', async (request) => ({ ip: request.ip }));
+    const ipFor = async (forwarded: string) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/ip-de-teste',
+          headers: { 'x-forwarded-for': forwarded },
+        })
+      ).json().ip;
+    // Traefik acrescenta o IP real; o que a pessoa mandou fica à esquerda e é ignorado.
+    expect(await ipFor('6.6.6.6, 200.1.2.3')).toBe('200.1.2.3');
+    // App web: Traefik e depois o nginx do download, os dois na rede interna do Docker.
+    expect(await ipFor('6.6.6.6, 200.1.2.3, 172.18.0.5')).toBe('200.1.2.3');
+    await app.close();
+  });
+
   it('checks token revocation only when a service account is configured', () => {
     expect(firebaseChecksRevocation(env)).toBe(false);
     expect(

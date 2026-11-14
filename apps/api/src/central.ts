@@ -21,6 +21,7 @@ import { HttpError } from './http.js';
 import { publicMediaUrl } from './media.js';
 import { notifyPeople } from './notify.js';
 import { needFor, plansFor } from './rescuePlan.js';
+import { queryNearby } from './nearbyQuery.js';
 import type { SessionUser } from './session.js';
 import { stripControls } from './text.js';
 
@@ -122,15 +123,16 @@ export async function loadCentral(
   if (query.species) where.push(`a.species = ${add(query.species)}`);
   if (query.status) where.push(`p.status = ${add(query.status)}`);
   let distance = 'NULL::float8';
+  let nearby = false;
   if (query.latitude !== undefined && query.longitude !== undefined) {
     const point = `ST_SetSRID(ST_MakePoint(${add(query.longitude)}, ${add(query.latitude)}), 4326)::geography`;
     distance = `ST_Distance(p.location, ${point})`;
     if (query.radiusKm !== undefined) {
       where.push(`ST_DWithin(p.location, ${point}, ${add(query.radiusKm * 1000)})`);
+      nearby = true;
     }
   }
-  const result = await pool.query<CaseRow>(
-    `SELECT p.id, p.urgency, p.status, p.created_at, p.approx_label, p.author_id,
+  const sql = `SELECT p.id, p.urgency, p.status, p.created_at, p.approx_label, p.author_id,
             a.id AS animal_id, a.species, a.size, a.name AS animal_name, a.health_notes,
             ST_Y(p.location::geometry) AS approx_lat,
             ST_X(p.location::geometry) AS approx_lng,
@@ -155,9 +157,10 @@ export async function loadCentral(
      JOIN animals a ON a.id = p.animal_id
      WHERE ${where.join(' AND ')}
      ORDER BY p.created_at DESC
-     LIMIT ${CANDIDATE_LIMIT}`,
-    params,
-  );
+     LIMIT ${CANDIDATE_LIMIT}`;
+  const result = nearby
+    ? await queryNearby<CaseRow>(pool, sql, params)
+    : await pool.query<CaseRow>(sql, params);
   const rows = result.rows;
   const ids = rows.map((row) => row.id);
   const people =
