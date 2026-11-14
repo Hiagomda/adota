@@ -243,6 +243,9 @@ export async function remindHelper(
   return true;
 }
 
+/** Status em que o animal ainda está na rua e vale chamar quem está perto. */
+const alertStatuses = ['open', 'not_found'];
+
 export async function dispatchRescueAlert(
   pool: Pool,
   env: Env,
@@ -256,9 +259,11 @@ export async function dispatchRescueAlert(
     description: string;
     approx_label: string;
   }>(
+    // Só avisa enquanto o animal ainda está na rua: resgate resolvido não chama a vizinhança.
     `SELECT id, author_id, urgency, description, approx_label FROM posts
-     WHERE id = $1 AND type = 'rescue_alert' AND review_status = 'published' AND hidden = false`,
-    [postId],
+     WHERE id = $1 AND type = 'rescue_alert' AND review_status = 'published' AND hidden = false
+       AND status = ANY($2::text[])`,
+    [postId, alertStatuses],
   );
   const alert = post.rows[0];
   if (!alert) return;
@@ -278,10 +283,14 @@ export async function dispatchRescueAlert(
        AND u.notifications_enabled = true
        AND u.id <> $2
        AND u.base_location IS NOT NULL
-       AND ST_DWithin(u.base_location, (SELECT location FROM posts WHERE id = $1), u.alert_radius_km * 1000 * $3)
+       AND ST_DWithin(u.base_location, (SELECT location FROM posts WHERE id = $1), u.alert_radius_km * 1000 * $3::float8)
        AND NOT EXISTS (
          SELECT 1 FROM blocks b
          WHERE (b.blocker_id = u.id AND b.blocked_id = $2) OR (b.blocker_id = $2 AND b.blocked_id = u.id)
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM notifications n
+         WHERE n.user_id = u.id AND n.type = 'rescue_alert' AND n.payload->>'postId' = $1::text
        )
      UNION
      SELECT u.id, u.fcm_tokens, u.quiet_hours_start, u.quiet_hours_end,
@@ -294,10 +303,14 @@ export async function dispatchRescueAlert(
        AND u.suspended = false
        AND u.notifications_enabled = true
        AND u.id <> $2
-       AND ST_DWithin(f.location, (SELECT location FROM posts WHERE id = $1), f.radius_km * 1000 * $3)
+       AND ST_DWithin(f.location, (SELECT location FROM posts WHERE id = $1), f.radius_km * 1000 * $3::float8)
        AND NOT EXISTS (
          SELECT 1 FROM blocks b
          WHERE (b.blocker_id = u.id AND b.blocked_id = $2) OR (b.blocker_id = $2 AND b.blocked_id = u.id)
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM notifications n
+         WHERE n.user_id = u.id AND n.type = 'rescue_alert' AND n.payload->>'postId' = $1::text
        )`,
     [postId, alert.author_id, radiusFactor],
   );
@@ -319,17 +332,21 @@ export async function dispatchRescueAlert(
 }
 
 export async function expandRescueAlert(pool: Pool, env: Env, postId: string): Promise<void> {
-  const post = await pool.query<{ boosted: boolean }>(`SELECT boosted FROM posts WHERE id = $1`, [
-    postId,
-  ]);
-  if (!post.rows[0] || post.rows[0].boosted) return;
+  const post = await pool.query<{ boosted: boolean; status: string }>(
+    `SELECT boosted, status FROM posts WHERE id = $1 AND hidden = false`,
+    [postId],
+  );
+  const row = post.rows[0];
+  if (!row || row.boosted || !alertStatuses.includes(row.status)) return;
   const help = await pool.query(
     `SELECT 1 FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
     [postId],
   );
   if ((help.rowCount ?? 0) > 0) return;
-  await pool.query(`UPDATE posts SET boosted = true WHERE id = $1`, [postId]);
+  // Avisa primeiro e só depois marca: se o envio falhar, o job tenta de novo em vez de o post
+  // ficar destacado no feed sem ninguém ter sido avisado. Quem já recebeu não recebe de novo.
   await dispatchRescueAlert(pool, env, postId, 1.5);
+  await pool.query(`UPDATE posts SET boosted = true WHERE id = $1`, [postId]);
 }
 
 export async function notifyDiaryNote(
