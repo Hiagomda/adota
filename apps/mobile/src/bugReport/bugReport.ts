@@ -18,7 +18,7 @@ export function bugReportBody(message: string, screen: string | null): BugReport
   return {
     message: message.trim(),
     screen: screen ? screen.slice(0, 200) : null,
-    appVersion: `${appVersion.version} (${appVersion.build})`.slice(0, 40),
+    appVersion: appVersion.version.slice(0, 40),
     platform: `${Platform.OS} ${String(Platform.Version)}`.slice(0, 40),
     device: deviceSummary().slice(0, 120),
   };
