@@ -244,24 +244,24 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.section}>
-              <AppText variant="h3">Privacidade e avisos</AppText>
+              <AppText variant="h3">Privacidade e notificações</AppText>
               <Card>
                 <View style={styles.form}>
                   <Switch
-                    label="Receber avisos"
+                    label="Receber notificações"
                     description="Resgates perto de você e comentários nas suas publicações."
                     value={me.data?.notificationsEnabled ?? true}
                     disabled={!me.data}
                     onValueChange={(value) =>
                       void patchMe(
                         { notificationsEnabled: value },
-                        value ? 'Avisos ligados.' : 'Avisos desligados.',
+                        value ? 'Notificações ligadas.' : 'Notificações desligadas.',
                       )
                     }
                   />
                   <Switch
                     label="Silêncio à noite"
-                    description="Sem aviso das 22h às 7h."
+                    description="Sem notificações das 22h às 7h."
                     value={me.data?.quietHoursStart === 22 && me.data.quietHoursEnd === 7}
                     disabled={!me.data}
                     onValueChange={(value) =>
@@ -269,7 +269,7 @@ export default function SettingsScreen() {
                         value
                           ? { quietHoursStart: 22, quietHoursEnd: 7 }
                           : { quietHoursStart: null, quietHoursEnd: null },
-                        value ? 'Silêncio das 22h às 7h.' : 'Avisos voltam a qualquer hora.',
+                        value ? 'Silêncio das 22h às 7h.' : 'Notificações voltam a qualquer hora.',
                       )
                     }
                   />
@@ -422,7 +422,7 @@ export default function SettingsScreen() {
                 <Divider inset />
                 <ListItem
                   title="Excluir minha conta"
-                  subtitle="Apaga telefone, foto e avisos. Não dá para desfazer."
+                  subtitle="Apaga telefone, foto e notificações. Não dá para desfazer."
                   icon="trash-2"
                   destructive
                   onPress={() => setConfirmDelete(true)}
@@ -436,7 +436,7 @@ export default function SettingsScreen() {
       <ConfirmDialog
         visible={confirmDelete}
         title="Excluir sua conta?"
-        message="Apagamos seu perfil, telefone, localização, fotos, Casa Amiga, conquistas e avisos. Seus resgates e comentários saem do app. Isso não pode ser desfeito."
+        message="Apagamos seu perfil, telefone, localização, fotos, Casa Amiga, conquistas e notificações. Seus resgates e comentários saem do app. Isso não pode ser desfeito."
         confirmLabel="Excluir minha conta"
         destructive
         loading={deleting}

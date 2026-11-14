@@ -204,7 +204,7 @@ export default function DonateScreen() {
       >
         <View style={styles.column}>
           <AppText color="textSecondary">
-            Só a equipe publica pedido com Pix. O app não recebe nem repassa dinheiro.
+            Pedido com Pix aqui é publicado pela equipe. O app não recebe nem repassa dinheiro.
           </AppText>
           {!token ? (
             <Button
@@ -225,7 +225,10 @@ export default function DonateScreen() {
               action={{ label: 'Tentar de novo', onPress: () => void me.refetch() }}
             />
           ) : !isTeamRole(me.data.role) ? (
-            <Notice message="Pedido com Pix só a equipe publica. As campanhas abertas continuam no início." />
+            <Notice
+              message="Para arrecadar para um animal, peça uma campanha. A equipe confere antes de ela aparecer com o seu Pix."
+              action={{ label: 'Pedir uma campanha', onPress: () => router.push('/campanha/nova') }}
+            />
           ) : (
             <>
               <View style={styles.group}>

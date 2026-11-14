@@ -666,7 +666,7 @@ export function registerPassportRoutes(
     const animalId = await resolveAnimal(pool, requested);
     if (!animalId) throw new HttpError(404, 'Esse animal não existe.');
     if (!(await isCaretaker(pool, animalId, user))) {
-      throw new HttpError(403, 'Só quem cuida do animal pode juntar as ocorrências.');
+      throw new HttpError(403, 'Só quem cuida do animal pode juntar as publicações.');
     }
     const otherPost = await pool.query<{ animal_id: string }>(
       `SELECT animal_id FROM posts

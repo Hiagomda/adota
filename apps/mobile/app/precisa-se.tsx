@@ -44,8 +44,8 @@ export default function NeedsScreen() {
         <View style={styles.column}>
           <Header title="Precisa-se" large onBack={() => router.back()} />
           <AppText color="textSecondary" style={styles.intro}>
-            Pedidos de ONGs e protetores verificados. A doação vai direto para eles pelo Pix do
-            pedido: o app não recebe nem repassa dinheiro.
+            Pedidos publicados pela equipe. A doação vai direto pelo Pix do pedido: o app não recebe
+            nem repassa dinheiro.
           </AppText>
           <View style={styles.intro}>
             <Button

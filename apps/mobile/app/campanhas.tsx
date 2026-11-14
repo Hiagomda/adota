@@ -103,7 +103,7 @@ export default function CampaignsScreen() {
                 body={
                   tab === 'mine'
                     ? 'Abra uma campanha ligada ao animal: meta, prazo e para que é o dinheiro.'
-                    : 'Quando uma ONG ou protetor verificado abrir uma campanha, ela aparece aqui.'
+                    : 'Quando a equipe aprovar uma campanha, ela aparece aqui. Você também pode pedir uma.'
                 }
               />
             ) : (

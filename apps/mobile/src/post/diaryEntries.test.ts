@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diaryLines, firstName, notFoundVisits } from './diaryEntries.ts';
+import { diaryLines, displayName, firstName, notFoundVisits } from './diaryEntries.ts';
 
 const ana = { name: 'Ana Ribeiro', handle: 'ana' };
 const joao = { name: 'João Lima', handle: 'joao' };
@@ -97,4 +97,18 @@ test('the first line follows the kind of post, and a lost pet goes home', () => 
   });
   assert.equal(lost[0]?.title, 'Ana avisou que ele sumiu');
   assert.equal(lost[1]?.title, 'Voltou para casa');
+});
+
+test('ONG aparece pelo nome inteiro, pessoa pelo primeiro nome', () => {
+  assert.equal(displayName('Patas   do Pará', 'ngo'), 'Patas do Pará');
+  assert.equal(displayName('Ana Ribeiro', 'protector'), 'Ana');
+  assert.equal(displayName('Ana Ribeiro'), 'Ana');
+  const lines = diaryLines({
+    id: 'p1',
+    type: 'adoption',
+    description: 'Mel',
+    createdAt: '2026-11-13T10:00:00Z',
+    author: { name: 'Patas do Pará', handle: 'patas', role: 'ngo' },
+  });
+  assert.equal(lines[0]?.title, 'Patas do Pará colocou para adoção');
 });

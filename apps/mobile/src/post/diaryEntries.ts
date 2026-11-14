@@ -27,7 +27,7 @@ interface DiarySource {
   type?: string;
   description: string;
   createdAt: string;
-  author: { name: string; handle: string };
+  author: { name: string; handle: string; role?: string };
   updates?: {
     id: string;
     description: string;
@@ -35,7 +35,7 @@ interface DiarySource {
     kind?: 'not_found' | 'status' | 'note';
     photo?: DiaryPhoto | null;
     createdAt: string;
-    author: { name: string; handle: string };
+    author: { name: string; handle: string; role?: string };
   }[];
 }
 
@@ -54,6 +54,15 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+/**
+ * Como chamar quem publicou numa frase curta. Pessoa vai pelo primeiro nome ("por Ana"), mas
+ * ONG vai pelo nome inteiro: "por Patas" não diz de qual ONG se trata.
+ */
+export function displayName(name: string, role?: string): string {
+  if (role === 'ngo') return name.trim().replace(/\s+/g, ' ') || name;
+  return firstName(name);
+}
+
 /** A primeira linha conta como o animal chegou ao app, que muda com o tipo do post. */
 function openingLine(type: string | undefined, name: string): string {
   if (type === 'adoption') return `${name} colocou para adoção`;
@@ -66,7 +75,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
     {
       id: post.id,
       tone: 'found',
-      title: openingLine(post.type, firstName(post.author.name)),
+      title: openingLine(post.type, displayName(post.author.name, post.author.role)),
       body: post.description,
       when: post.createdAt,
       handle: post.author.handle,
@@ -74,7 +83,7 @@ export function diaryLines(post: DiarySource): DiaryLine[] {
     },
   ];
   for (const update of post.updates ?? []) {
-    const name = firstName(update.author.name);
+    const name = displayName(update.author.name, update.author.role);
     const kind = update.kind ?? 'note';
     if (kind === 'not_found') {
       lines.push({

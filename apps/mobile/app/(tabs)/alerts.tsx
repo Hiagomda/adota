@@ -72,7 +72,7 @@ export default function AlertsScreen() {
         {!token ? (
           <EmptyState
             pose="login"
-            title="Entre para ver os avisos"
+            title="Entre para ver suas notificações"
             body="As notificações de resgates perto de você aparecem depois que você entra na conta."
           />
         ) : query.isLoading ? (

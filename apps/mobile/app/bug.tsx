@@ -58,8 +58,8 @@ export default function BugReportScreen() {
               </View>
             </View>
             <AppText style={styles.center} color="textSecondary">
-              O app é novinho e está em pleno desenvolvimento. Conta pra gente o que aconteceu: o
-              que tu tentaste fazer e o que deu errado. Cada aviso ajuda o Cupu a deixar tudo
+              O app é novinho e está em pleno desenvolvimento. Conte para a gente o que aconteceu: o
+              que você tentou fazer e o que deu errado. Cada aviso ajuda o Cupu a deixar tudo
               redondinho.
             </AppText>
             <Input
@@ -72,7 +72,7 @@ export default function BugReportScreen() {
               autoFocus
             />
             <AppText variant="caption" color="textSecondary">
-              Vai junto: a versão do app, o modelo do celular e a tela em que tu estavas. Nada de
+              Vai junto: a versão do app, o modelo do celular e a tela em que você estava. Nada de
               localização ou fotos.
             </AppText>
             {error ? <Notice tone="error" message={error} /> : null}

@@ -58,7 +58,7 @@ const steps: Step[] = [
     tint: 'secondarySoft',
     title: 'Viu um bicho precisando?',
     description:
-      'Toca no + do meio: a câmera abre na hora. Tira a foto, marca onde ele está e publica. Quem está perto recebe o alerta.',
+      'Toca no + do meio: a câmera abre na hora. Tira a foto, marca onde ele está e publica. Quem está perto recebe o aviso de resgate.',
     tip: {
       icon: 'shield',
       text: 'No feed aparece só a área aproximada. O ponto exato vai pra quem disser que vai ajudar.',
@@ -70,7 +70,7 @@ const steps: Step[] = [
     tint: 'infoSoft',
     title: 'Ajuda quem está perto',
     description:
-      'No início e no mapa tu vês os alertas do teu bairro. Toca em “Vou ajudar” e combina o resgate com quem publicou.',
+      'No início e no mapa tu vês os resgates do teu bairro. Toca em “Vou ajudar” e combina o resgate com quem publicou.',
     button: 'E depois?',
   },
   {

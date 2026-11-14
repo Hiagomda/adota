@@ -21,6 +21,20 @@ import { queryClient } from './queryClient';
 import type { Account } from './types';
 import { logBestEffort } from './crash/bestEffort';
 
+/**
+ * O cadastro no Firebase deu certo, mas a primeira conversa com a API falhou (sem rede, servidor
+ * fora). A conta já existe: tentar "Criar conta" de novo daria "e-mail já usado", então a tela
+ * oferece entrar com o mesmo e-mail e senha.
+ */
+export class AccountCreatedError extends Error {
+  constructor() {
+    super(
+      'Sua conta foi criada, mas não consegui terminar de entrar. Entre com o mesmo e-mail e senha.',
+    );
+    this.name = 'AccountCreatedError';
+  }
+}
+
 /** The team, in the app: admin and superadmin. Reviewers are not included. */
 export function isTeamRole(role: string | undefined): boolean {
   return role === 'admin' || role === 'superadmin';
@@ -181,7 +195,8 @@ export const useSession = create<SessionState>((set) => ({
       return created.verificationSent;
     } catch (error) {
       await signOutAuth();
-      throw error;
+      reportError(error, { source: 'handled', where: 'session:signUp' });
+      throw new AccountCreatedError();
     }
   },
   refresh: async () => {

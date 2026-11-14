@@ -897,7 +897,7 @@ export async function registerRoutes(
       [id, status],
     );
     const post = updated.rows[0];
-    if (!post) throw new HttpError(404, 'Alerta não encontrado.');
+    if (!post) throw new HttpError(404, 'Essa publicação não existe mais.');
     if (status === 'published' && post.type === 'rescue_alert') {
       await enqueueRescueAlert(queue, id, post.urgency).catch(
         bestEffort(request, 'queue:rescue-alert'),
@@ -984,13 +984,13 @@ async function toggle(
   return { active: false };
 }
 
-/** Curtir, salvar ou seguir um alerta que não existe responde 404, não erro do servidor. */
+/** Curtir, salvar ou seguir uma publicação que não existe responde 404, não erro do servidor. */
 async function assertVisiblePost(pool: Pool, id: string): Promise<void> {
   const found = await pool.query(
     `SELECT 1 FROM posts WHERE id = $1 AND hidden = false AND review_status = 'published'`,
     [id],
   );
-  if ((found.rowCount ?? 0) === 0) throw new HttpError(404, 'Esse alerta não existe.');
+  if ((found.rowCount ?? 0) === 0) throw new HttpError(404, 'Essa publicação não existe mais.');
 }
 
 /** Aparelhos por conta que recebem push. Celular trocado não fica para sempre na lista. */

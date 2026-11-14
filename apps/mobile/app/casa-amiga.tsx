@@ -150,12 +150,33 @@ export default function FosterHomeScreen() {
                       ? 'Sua casa está aberta'
                       : 'Sua casa está fechada'}
                   </AppText>
-                  <ProgressBar
-                    value={data.slots.capacity > 0 ? data.slots.occupied / data.slots.capacity : 0}
-                    label="Vagas ocupadas"
-                    caption={slotsLabel(data.slots.free, data.slots.capacity)}
-                    tone="primary"
-                  />
+                  {data.settings.isFosterAvailable ? (
+                    <ProgressBar
+                      value={
+                        data.slots.capacity > 0 ? data.slots.occupied / data.slots.capacity : 0
+                      }
+                      label="Vagas ocupadas"
+                      caption={slotsLabel(data.slots.free, data.slots.capacity)}
+                      tone="primary"
+                    />
+                  ) : (
+                    <>
+                      {/* Casa fechada não oferece vaga: mostrar "1 vaga livre" aqui confundia. */}
+                      <AppText color="textSecondary">
+                        {data.slots.occupied > 0
+                          ? `Quem resgata não vê sua casa agora. ${data.slots.occupied === 1 ? 'O animal que está com você continua' : `Os ${data.slots.occupied} animais que estão com você continuam`} aqui.`
+                          : 'Quem resgata não vê sua casa agora. Abra quando puder receber um animal.'}
+                      </AppText>
+                      {tab !== 'home' ? (
+                        <Button
+                          title="Abrir minha casa"
+                          icon="home"
+                          variant="secondary"
+                          onPress={() => setTab('home')}
+                        />
+                      ) : null}
+                    </>
+                  )}
                 </View>
               </Card>
               <Segmented

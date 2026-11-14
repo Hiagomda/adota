@@ -16,7 +16,7 @@ import {
 import { AuthForm } from '../src/components/auth/AuthForm';
 import { PasswordStrengthBar } from '../src/components/auth/PasswordStrength';
 import { AppText, Button, Checkbox, FloatingField, Touchable } from '../src/components/ui';
-import { useSession } from '../src/session';
+import { AccountCreatedError, useSession } from '../src/session';
 import { size, spacing } from '../src/theme';
 
 export default function SignupScreen() {
@@ -45,6 +45,8 @@ export default function SignupScreen() {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
+  /** A conta já existe (cadastro pela metade ou e-mail já usado): oferece entrar. */
+  const [offerLogin, setOfferLogin] = useState(false);
 
   if (token && !created) return <Redirect href={(returnTo ?? '/(tabs)') as Href} />;
 
@@ -54,6 +56,7 @@ export default function SignupScreen() {
   function submit() {
     setSubmitted(true);
     setFormError(null);
+    setOfferLogin(false);
     if (
       nameError(name) ||
       emailError(email) ||
@@ -75,7 +78,15 @@ export default function SignupScreen() {
             : 'Conta criada. Você já pode continuar.',
         );
       } catch (error) {
-        setFormError(error instanceof AuthError ? error.message : messageFrom(error));
+        setOfferLogin(
+          error instanceof AccountCreatedError ||
+            (error instanceof AuthError && error.code === 'email-in-use'),
+        );
+        setFormError(
+          error instanceof AuthError || error instanceof AccountCreatedError
+            ? error.message
+            : messageFrom(error),
+        );
       }
     });
   }
@@ -100,6 +111,20 @@ export default function SignupScreen() {
       notice={formError}
       onBack={() => router.back()}
     >
+      {offerLogin ? (
+        <Button
+          title="Entrar com esse e-mail"
+          icon="log-in"
+          variant="outline"
+          fullWidth
+          onPress={() =>
+            router.replace({
+              pathname: '/login',
+              params: { email: normalizeEmail(email), ...(returnTo ? { returnTo } : {}) },
+            })
+          }
+        />
+      ) : null}
       <FloatingField
         label="Nome"
         icon="user"
