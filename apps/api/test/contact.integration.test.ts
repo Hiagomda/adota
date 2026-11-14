@@ -24,11 +24,16 @@ async function insertUser(
   return id;
 }
 
-async function offerHome(userId: string, petTypes: string[]) {
+/** A casa fica a uns 2 km do resgate, a não ser que venha outro ponto. */
+async function offerHome(userId: string, petTypes: string[], home = { lng: -48.47, lat: -1.44 }) {
   await pool.query(
-    `INSERT INTO volunteer_profiles (user_id, is_foster_available, foster_pet_types, foster_max_days)
-     VALUES ($1, true, $2::jsonb, 7)`,
+    `INSERT INTO volunteer_profiles (user_id, is_foster_available, foster_pet_types, foster_sizes, foster_max_days)
+     VALUES ($1, true, $2::jsonb, '["small","medium","large"]'::jsonb, 7)`,
     [userId, JSON.stringify(petTypes)],
+  );
+  await pool.query(
+    `UPDATE users SET base_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography WHERE id = $1`,
+    [userId, home.lng, home.lat],
   );
 }
 
@@ -126,9 +131,12 @@ describe('contact on WhatsApp', () => {
     const homeId = await insertUser('home@egua.local', 'home', '5591983334444');
     const catOnly = await insertUser('cats@egua.local', 'cats', '5591981112222');
     const hidden = await insertUser('hidden@egua.local', 'hidden');
+    // Outra ponta da região, a uns 30 km: fora do raio de 10 km dessa casa.
+    const far = await insertUser('far@egua.local', 'far', '5591985556666');
     await offerHome(homeId, ['dog']);
     await offerHome(catOnly, ['cat']);
     await offerHome(hidden, ['dog']);
+    await offerHome(far, ['dog'], { lng: -48.2, lat: -1.3 });
     const postId = await createAlert('author@egua.local');
     const list = (email: string) =>
       app.inject({ method: 'GET', url: `/posts/${postId}/foster-homes`, headers: auth(email) });
@@ -157,6 +165,8 @@ describe('contact on WhatsApp', () => {
       phone: '5591983334444',
     });
     expect((await contact(catOnly, 'author@egua.local')).statusCode).toBe(404);
+    // Casa fora do raio de atendimento: nem na lista nem o número.
+    expect((await contact(far, 'author@egua.local')).statusCode).toBe(404);
     expect((await contact(homeId, 'stranger@egua.local')).statusCode).toBe(403);
   });
 
