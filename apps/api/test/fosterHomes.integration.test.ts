@@ -228,6 +228,30 @@ describe('Casas Amigas', () => {
     ).toBe(200);
   });
 
+  it('nunca deixa duas Casas Amigas aceitarem o mesmo animal ao mesmo tempo', async () => {
+    const aliceId = await insertUser('alice@egua.local', 'alice');
+    const firstHome = await insertUser('casa1@egua.local', 'casa1');
+    const secondHome = await insertUser('casa2@egua.local', 'casa2');
+    await saveHome('casa1@egua.local', { ...homeSettings, capacity: 2 });
+    await saveHome('casa2@egua.local', { ...homeSettings, capacity: 2 });
+    const postId = await rescue('alice@egua.local', aliceId);
+    // Repete algumas vezes: a disputa só aparece quando os dois aceites chegam juntos.
+    for (let round = 0; round < 5; round += 1) {
+      await pool.query(`DELETE FROM foster_stays`);
+      await pool.query(`DELETE FROM animal_custody`);
+      await pool.query(`UPDATE posts SET status = 'open' WHERE id = $1`, [postId]);
+      const a = (await ask(postId, 'alice@egua.local', firstHome)).json().id as string;
+      const b = (await ask(postId, 'alice@egua.local', secondHome)).json().id as string;
+      const results = await Promise.all([
+        act(a, 'approve', 'casa1@egua.local'),
+        act(b, 'approve', 'casa2@egua.local'),
+      ]);
+      expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
+      const approved = await pool.query(`SELECT 1 FROM foster_stays WHERE status = 'approved'`);
+      expect(approved.rowCount).toBe(1);
+    }
+  });
+
   it('lets the requester cancel and the home decline, and hides stays from strangers', async () => {
     const authorId = await insertUser('autora@egua.local', 'autora');
     const homeId = await insertUser('casa@egua.local', 'casa');
