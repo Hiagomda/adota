@@ -134,7 +134,7 @@ export default function FeedPointsScreen() {
                   Ração e água na rua.
                 </AppText>
                 <AppText variant="body" style={{ color: colors.onHeroMuted }}>
-                  Você deixa um pote para os bichinhos da rua ou conhece quem deixa? Bota no mapa
+                  Você deixa um pote para os bichinhos da rua ou conhece quem deixa? Coloque no mapa
                   para mais gente ajudar a manter cheio.
                 </AppText>
               </View>
