@@ -34,7 +34,7 @@ export function Mascot({
       source={poses[pose]}
       style={{ width: size, height: size }}
       resizeMode="contain"
-      accessible={Boolean(label)}
+      accessible={label ? true : undefined}
       accessibilityLabel={label}
     />
   );

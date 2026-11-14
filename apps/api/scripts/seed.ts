@@ -432,7 +432,7 @@ async function seed(pool: Pool): Promise<void> {
     const spot = spots[index];
     if (!spot) continue;
     const author = ids.get(authors[index % authors.length] ?? 'maria');
-    const status =
+    const rescueStatus =
       index > 19
         ? (statuses[index % statuses.length] ?? 'open')
         : index % 5 === 0
@@ -448,6 +448,14 @@ async function seed(pool: Pool): Promise<void> {
             : index === 20
               ? 'adoption'
               : 'rescue_alert';
+    // Cada tipo nasce no estado que o app daria a ele: adoção já "para adoção", perdido e
+    // pedido de ajuda abertos. Antes o exemplo de adoção aparecia como "Resgatado".
+    const status =
+      type === 'adoption'
+        ? 'for_adoption'
+        : type === 'lost' || type === 'help_request'
+          ? 'open'
+          : rescueStatus;
     const urgency = urgencies[index % urgencies.length] ?? 'medium';
     const size = sizes[index % sizes.length] ?? 'medium';
     const photo = spot.species === 'cat' ? cats[index % cats.length] : dogs[index % dogs.length];

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useEffect, useRef, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -280,6 +281,7 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
           <Touchable
             accessibilityRole="button"
             accessibilityLabel={`Ver ${comments}`}
+            hitSlop={{ top: 7, bottom: 7 }}
             pressedScale={0.98}
             onPress={() => onOpen(post.id)}
             style={styles.more}
@@ -345,7 +347,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, gap: 2 },
   more: {
     alignSelf: 'flex-start',
-    minHeight: size.touch / 2 + spacing.sm,
+    // No celular o hitSlop completa os 44 px; o app web ignora hitSlop, então lá o link já tem 44.
+    minHeight: Platform.OS === 'web' ? size.touch : size.touch / 2 + spacing.sm,
     justifyContent: 'center',
   },
 });
