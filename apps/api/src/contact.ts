@@ -42,6 +42,7 @@ interface PostGate {
   status: string;
   type: string;
   species: string;
+  size: string;
   author_phone: string | null;
   author_whatsapp: boolean;
   viewer_will_help: boolean;
@@ -69,7 +70,7 @@ function params<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.
 
 async function loadPost(pool: Pool, postId: string, viewerId: string): Promise<PostGate> {
   const result = await pool.query<PostGate>(
-    `SELECT p.id, p.author_id, p.status, p.type, a.species,
+    `SELECT p.id, p.author_id, p.status, p.type, a.species, a.size,
             u.phone AS author_phone, u.whatsapp_opt_in AS author_whatsapp,
             EXISTS (
               SELECT 1 FROM responses r
@@ -100,7 +101,12 @@ async function blocked(pool: Pool, left: string, right: string): Promise<boolean
   return (found.rowCount ?? 0) > 0;
 }
 
-/** People offering Casa Amiga for this species who agreed to show their WhatsApp. */
+/**
+ * Casas Amigas para este animal que liberaram o WhatsApp: mesma espécie e porte, e só as que
+ * atendem o ponto do resgate (raio de atendimento), como em /posts/:id/foster-options. Antes a
+ * lista ia para a cidade toda, e quem dizia "vou ajudar" em qualquer resgate pegava o número de
+ * até 20 casas.
+ */
 async function homesFor(pool: Pool, post: PostGate, viewerId: string, onlyUser?: string) {
   const result = await pool.query<HomeRow>(
     `SELECT u.id, u.name, u.handle, u.verified, v.foster_pet_types, v.foster_max_days, u.phone
@@ -108,6 +114,13 @@ async function homesFor(pool: Pool, post: PostGate, viewerId: string, onlyUser?:
      JOIN users u ON u.id = v.user_id
      WHERE v.is_foster_available = true
        AND v.foster_pet_types ? $1
+       AND v.foster_sizes ? $4
+       AND u.base_location IS NOT NULL
+       AND ST_DWithin(
+         u.base_location,
+         (SELECT location FROM posts WHERE id = $5),
+         v.service_radius_km * 1000
+       )
        AND u.whatsapp_opt_in = true
        AND u.phone IS NOT NULL
        AND u.deleted_at IS NULL
@@ -120,7 +133,7 @@ async function homesFor(pool: Pool, post: PostGate, viewerId: string, onlyUser?:
        )
      ORDER BY u.verified DESC, u.name ASC
      LIMIT ${HOMES_LIMIT}`,
-    [post.species, viewerId, onlyUser ?? null],
+    [post.species, viewerId, onlyUser ?? null, post.size, post.id],
   );
   return result.rows;
 }
