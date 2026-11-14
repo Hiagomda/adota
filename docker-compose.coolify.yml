@@ -99,6 +99,10 @@ services:
       REDIS_URL: redis://redis:6379
       AUTH_DEV_MODE: 'false'
       FIREBASE_PROJECT_ID: egua-adota
+      # Conta de serviço do Firebase (variáveis do Coolify). Sem elas a API só valida login:
+      # o push não sai e excluir a conta não apaga o login no Firebase.
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
       OWNER_EMAILS: hiago.yan@hotmail.com
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: https://media.eguaadota.com.br
