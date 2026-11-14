@@ -1,7 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
-import { isNetworkError, loadMe, setUnauthorizedHandler, ApiError } from './api';
+import {
+  isNetworkError,
+  loadMe,
+  setSuspendedHandler,
+  setUnauthorizedHandler,
+  ApiError,
+} from './api';
 import {
   currentIdToken,
   signInWithEmail,
@@ -112,6 +118,7 @@ export const useSession = create<SessionState>((set) => ({
     const stored = await readOrDiscard(tokenKey, readToken, null);
     let token = stored;
     let user: Account | null = null;
+    let signedOutReason: string | null = null;
     try {
       const fresh = await currentIdToken();
       const candidate = fresh ?? stored;
@@ -122,16 +129,18 @@ export const useSession = create<SessionState>((set) => ({
         setReporterUser({ id: user.id, handle: user.handle });
       }
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      const suspended = error instanceof ApiError && error.code === 'account_suspended';
+      if (error instanceof ApiError && (error.status === 401 || suspended)) {
         await signOutAuth();
         await writeToken(null);
         token = null;
         user = null;
+        if (suspended) signedOutReason = error.message;
       } else if (!isNetworkError(error)) {
         reportError(error, { source: 'handled', where: 'session:hydrate' });
       }
     }
-    set({ ready: true, token, user, ...flags });
+    set({ ready: true, token, user, signedOutReason, ...flags });
   },
   finishPermissions: async () => {
     const flags = { permissionsSeen: true };
@@ -198,6 +207,12 @@ export const useSession = create<SessionState>((set) => ({
 }));
 
 let refreshingSession = false;
+
+setSuspendedHandler((message) => {
+  const state = useSession.getState();
+  if (!state.token) return;
+  void state.logout(message);
+});
 
 setUnauthorizedHandler(() => {
   const state = useSession.getState();

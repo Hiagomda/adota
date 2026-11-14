@@ -243,7 +243,8 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
      FROM posts p
      JOIN users u ON u.id = p.author_id
      JOIN animals a ON a.id = p.animal_id
-     WHERE p.id = $1 AND p.hidden = false AND p.review_status = 'published'`,
+     WHERE p.id = $1 AND p.hidden = false AND p.review_status = 'published'
+       AND u.deleted_at IS NULL AND u.suspended = false`,
     [id, viewer?.id ?? null],
   );
   const row = rowsOf<PostRow>(result)[0];
@@ -420,7 +421,7 @@ export async function changeStatus(
   postId: string,
   user: SessionUser,
   status: AnimalStatus,
-) {
+): Promise<{ status: AnimalStatus; changed: boolean }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -458,8 +459,42 @@ export async function changeStatus(
     ) {
       throw new HttpError(403, 'Só quem publicou pode fazer essa mudança no alerta.');
     }
+    // Quem ia ajudar e volta o resgate para aberto (ou não encontrado) está saindo dele: sai da
+    // lista de quem vai, igual a "Não consegui ir". Antes ficava marcado como a caminho, vendo o
+    // ponto exato, e o resgate aberto. Se ainda há outra pessoa indo, o status fica a caminho.
+    if (!owner && post.status === 'on_the_way' && (status === 'open' || status === 'not_found')) {
+      await client.query(
+        `DELETE FROM responses WHERE post_id = $1 AND user_id = $2 AND kind = 'will_help'`,
+        [postId, user.id],
+      );
+      const left = await client.query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
+        [postId],
+      );
+      const next = statusAfterLeavingHelp(
+        post.status,
+        status === 'not_found' ? 'not_found' : 'could_not',
+        left.rows[0]?.count ?? 0,
+      );
+      if (next) {
+        await applyStatus(client, postId, user.id, post.animal_id, next, post.type);
+      } else if (status === 'not_found') {
+        // Outra pessoa continua a caminho: fica só o registro de que esta não achou o animal.
+        await client.query(
+          `INSERT INTO posts (
+             author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id
+           )
+           SELECT $2, animal_id, 'update', 'low', $3, location, approx_label, status, id
+           FROM posts WHERE id = $1`,
+          [postId, user.id, NOT_FOUND_NOTE],
+        );
+      }
+      await client.query('COMMIT');
+      return { status: next ?? post.status, changed: next !== null };
+    }
     await applyStatus(client, postId, user.id, post.animal_id, status, post.type);
     await client.query('COMMIT');
+    return { status, changed: true };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -847,6 +882,14 @@ export async function addResponse(
     if (kind === 'will_help' && !streetStatuses.has(post.status)) {
       throw new HttpError(400, 'Esse resgate não precisa mais de alguém a caminho.');
     }
+    // Quem publicou não diz "vou ajudar" no próprio resgate: o caso parecia atendido, a
+    // vizinhança parava de ir e o aviso não era ampliado. Ele atualiza o status direto.
+    if (kind === 'will_help' && user.id === post.author_id) {
+      throw new HttpError(
+        400,
+        'Esse resgate é seu. Quando o animal estiver seguro, toque em "O animal já está seguro".',
+      );
+    }
     try {
       await client.query(
         `INSERT INTO responses (post_id, user_id, kind, note) VALUES ($1, $2, $3, $4)`,
@@ -1103,7 +1146,18 @@ function decodeCursor(
   const [rank, boosted, createdAt, id] = Buffer.from(cursor, 'base64url')
     .toString('utf8')
     .split('|');
-  if (!rank || !createdAt || !id || !boosted) return null;
+  // Cursor velho ou mexido à mão respondia 500 (data ou id inválidos no SQL).
+  if (
+    !rank ||
+    !createdAt ||
+    !id ||
+    !boosted ||
+    !/^[0-2]$/.test(rank) ||
+    Number.isNaN(Date.parse(createdAt)) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  ) {
+    throw new HttpError(400, 'A lista mudou. Puxe para atualizar.');
+  }
   return { rank: Number(rank), boosted: boosted === '1', createdAt, id };
 }
 

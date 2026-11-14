@@ -448,28 +448,37 @@ export default function PostScreen() {
                   variant: 'secondary',
                   onPress: () => setFoundOpen(true),
                 }
-              : rescueOpen
+              : rescueOpen && isAuthor
                 ? {
-                    title: item.status === 'not_found' ? 'Vou procurar' : 'Eu vou ajudar',
-                    icon: item.status === 'not_found' ? 'search' : 'heart',
+                    // Quem publicou não se marca "a caminho" no próprio resgate: um toque por
+                    // engano fazia o caso parecer atendido e a vizinhança parava de ir.
+                    title: 'O animal já está seguro',
+                    icon: 'check',
                     variant: 'secondary',
-                    onPress: onHelpPress,
+                    onPress: () => setFoundOpen(true),
                   }
-                : canMoveStatus && (item.status === 'rescued' || item.status === 'fostered')
+                : rescueOpen
                   ? {
-                      title: 'Próximo passo',
-                      icon: 'arrow-right',
-                      variant: 'primary',
-                      loading: marking,
-                      onPress: () => setFoundOpen(true),
+                      title: item.status === 'not_found' ? 'Vou procurar' : 'Eu vou ajudar',
+                      icon: item.status === 'not_found' ? 'search' : 'heart',
+                      variant: 'secondary',
+                      onPress: onHelpPress,
                     }
-                  : {
-                      title: 'Compartilhar',
-                      icon: 'share-2',
-                      variant: 'primary',
-                      onPress: share,
-                      share: true,
-                    };
+                  : canMoveStatus && (item.status === 'rescued' || item.status === 'fostered')
+                    ? {
+                        title: 'Próximo passo',
+                        icon: 'arrow-right',
+                        variant: 'primary',
+                        loading: marking,
+                        onPress: () => setFoundOpen(true),
+                      }
+                    : {
+                        title: 'Compartilhar',
+                        icon: 'share-2',
+                        variant: 'primary',
+                        onPress: share,
+                        share: true,
+                      };
   const footerLine = helpingNow
     ? othersGoing > 0
       ? `Você e mais ${othersGoing} a caminho · ponto exato liberado`
@@ -951,7 +960,11 @@ export default function PostScreen() {
                 onPress={talkToAuthor}
               />
             ) : null}
-            {canOwn && !lost && !item.viewerWillHelp && openRescueStatuses.has(item.status) ? (
+            {canOwn &&
+            !isAuthor &&
+            !lost &&
+            !item.viewerWillHelp &&
+            openRescueStatuses.has(item.status) ? (
               <Button
                 title="O animal já está seguro"
                 icon="check"

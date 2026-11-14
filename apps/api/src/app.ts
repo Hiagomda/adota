@@ -93,7 +93,11 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof HttpError) {
-      return reply.code(error.statusCode).send({ message: error.message });
+      return reply
+        .code(error.statusCode)
+        .send(
+          error.code ? { message: error.message, code: error.code } : { message: error.message },
+        );
     }
     const statusCode =
       typeof error === 'object' &&
