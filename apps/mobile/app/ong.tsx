@@ -149,7 +149,7 @@ export default function NgoSignupScreen() {
           <AppText style={{ color: colors.onInfoSoft }}>
             Recebemos o cadastro de {current.request.organizationName}{' '}
             {formatWhen(current.request.createdAt)}. A equipe confere o Instagram e os dados, e você
-            recebe um aviso em Alertas quando terminar.
+            recebe um aviso em Notificações quando terminar.
           </AppText>
         </View>
       </Card>

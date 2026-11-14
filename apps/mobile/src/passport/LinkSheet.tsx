@@ -66,7 +66,7 @@ export function LinkSheet({
       );
       await onDone(
         result.status === 'accepted'
-          ? 'Pronto: as ocorrências agora são um passaporte só.'
+          ? 'Pronto: as publicações agora são um passaporte só.'
           : 'Pedido enviado. Quem publicou o outro post confirma se é o mesmo animal.',
       );
     } catch (failure) {
@@ -112,7 +112,7 @@ export function LinkSheet({
         />
         {error ? <Notice tone="error" message={error} /> : null}
         <Button
-          title="Juntar as ocorrências"
+          title="Juntar as publicações"
           fullWidth
           loading={sending}
           onPress={() => void send()}

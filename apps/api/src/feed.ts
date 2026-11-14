@@ -248,9 +248,9 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
     [id, viewer?.id ?? null],
   );
   const row = rowsOf<PostRow>(result)[0];
-  if (!row) throw new HttpError(404, 'Esse alerta não existe.');
+  if (!row) throw new HttpError(404, 'Essa publicação não existe mais.');
   const [post] = await hydrate(pool, env, [row], viewer);
-  if (!post) throw new HttpError(404, 'Esse alerta não existe.');
+  if (!post) throw new HttpError(404, 'Essa publicação não existe mais.');
   const helpers = await pool.query<{ count: number }>(
     `SELECT count(*)::int AS count FROM responses WHERE post_id = $1 AND kind = 'will_help'`,
     [id],
@@ -368,7 +368,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
       ],
     );
     const postId = post.rows[0]?.id;
-    if (!postId) throw new HttpError(500, 'Não consegui salvar o alerta.');
+    if (!postId) throw new HttpError(500, 'Não consegui salvar a publicação.');
     for (const [position, media] of input.media.entries()) {
       await client.query(
         `INSERT INTO post_media (post_id, url, type, position) VALUES ($1, $2, 'image', $3)`,
@@ -427,7 +427,7 @@ export async function changeStatus(
     await client.query('BEGIN');
     const post = await lockRescue(client, postId);
     const allowed = await canChange(client, post.author_id, postId, user);
-    if (!allowed) throw new HttpError(403, 'Você não pode atualizar esse alerta.');
+    if (!allowed) throw new HttpError(403, 'Você não pode atualizar essa publicação.');
     const owner = user.id === post.author_id || isOperator(user.role);
     // Animal perdido tem família: ele volta para casa, não vai para lar temporário nem adoção, e
     // quem diz que voltou é o tutor. Quem achou fala com o tutor pelo WhatsApp.
@@ -457,7 +457,7 @@ export async function changeStatus(
       user.id !== post.author_id &&
       !isOperator(user.role)
     ) {
-      throw new HttpError(403, 'Só quem publicou pode fazer essa mudança no alerta.');
+      throw new HttpError(403, 'Só quem publicou pode fazer essa mudança.');
     }
     // Quem ia ajudar e volta o resgate para aberto (ou não encontrado) está saindo dele: sai da
     // lista de quem vai, igual a "Não consegui ir". Antes ficava marcado como a caminho, vendo o
@@ -523,7 +523,7 @@ async function lockRescue(
     [postId],
   );
   const post = current.rows[0];
-  if (!post) throw new HttpError(404, 'Esse alerta não existe.');
+  if (!post) throw new HttpError(404, 'Essa publicação não existe mais.');
   return post;
 }
 
@@ -876,7 +876,8 @@ export async function addResponse(
       `SELECT 1 FROM posts WHERE id = $1 AND review_status = 'published'`,
       [postId],
     );
-    if ((published.rowCount ?? 0) === 0) throw new HttpError(404, 'Esse alerta não existe.');
+    if ((published.rowCount ?? 0) === 0)
+      throw new HttpError(404, 'Essa publicação não existe mais.');
     // "Vou ajudar" libera o ponto exato e o WhatsApp, e deixa mudar o status. Só vale enquanto
     // alguém ainda pode ir até o animal; num anúncio de adoção o caminho é "Quero adotar".
     if (kind === 'will_help' && !streetStatuses.has(post.status)) {
@@ -896,7 +897,8 @@ export async function addResponse(
         [postId, user.id, kind, note ?? null],
       );
     } catch (error) {
-      if (isUnique(error)) throw new HttpError(409, 'Você já respondeu esse alerta desse jeito.');
+      if (isUnique(error))
+        throw new HttpError(409, 'Você já respondeu essa publicação desse jeito.');
       throw error;
     }
     if (kind === 'will_help' && (post.status === 'open' || post.status === 'not_found')) {

@@ -58,7 +58,7 @@ import { journeyOf } from '../../src/post/journey';
 import { currentStep, operationSteps, type OperationPage } from '../../src/operation/operation';
 import { needsAttention, pendingCheckin, type FollowupPage } from '../../src/followup/followup';
 import { careChips } from '../../src/post/care';
-import { firstName, notFoundVisits } from '../../src/post/diaryEntries';
+import { displayName, firstName, notFoundVisits } from '../../src/post/diaryEntries';
 import { RescueJourney } from '../../src/post/RescueJourney';
 import { FosterHomesSection } from '../../src/fosterHome/FosterHomesSection';
 import { HelpOffers } from '../../src/central/HelpOffers';
@@ -490,7 +490,7 @@ export default function PostScreen() {
   const postLink = postLinkFor(item.id);
   // "a Mel" reads wrong without knowing the sex, so the name goes alone or "um gato".
   const animalRef = item.animal.name?.trim() || `um ${speciesName.toLowerCase()}`;
-  const authorFirstName = item.author.name.split(' ')[0] ?? item.author.name;
+  const authorFirstName = displayName(item.author.name, item.author.role);
 
   function talkToAuthor() {
     if (!item) return;
@@ -614,7 +614,7 @@ export default function PostScreen() {
               <AppText variant="display">{animalHeadline(item.animal)}</AppText>
               {/* Num resgate, há quanto tempo foi o aviso decide se ainda vale ir. */}
               <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-                {publishedLine(item.createdAt, item.author.name)}
+                {publishedLine(item.createdAt, item.author.name, item.author.role)}
               </AppText>
               <View style={styles.pills}>
                 {journeyOf(item.type, item.status) ? null : (
@@ -774,7 +774,7 @@ export default function PostScreen() {
               <Card padding="none" elevation="sm">
                 <ListItem
                   title="Passaporte do animal"
-                  subtitle="Saúde, lares, adoção e outras ocorrências dele"
+                  subtitle="Saúde, lares, adoção e outras publicações dele"
                   icon="book-open"
                   showChevron
                   onPress={() => router.push(`/animal/${item.animal.id}`)}
@@ -1712,9 +1712,9 @@ interface Sighting {
 }
 
 /** "Publicado há 2 horas por Ana", logo abaixo do título. */
-function publishedLine(createdAt: string, authorName: string): string {
+function publishedLine(createdAt: string, authorName: string, role?: string): string {
   const when = formatWhen(createdAt);
-  const first = authorName.split(' ')[0] || authorName;
+  const first = displayName(authorName, role);
   const prefix = when === 'agora' || when.startsWith('há') ? 'Publicado' : 'Publicado em';
   return `${prefix} ${when} por ${first}`;
 }

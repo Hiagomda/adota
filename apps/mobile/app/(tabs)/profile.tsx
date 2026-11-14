@@ -123,38 +123,42 @@ export default function ProfileScreen() {
               onPress={() => router.push('/settings')}
             />
           </View>
-          <ProfileHeader
-            name={me.data?.name ?? 'Sua conta'}
-            avatarUrl={me.data?.avatarUrl}
-            verified={me.data?.verified}
-            subtitle={[level?.name, me.data?.city].filter(Boolean).join(' · ') || null}
-            stats={[
-              { value: publicProfile.data?.counts.posts ?? 0, label: 'publicações' },
-              { value: publicProfile.data?.counts.followers ?? 0, label: 'seguidores' },
-              {
-                value: publicProfile.data?.counts.rescued ?? publicProfile.data?.counts.helped ?? 0,
-                label: 'saíram da rua',
-              },
-            ]}
-          >
-            {token ? (
-              <>
-                <Button
-                  title="Editar perfil"
-                  variant="outline"
-                  onPress={() => router.push('/settings')}
-                  style={styles.grow}
-                />
-                <Button
-                  title="Minha rede"
-                  icon="users"
-                  variant="outline"
-                  onPress={() => router.push('/voluntario')}
-                  style={styles.grow}
-                />
-              </>
-            ) : null}
-          </ProfileHeader>
+          {/* Sem conta não existe perfil: o cabeçalho com letra e "0 publicações" parecia de alguém. */}
+          {token ? (
+            <ProfileHeader
+              name={me.data?.name ?? 'Sua conta'}
+              avatarUrl={me.data?.avatarUrl}
+              verified={me.data?.verified}
+              subtitle={[level?.name, me.data?.city].filter(Boolean).join(' · ') || null}
+              stats={[
+                { value: publicProfile.data?.counts.posts ?? 0, label: 'publicações' },
+                { value: publicProfile.data?.counts.followers ?? 0, label: 'seguidores' },
+                {
+                  value:
+                    publicProfile.data?.counts.rescued ?? publicProfile.data?.counts.helped ?? 0,
+                  label: 'saíram da rua',
+                },
+              ]}
+            >
+              {token ? (
+                <>
+                  <Button
+                    title="Editar perfil"
+                    variant="outline"
+                    onPress={() => router.push('/settings')}
+                    style={styles.grow}
+                  />
+                  <Button
+                    title="Minha rede"
+                    icon="users"
+                    variant="outline"
+                    onPress={() => router.push('/voluntario')}
+                    style={styles.grow}
+                  />
+                </>
+              ) : null}
+            </ProfileHeader>
+          ) : null}
           {me.data?.verified && (me.data.role === 'ngo' || me.data.role === 'protector') ? (
             <View style={styles.network}>
               <ActionCard
@@ -210,16 +214,20 @@ export default function ProfileScreen() {
               ))}
             </ScrollView>
           ) : null}
-          <View style={styles.tabs}>
-            <Segmented
-              variant="underline"
-              accessibilityLabel="Seções do perfil"
-              options={tabOptions}
-              value={tab}
-              onChange={setTab}
-            />
-          </View>
-          <PostGrid posts={posts.data?.posts ?? []} />
+          {token ? (
+            <>
+              <View style={styles.tabs}>
+                <Segmented
+                  variant="underline"
+                  accessibilityLabel="Seções do perfil"
+                  options={tabOptions}
+                  value={tab}
+                  onChange={setTab}
+                />
+              </View>
+              <PostGrid posts={posts.data?.posts ?? []} />
+            </>
+          ) : null}
           {!token ? (
             <EmptyState
               pose="login"

@@ -30,6 +30,7 @@ import {
   type OperationOutcome,
   type OperationPage,
 } from '../../src/operation/operation';
+import { displayName } from '../../src/post/diaryEntries';
 import { statusChoices, type StatusChoice } from '../../src/post/statusChoices';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, useTheme } from '../../src/theme';
@@ -105,7 +106,7 @@ export default function RescueOperationScreen() {
   const team = teamLine(page.team);
   const choices = statusChoices('on_the_way', page.isAuthor, item.type);
   const animal = animalHeadline(item.animal);
-  const authorFirst = item.author.name.split(' ')[0] ?? item.author.name;
+  const authorFirst = displayName(item.author.name, item.author.role);
   const animalRef =
     item.animal.name?.trim() ||
     `um ${(speciesLabel[item.animal.species] ?? 'bichinho').toLowerCase()}`;

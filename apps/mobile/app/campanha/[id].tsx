@@ -513,7 +513,7 @@ export default function CampaignScreen() {
                   <Card padding="none" elevation="sm">
                     <ListItem
                       title="Passaporte do animal"
-                      subtitle={data.animal.name ?? 'Saúde, lares e ocorrências dele'}
+                      subtitle={data.animal.name ?? 'Saúde, lares e publicações dele'}
                       icon="book-open"
                       showChevron
                       onPress={() => router.push(`/animal/${data.animal?.id ?? ''}`)}

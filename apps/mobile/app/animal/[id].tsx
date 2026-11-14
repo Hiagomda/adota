@@ -110,7 +110,7 @@ export default function PassportScreen() {
       await client.invalidateQueries({ queryKey: ['post'] });
       toast.show(
         action === 'accept'
-          ? 'Pronto: as ocorrências agora são um passaporte só.'
+          ? 'Pronto: as publicações agora são um passaporte só.'
           : 'Pedido recusado. Os posts continuam separados.',
         'success',
       );

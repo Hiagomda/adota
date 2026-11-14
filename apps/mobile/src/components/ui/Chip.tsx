@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { radius, spacing, useTheme } from '../../theme';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
@@ -16,7 +16,10 @@ export interface ChipProps {
 
 const MULTILINE_MAX_WIDTH = 240;
 
-/** Filter or choice chip. 40 px tall plus 4 px of hit slop on each side gives a 48 px target. */
+/**
+ * Chip de filtro ou escolha. No celular tem 40 px mais 4 px de hitSlop em cima e embaixo (alvo de
+ * 48 px). O app web do iPhone ignora o hitSlop, então lá o próprio chip tem 44 px.
+ */
 export function Chip({
   label,
   selected = false,
@@ -63,7 +66,7 @@ export function Chip({
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 40,
+    minHeight: Platform.OS === 'web' ? 44 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,

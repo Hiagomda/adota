@@ -108,7 +108,7 @@ export default function LostMatchesScreen() {
       setLinked((current) => new Set(current).add(match.id));
       toast.show(
         result.status === 'accepted'
-          ? 'Pronto: as duas ocorrências agora são um passaporte só.'
+          ? 'Pronto: as duas publicações agora são um passaporte só.'
           : 'Pedido enviado. Quem publicou o outro post confirma no passaporte.',
         'success',
       );

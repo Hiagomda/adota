@@ -14,14 +14,18 @@ import { size } from '../src/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    returnTo?: string | string[];
+    email?: string | string[];
+  }>();
   const returnTo = safeReturnTo(params.returnTo);
   const token = useSession((state) => state.token);
   const permissionsSeen = useSession((state) => state.permissionsSeen);
   const signIn = useSession((state) => state.signIn);
   const passwordRef = useRef<TextInput>(null);
   const { pending, run } = useSubmitLock();
-  const [email, setEmail] = useState('');
+  // Vindo do cadastro com a conta já criada, o e-mail chega preenchido.
+  const [email, setEmail] = useState(() => (typeof params.email === 'string' ? params.email : ''));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
