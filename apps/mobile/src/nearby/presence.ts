@@ -75,7 +75,15 @@ export async function releasePushToken(token: string): Promise<void> {
     if (notifications.status !== 'granted') return;
     const push = await Notifications.getDevicePushTokenAsync();
     const value = typeof push.data === 'string' ? push.data : null;
-    if (value) await api('/me/fcm-token', { method: 'DELETE', token, body: { token: value } });
+    // Curto: sem internet, sair da conta não pode ficar esperando.
+    if (value) {
+      await api('/me/fcm-token', {
+        method: 'DELETE',
+        token,
+        body: { token: value },
+        timeoutMs: 4000,
+      });
+    }
   } catch (error) {
     reportError(error, { source: 'handled', where: 'presence:push-release' });
   }
