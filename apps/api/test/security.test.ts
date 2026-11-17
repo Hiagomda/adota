@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { isOwnerToken } from '../src/accounts.js';
 import { buildApp } from '../src/app.js';
+import {
+  forgetRevocationCheck,
+  markRevocationChecked,
+  REVOCATION_CHECK_EVERY_MS,
+  revocationCheckDue,
+} from '../src/register.js';
 import { requireRole, requireUser } from '../src/authz.js';
 import { loadEnv, productionProblems, productionWarnings, type Env } from '../src/config.js';
 import { clientIp, configureStaffProxy } from '../src/staff/routes.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
-import { firebaseChecksRevocation, isTokenRejection } from '../src/firebaseAdmin.js';
+import {
+  firebaseChecksRevocation,
+  isTokenRejection,
+  normalizePrivateKey,
+} from '../src/firebaseAdmin.js';
 import { extensionKind, ownedMediaKey, sniffImage } from '../src/mediaPolicy.js';
 import { assertHelpRequest, publicPixKey, publicPlace } from '../src/privacy.js';
 import type { SessionUser } from '../src/session.js';
@@ -208,9 +218,28 @@ describe('http hardening', () => {
         ...env,
         FIREBASE_PROJECT_ID: 'egua-adota',
         FIREBASE_CLIENT_EMAIL: 'firebase-adminsdk-fbsvc@egua-adota.iam.gserviceaccount.com',
-        FIREBASE_PRIVATE_KEY: 'key',
+        FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n',
       }),
     ).toBe(true);
+    // Chave quebrada: segue só validando login, sem derrubar nada.
+    expect(
+      firebaseChecksRevocation({
+        ...env,
+        FIREBASE_CLIENT_EMAIL: 'firebase-adminsdk-fbsvc@egua-adota.iam.gserviceaccount.com',
+        FIREBASE_PRIVATE_KEY: 'key',
+      }),
+    ).toBe(false);
+  });
+
+  it('a chave do Firebase fica só com o bloco PEM, sem o que foi colado a mais', () => {
+    const pem = '-----BEGIN PRIVATE KEY-----\nMIIEabc\ndef==\n-----END PRIVATE KEY-----';
+    // Como veio do Coolify: \n escritos e o começo do JSON colado depois do END.
+    const colado =
+      pem.replace(/\n/g, '\\n') +
+      '\\n",\\n  "client_email": "x@egua-adota.iam.gserviceaccount.com",';
+    expect(normalizePrivateKey(colado)).toBe(`${pem}\n`);
+    expect(normalizePrivateKey(`"${pem}"`)).toBe(`${pem}\n`);
+    expect(() => normalizePrivateKey('qualquer coisa')).toThrow(/BEGIN\/END/);
   });
 
   it('refuses to start in production with development settings', () => {
@@ -282,5 +311,19 @@ describe('avisos de configuração em produção', () => {
   it('avisa push e Sentry desligados sem impedir a subida', () => {
     expect(productionWarnings({ ...env, NODE_ENV: 'production' })).toHaveLength(2);
     expect(productionWarnings(env)).toEqual([]);
+  });
+});
+
+describe('conferência de conta revogada no Firebase', () => {
+  it('confere no Google no máximo a cada 10 min por conta, e de novo depois de excluir', () => {
+    const uid = 'uid-teste-revogacao';
+    const start = 1_000_000;
+    expect(revocationCheckDue(uid, start)).toBe(true);
+    markRevocationChecked(uid, start);
+    expect(revocationCheckDue(uid, start + REVOCATION_CHECK_EVERY_MS - 1)).toBe(false);
+    expect(revocationCheckDue(uid, start + REVOCATION_CHECK_EVERY_MS)).toBe(true);
+    markRevocationChecked(uid, start);
+    forgetRevocationCheck(uid);
+    expect(revocationCheckDue(uid, start + 1)).toBe(true);
   });
 });

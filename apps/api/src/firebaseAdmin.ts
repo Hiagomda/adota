@@ -40,8 +40,32 @@ export function isTokenRejection(error: unknown): boolean {
   return !serverSideCause.test(message);
 }
 
+const pemBlock = /-----BEGIN PRIVATE KEY-----[\s\S]+?-----END PRIVATE KEY-----/;
+
+/**
+ * Chave da conta de serviço como o Coolify guardou: com `\n` escritos, aspas ou o resto do JSON
+ * colado junto (aconteceu: ~80 caracteres depois do END). Fica só o bloco PEM. Nunca loga a chave.
+ */
+export function normalizePrivateKey(raw: string): string {
+  const unescaped = raw.replace(/\\n/g, '\n');
+  const block = pemBlock.exec(unescaped)?.[0];
+  if (!block) throw new Error('FIREBASE_PRIVATE_KEY não tem um bloco BEGIN/END PRIVATE KEY');
+  return `${block}\n`;
+}
+
+/** Chave pronta para uso, ou null se faltar ou estiver quebrada (aí o servidor só valida login). */
+function serviceAccountKey(env: Env): string | null {
+  if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return null;
+  try {
+    return normalizePrivateKey(env.FIREBASE_PRIVATE_KEY);
+  } catch (error) {
+    console.error(JSON.stringify({ level: 'error', where: 'firebase:key', error: String(error) }));
+    return null;
+  }
+}
+
 export function firebaseChecksRevocation(env: Env): boolean {
-  return Boolean(env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY);
+  return serviceAccountKey(env) !== null;
 }
 
 export async function ensureFirebaseApp(env: Env): Promise<void> {
@@ -49,13 +73,14 @@ export async function ensureFirebaseApp(env: Env): Promise<void> {
   const admin = await import('firebase-admin');
   if (admin.apps.length > 0) return;
   const projectId = env.FIREBASE_PROJECT_ID;
-  if (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+  const privateKey = serviceAccountKey(env);
+  if (env.FIREBASE_CLIENT_EMAIL && privateKey) {
     admin.initializeApp({
       projectId,
       credential: admin.credential.cert({
         projectId,
         clientEmail: env.FIREBASE_CLIENT_EMAIL,
-        privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        privateKey,
       }),
     });
     return;

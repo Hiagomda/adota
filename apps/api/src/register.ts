@@ -247,9 +247,22 @@ export async function registerRoutes(
     return { ok: true };
   });
 
+  // Ao sair da conta o app tira o token do aparelho: sem isso, quem saiu seguia recebendo os
+  // avisos (resgates, conversas) daquela conta no celular até outra pessoa entrar nele.
+  app.delete('/me/fcm-token', writeLimit, async (request) => {
+    const user = requireUser(request.user);
+    const { token } = parse(z.object({ token: z.string().min(8).max(512) }), request.body);
+    await pool.query(`UPDATE users SET fcm_tokens = array_remove(fcm_tokens, $2) WHERE id = $1`, [
+      user.id,
+      token,
+    ]);
+    return { ok: true };
+  });
+
   app.delete('/me', strictLimit, async (request, reply) => {
     const user = requireUser(request.user);
     const firebaseUid = await anonymizeUser(pool, user.id);
+    if (firebaseUid) forgetRevocationCheck(firebaseUid);
     // The account is already gone from the app. Photos and the sign-in record follow; a failure
     // there is logged for a manual cleanup instead of failing the request.
     await deleteUserUploads(env, storage, user.id).catch(
@@ -1125,6 +1138,29 @@ function parse<Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): z.o
 }
 
 /**
+ * Conta desativada ou sessão revogada no Firebase: conferido no Google no máximo a cada 10 min
+ * por conta, e não em todo pedido (cada conferência é uma chamada de rede ao Google).
+ */
+export const REVOCATION_CHECK_EVERY_MS = 10 * 60 * 1000;
+const revocationCheckedAt = new Map<string, number>();
+
+export function revocationCheckDue(uid: string, now = Date.now()): boolean {
+  const last = revocationCheckedAt.get(uid);
+  return last === undefined || now - last >= REVOCATION_CHECK_EVERY_MS;
+}
+
+/** Depois de excluir a conta, o próximo pedido com o token antigo confere no Google de novo. */
+export function forgetRevocationCheck(uid: string): void {
+  revocationCheckedAt.delete(uid);
+}
+
+export function markRevocationChecked(uid: string, now = Date.now()): void {
+  // shortcut: limpa tudo ao passar de 20 mil contas; trocar por LRU se a base crescer muito.
+  if (revocationCheckedAt.size > 20_000) revocationCheckedAt.clear();
+  revocationCheckedAt.set(uid, now);
+}
+
+/**
  * A token Firebase rejects means "signed out" and the route answers 401. Anything else (database,
  * Firebase config, network to Google) is a server failure and must surface as 500: answering 401
  * there would make the app drop a valid session.
@@ -1147,7 +1183,18 @@ async function resolveUser(
   const admin = await import('firebase-admin');
   let decoded: Awaited<ReturnType<ReturnType<typeof admin.auth>['verifyIdToken']>>;
   try {
-    decoded = await admin.auth().verifyIdToken(token, firebaseChecksRevocation(env));
+    // Assinatura e validade só com as chaves públicas do Google (em cache), sem chamada de rede.
+    decoded = await admin.auth().verifyIdToken(token, false);
+    if (firebaseChecksRevocation(env) && revocationCheckDue(decoded.uid)) {
+      try {
+        await admin.auth().verifyIdToken(token, true);
+        markRevocationChecked(decoded.uid);
+      } catch (error) {
+        if (isTokenRejection(error)) throw error;
+        // Google lento ou fora: segue com o token já validado em vez de derrubar o pedido.
+        log.warn({ where: 'auth:revocation' }, 'auth: revocation check unavailable');
+      }
+    }
   } catch (error) {
     if (!isTokenRejection(error)) throw error;
     log.info({ code: (error as { code: string }).code }, 'auth: Firebase rejected the token');
