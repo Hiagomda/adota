@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
@@ -30,6 +31,11 @@ const SESSION_MS = 8 * 60 * 60 * 1000;
 const IDLE_MS = 30 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 5;
+/**
+ * Bloqueio do usuário vindo de qualquer lugar. Bem acima dos 5 por endereço: quem erra a senha
+ * tranca só o próprio IP, e um ataque espalhado por muitos IPs ainda para.
+ */
+const MAX_FAILURES_ANY_IP = 25;
 
 const roleChangeSchema = z
   .object({
@@ -80,7 +86,37 @@ function sameHex(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Segredo que o painel (AdotaSite) manda junto com o IP de quem está nele. Vazio: desligado. */
+let staffProxySecret: Buffer | null = null;
+
+export function configureStaffProxy(secret: string | undefined): void {
+  staffProxySecret = secret ? Buffer.from(secret) : null;
+}
+
+export const STAFF_PROXY_SECRET_HEADER = 'x-egua-proxy-secret';
+export const STAFF_CLIENT_IP_HEADER = 'x-egua-client-ip';
+
+/**
+ * IP de quem fez o pedido. O painel chama a API pelo servidor dele, então sem ajuda todo login da
+ * equipe chega com o IP da VPS: o limite por IP e o bloqueio por senha errada valiam para todo
+ * mundo junto. Quando o painel manda o segredo certo, vale o IP que ele repassa. Sem o segredo
+ * (ou com um errado), o cabeçalho é ignorado, então ninguém escolhe o próprio IP de fora.
+ */
 export function clientIp(request: FastifyRequest): string {
+  if (staffProxySecret) {
+    const sent = request.headers[STAFF_PROXY_SECRET_HEADER];
+    const forwarded = request.headers[STAFF_CLIENT_IP_HEADER];
+    const sentBytes = typeof sent === 'string' ? Buffer.from(sent) : null;
+    if (
+      sentBytes !== null &&
+      typeof forwarded === 'string' &&
+      isIP(forwarded.trim()) !== 0 &&
+      sentBytes.length === staffProxySecret.length &&
+      timingSafeEqual(sentBytes, staffProxySecret)
+    ) {
+      return forwarded.trim();
+    }
+  }
   return request.ip || 'unknown';
 }
 
@@ -109,7 +145,11 @@ async function assertUnlocked(pool: Pool, subject: string): Promise<void> {
   }
 }
 
-async function recordFailure(pool: Pool, subject: string): Promise<void> {
+async function recordFailure(
+  pool: Pool,
+  subject: string,
+  maxFailures = MAX_FAILURES,
+): Promise<void> {
   await pool.query(
     `INSERT INTO staff_login_attempts (subject, failures, locked_until, updated_at)
      VALUES ($1, 1, NULL, now())
@@ -120,7 +160,7 @@ async function recordFailure(pool: Pool, subject: string): Promise<void> {
          ELSE staff_login_attempts.locked_until
        END,
        updated_at = now()`,
-    [subject, MAX_FAILURES, String(LOCK_MS)],
+    [subject, maxFailures, String(LOCK_MS)],
   );
 }
 
@@ -283,21 +323,33 @@ async function passwordMatches(pool: Pool, userId: string, password: string): Pr
   return verifyPassword(password, stored ?? (await decoyHash()));
 }
 
-const loginLimit = { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } };
+const loginLimit = {
+  config: {
+    rateLimit: {
+      max: 8,
+      timeWindow: '15 minutes',
+      keyGenerator: (request: FastifyRequest) => `staff-login:${clientIp(request)}`,
+    },
+  },
+};
 
 export async function registerStaffRoutes(
   app: FastifyInstance,
   deps: { env: Env; pool: Pool; queue: RescueQueue },
 ): Promise<void> {
   const { env, pool, queue } = deps;
+  configureStaffProxy(env.STAFF_PROXY_SECRET);
 
   app.post('/admin/v1/login', loginLimit, async (request, reply) => {
     const ip = clientIp(request);
     allowlisted(env, ip);
     const body = parseBody(loginSchema, request.body);
-    // O painel chama a API do próprio servidor, então o IP é o mesmo para toda a equipe.
-    // O bloqueio conta por usuário para um erro de alguém não trancar todo mundo.
-    await assertUnlocked(pool, `login:${body.username}`);
+    // Dois bloqueios: usuário + IP (5 erros) e usuário de qualquer IP (25 erros). Sem o segredo do
+    // painel o IP é o da VPS para todos, e fica como antes (5 erros trancam o usuário).
+    const perIp = `login:${body.username}:${ip}`;
+    const anyIp = `login:${body.username}`;
+    await assertUnlocked(pool, perIp);
+    await assertUnlocked(pool, anyIp);
     const found = await pool.query<{ user_id: string; password_hash: string; role: string }>(
       `SELECT p.user_id, p.password_hash, u.role
        FROM staff_passwords p JOIN users u ON u.id = p.user_id
@@ -308,10 +360,12 @@ export async function registerStaffRoutes(
     // Sem conta, compara com um hash qualquer: a resposta demora o mesmo tanto.
     const ok = await verifyPassword(body.password, row?.password_hash ?? (await decoyHash()));
     if (!row || !ok || !isStaffRole(row.role)) {
-      await recordFailure(pool, `login:${body.username}`);
+      await recordFailure(pool, perIp);
+      await recordFailure(pool, anyIp, MAX_FAILURES_ANY_IP);
       throw new HttpError(401, 'Usuário ou senha incorretos.');
     }
-    await clearFailures(pool, `login:${body.username}`);
+    await clearFailures(pool, perIp);
+    await clearFailures(pool, anyIp);
     const session = await openSession(pool, env, reply, row.user_id, request);
     return { token: session.token, csrf: session.csrf };
   });

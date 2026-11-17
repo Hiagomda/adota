@@ -41,6 +41,11 @@ const envSchema = z.object({
   ADMIN_ORIGIN: z.string().min(1).default('http://localhost:3020'),
   /** Comma-separated IPs. Empty means the staff API does not filter by address. */
   ADMIN_IP_ALLOWLIST: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /**
+   * Segredo compartilhado com o painel (mesmo valor no AdotaSite). Com ele a API usa o IP real de
+   * quem está no painel nos limites de login e na auditoria. Vazio: tudo como antes.
+   */
+  STAFF_PROXY_SECRET: z.preprocess(blankAsUnset, z.string().min(32).optional()),
   /** Comma-separated e-mails promoted to admin once Firebase has verified them. */
   OWNER_EMAILS: z.preprocess(blankAsUnset, z.string().min(3).optional()),
   /** How many reverse proxies sit in front of the API. 1 is Caddy or Coolify. */
@@ -49,6 +54,12 @@ const envSchema = z.object({
   SENTRY_DSN: z.preprocess(blankAsUnset, z.string().url().optional()),
   /** Versão que aparece no Sentry, por exemplo o commit do deploy. */
   SENTRY_RELEASE: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /** Endereços públicos que a vigia interna confere (separados por vírgula). Vazio: só os internos. */
+  HEARTBEAT_URLS: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /** Pasta dos backups montada só para leitura: a vigia confere a idade do último e o disco. */
+  HEARTBEAT_BACKUP_DIR: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  /** Arquivo que o envio externo de backup grava a cada envio. Só é conferido se existir. */
+  HEARTBEAT_OFFSITE_FILE: z.preprocess(blankAsUnset, z.string().min(1).optional()),
 });
 
 export type Env = z.infer<typeof envSchema> & { authDevMode: boolean };
@@ -80,4 +91,18 @@ export function productionProblems(env: Env): string[] {
     problems.push('MINIO_SECRET_KEY é o padrão local');
   if (!env.IMGPROXY_KEY || !env.IMGPROXY_SALT) problems.push('IMGPROXY_KEY e IMGPROXY_SALT vazios');
   return problems;
+}
+
+/** Falta que não impede a API de subir, mas desliga algo importante. Vai para o log ao subir. */
+export function productionWarnings(env: Env): string[] {
+  if (env.NODE_ENV !== 'production') return [];
+  const warnings: string[] = [];
+  if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
+    warnings.push(
+      'FIREBASE_CLIENT_EMAIL ou FIREBASE_PRIVATE_KEY vazio: o push não sai e excluir conta não apaga o login no Firebase',
+    );
+  }
+  if (!env.SENTRY_DSN)
+    warnings.push('SENTRY_DSN vazio: erros e a vigia da VPS não chegam ao Sentry');
+  return warnings;
 }

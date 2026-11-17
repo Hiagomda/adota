@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { isOwnerToken } from '../src/accounts.js';
 import { buildApp } from '../src/app.js';
 import { requireRole, requireUser } from '../src/authz.js';
-import { loadEnv, productionProblems, type Env } from '../src/config.js';
+import { loadEnv, productionProblems, productionWarnings, type Env } from '../src/config.js';
+import { clientIp, configureStaffProxy } from '../src/staff/routes.js';
 import type { DatabaseClient, RedisClient } from '../src/health.js';
 import { HttpError } from '../src/http.js';
 import { firebaseChecksRevocation, isTokenRejection } from '../src/firebaseAdmin.js';
@@ -235,5 +236,51 @@ describe('http hardening', () => {
         IMGPROXY_SALT: 'bb',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('IP de quem está no painel', () => {
+  const secret = 'segredo-de-teste-com-mais-de-32-caracteres';
+  const request = (headers: Record<string, string>) =>
+    ({ ip: '10.0.0.5', headers }) as unknown as Parameters<typeof clientIp>[0];
+
+  it('sem segredo configurado ignora o cabeçalho de IP', () => {
+    configureStaffProxy(undefined);
+    expect(clientIp(request({ 'x-egua-client-ip': '200.1.2.3' }))).toBe('10.0.0.5');
+  });
+
+  it('com o segredo certo usa o IP repassado pelo painel', () => {
+    configureStaffProxy(secret);
+    expect(
+      clientIp(request({ 'x-egua-proxy-secret': secret, 'x-egua-client-ip': '200.1.2.3' })),
+    ).toBe('200.1.2.3');
+  });
+
+  it('segredo errado ou IP inválido: vale o IP da conexão', () => {
+    configureStaffProxy(secret);
+    expect(
+      clientIp(
+        request({
+          'x-egua-proxy-secret': 'x'.repeat(secret.length),
+          'x-egua-client-ip': '200.1.2.3',
+        }),
+      ),
+    ).toBe('10.0.0.5');
+    expect(clientIp(request({ 'x-egua-client-ip': '200.1.2.3' }))).toBe('10.0.0.5');
+    expect(
+      clientIp(request({ 'x-egua-proxy-secret': secret, 'x-egua-client-ip': 'não é ip' })),
+    ).toBe('10.0.0.5');
+    configureStaffProxy(undefined);
+  });
+
+  it('recusa segredo curto', () => {
+    expect(() => loadEnv({ NODE_ENV: 'test', STAFF_PROXY_SECRET: 'curto' })).toThrow();
+  });
+});
+
+describe('avisos de configuração em produção', () => {
+  it('avisa push e Sentry desligados sem impedir a subida', () => {
+    expect(productionWarnings({ ...env, NODE_ENV: 'production' })).toHaveLength(2);
+    expect(productionWarnings(env)).toEqual([]);
   });
 });
