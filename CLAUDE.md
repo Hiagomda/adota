@@ -64,7 +64,7 @@ Não compile a partir do OneDrive (caminho longo → CMake/ninja quebra). Não r
 
 - Disparar sem o navegador: `POST /repos/Hiagomda/adota/actions/workflows/build-apk.yml/dispatches` com `{"ref":"master","inputs":{"publish":true}}`, token via `git credential fill` num script temporário (mesma regra do passo 3). Leva ~15 min.
 - O secret `MOBILE_ENV` é o `.env` inteiro do app. O GitHub não mostra o valor salvo e o _Update_ **substitui tudo**: a cópia completa está em `C:devegua-adotaappsmobile.env`. O agente não escreve secrets; o Hiago cola.
-- `EXPO_PUBLIC_SENTRY_DSN` é obrigatório no release (trava no `app.config.ts` e no `check-apk`), junto com API, download, Firebase e Google.
+- `EXPO_PUBLIC_SENTRY_DSN` é obrigatório no release (trava no `app.config.ts` e no `check-apk`), junto com API, download, Firebase e Google. O secret `GOOGLE_SERVICES_JSON` (google-services.json do app Android) também: sem ele o Firebase nativo não inicia, o Android não gera token de push e o `check-apk` reprova (`ALLOW_NO_PUSH=1` só em emergência). O APK 48 saiu sem ele.
 
 1. Robocopy OneDrive → `C:\dev\egua-adota` com `/E`, **excluindo** `android`, `node_modules`, `.expo`, `.git`, `.env`. **Nunca** `/MIR`.
 2. Não rode `pnpm install` completo. Se `@patinha/shared` quebrar o tsc, `pnpm --filter @patinha/shared build` na árvore de compile.
@@ -114,7 +114,7 @@ Espere `androidVersionCode` **igual ao build novo**, `Last-Modified` recente, AP
 - Domínios em `eguaadota.com.br`, todos HTTPS: `app.` (download e /app), `api.`, `img.`, `media.` e `admin.`; o domínio puro é o site de apresentação (AdotaSite). Os sslip antigos continuam como segundo domínio de cada serviço no Coolify, porque APKs antigos chamam `http://api-…sslip.io`. Não tire o sslip da API sem todo mundo atualizar.
 - `docker/download-entrypoint.sh` copia `/opt/egua-adota.apk` e `/opt/version.json` sobre o volume a cada start — cópia só no volume some no restart. Caminho durável = release GitHub + `APK_URL` no Dockerfile + redeploy.
 - `docker-compose.prod.yml` + `deploy.yml` (Caddy em `/opt/patinha`) **não** estão em uso.
-- Serviço `backup` (`docker/backup-loop.sh`): dump diário do Postgres às 3h de Belém (guarda 14 dias) e cópia das fotos (sem rsync nem apt-get: a imagem do PostGIS é Debian 11, fora dos espelhos), no volume `backups` da mesma VPS. Não é cópia fora da VPS.
+- Serviço `backup` (`docker/backup-loop.sh`): dump diário do Postgres às 3h de Belém (guarda 14 dias) e cópia das fotos (sem rsync nem apt-get: a imagem do PostGIS é Debian 11, fora dos espelhos), no volume `backups` da mesma VPS. Cada dump é lido inteiro (`pg_restore`) antes de contar, e `ultimo-backup.txt` só muda com dump bom. Cópia externa: serviço `backup-offsite` (`docker/offsite-loop.sh`, rclone crypt para qualquer bucket S3), desligado até `OFFSITE_S3_*` e `OFFSITE_ENCRYPTION_PASSWORD` existirem no Coolify; lê os backups só para leitura, nunca apaga dump lá fora e espelha as fotos. Sem a senha de criptografia nada lá fora abre.
 - `publish-download.yml` espelha o APK do release `apk-<version>-<build>` lendo `download/version.json`.
 
 ## Estrutura
@@ -176,6 +176,8 @@ download/                     página de download servida pelo container `downlo
 - Antes de instalar biblioteca, diga qual, por quê e o impacto no tamanho. Para pacotes Expo use `pnpm expo install` dentro de `apps/mobile`.
 - Nomes no código e tabelas em inglês. Commits (Conventional Commits com a descrição em português), comentários no código, textos do GitHub (releases, workflows) e textos da interface em português do Brasil. Pedido do Hiago em 17/10/2026; comentários antigos em inglês são traduzidos quando o arquivo for mexido.
 - Não crie documentação além deste arquivo, salvo pedido.
+- O seed completo (`db:seed` sem `SEED_IF_EMPTY=true`) apaga o banco; em produção ele se recusa a rodar.
+- Login do painel: o painel chama a API pelo servidor. Com `STAFF_PROXY_SECRET` igual na API e no AdotaSite, a API usa o IP real (cabeçalho `x-egua-client-ip`) no limite de login, no bloqueio (5 erros por usuário+IP, 25 por usuário) e na auditoria; sem ele, todo mundo conta como o IP da VPS.
 
 ## Armadilhas conhecidas
 
@@ -188,8 +190,8 @@ download/                     página de download servida pelo container `downlo
 - MapLibre `setCamera` vira a prop nativa `stop` via `setNativeProps`, e o Fabric guarda essas props e pode reaplicá-las depois: o mapa voltava sozinho para o primeiro centro. A `<Camera>` fica num componente memorizado que nunca renderiza de novo (`StableCamera`) e, quando cada movimento do app termina, o `stop` gravado vira um destino neutro (sem centro nem zoom). Não regrave o `stop` com a vista onde a pessoa parou: a ordem chegava atrasada, com o dedo já num novo arrasto, e o mapa "teleportava" para trás (build 33). Não volte a mover a câmera por props declarativas. Estilos de camada ficam em constantes de módulo.
 - Patas do mapa: `explore.tsx` acumula as já carregadas (`src/map/knownPaws.ts`, `mergePaws`) em vez de trocar a lista a cada arrasto, que fazia patas piscarem. Os marcadores (gota na cor da urgência com patinha) saem de `apps/mobile/scripts/paw-pins.mjs` (usa o `sharp` hoistado; rode em `C:devegua-adota`); a ponta é o ponto do animal (`iconAnchor: 'bottom'`).
 - GitHub Actions: o heap padrão do prebuild estourou ("Java heap space"); o workflow passa `-Xmx6g` ao Gradle.
-- Sentry: org `hiago-uq`, projeto `react-native`, plano grátis. O app manda erros desde o build 28. A API manda erros 500, falhas de "melhor esforço", do worker e do push quando `SENTRY_DSN` está preenchido no Coolify (`src/monitoring.ts`, sem tracing).
-- O workflow **Vigia da VPS** confere API, fotos e download a cada 15 min e abre a issue "VPS fora do ar" quando algo cai (fecha sozinha quando volta). Sem `SENTRY_AUTH_TOKEN` os source maps não sobem (stack em código compilado) e o agente não lê o Sentry: o Hiago repassa o link do erro.
+- Sentry: org `hiago-uq`, projeto `react-native`, plano grátis. O app manda erros desde o build 28. A API manda erros 500, falhas de "melhor esforço", do worker e do push quando `SENTRY_DSN` está preenchido no Coolify (`src/monitoring.ts`, sem tracing). Nada pessoal sai: sem query string (lat/lng), corpo, cookie, IP, e-mail ou telefone (`scrubEvent`, testado). A versão vem de `SOURCE_COMMIT`. A API também é a vigia principal (`src/heartbeat.ts`): a cada 5 min confere banco, Redis, MinIO, fotos, `HEARTBEAT_URLS`, idade do último backup, envio externo e disco, e manda check-in ao Sentry Crons (monitor `vps-egua-adota`); se a VPS cair o sinal para e o Sentry avisa.
+- O workflow **Vigia da VPS** (segunda camada; o GitHub só roda de 4 em 4 h ou mais) confere API, fotos, download, site e painel e abre a issue "VPS fora do ar" quando algo cai (fecha sozinha quando volta). Sem `SENTRY_AUTH_TOKEN` os source maps não sobem (stack em código compilado) e o agente não lê o Sentry: o Hiago repassa o link do erro.
 
 ## Onde paramos (17/10/2026)
 
