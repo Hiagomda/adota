@@ -2,7 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { type HealthResponse } from '@patinha/shared';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { Redis } from 'ioredis';
 import { Pool } from 'pg';
 import { loadEnv, type Env } from './config.js';
@@ -68,13 +68,24 @@ export async function buildApp(dependencies: AppDependencies = {}): Promise<Fast
         ? false
         : {
             redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'],
+            serializers: {
+              // Sem query string no log: o feed e o mapa mandam latitude e longitude de quem abre.
+              req: (request: FastifyRequest) => ({
+                method: request.method,
+                url: request.url.split('?')[0],
+                host: request.host,
+                remoteAddress: request.ip,
+              }),
+            },
           },
   });
 
   await app.register(helmet, {
-    // The API is JSON. CSP belongs on the web app. HSTS waits until this host is served over HTTPS.
+    // A API é JSON: CSP fica com o site. HSTS desde o domínio eguaadota.com.br (tudo HTTPS); o
+    // navegador ignora o cabeçalho no sslip antigo (HTTP), então APK antigo não muda. Sem
+    // includeSubDomains nem preload: cada subdomínio decide o seu e dá para voltar atrás.
     contentSecurityPolicy: false,
-    hsts: false,
+    hsts: { maxAge: 180 * 24 * 60 * 60, includeSubDomains: false, preload: false },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   });
   await app.register(cors, {
