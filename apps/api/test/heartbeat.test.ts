@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BACKUP_MAX_AGE_MS,
+  RESTORE_TEST_MAX_AGE_MS,
   describeFailures,
   runChecks,
   type HeartbeatDeps,
@@ -37,6 +38,7 @@ describe('vigia da VPS', () => {
       'eguaadota.com.br/',
       'admin.eguaadota.com.br/',
       'backup',
+      'restauração',
       'disco',
       'backup externo',
     ]);
@@ -81,6 +83,22 @@ describe('vigia da VPS', () => {
       ok: true,
       detail: 'desligado',
     });
+  });
+
+  it('teste de restauração velho é falha; nunca rodado ainda não', async () => {
+    const velho = await runChecks(
+      deps({
+        fileAge: async (path) =>
+          path.endsWith('ultimo-teste-restauracao.txt') ? RESTORE_TEST_MAX_AGE_MS + hour : hour,
+      }),
+    );
+    expect(describeFailures(velho)).toBe('restauração (último teste há 193 h)');
+    const nunca = await runChecks(
+      deps({
+        fileAge: async (path) => (path.endsWith('ultimo-teste-restauracao.txt') ? null : hour),
+      }),
+    );
+    expect(describeFailures(nunca)).toBe('');
   });
 
   it('sem pasta de backup configurada não confere backup nem disco', async () => {

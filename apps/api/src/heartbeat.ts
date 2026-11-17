@@ -16,6 +16,8 @@ export const MONITOR_SLUG = 'vps-egua-adota';
 export const BACKUP_MAX_AGE_MS = 26 * 60 * 60 * 1000;
 /** Envio externo também é diário; 30 h dá folga para um envio lento. */
 export const OFFSITE_MAX_AGE_MS = 30 * 60 * 60 * 1000;
+/** Teste de restauração roda toda semana (docker/backup-loop.sh); 8 dias dá um de folga. */
+export const RESTORE_TEST_MAX_AGE_MS = 8 * 24 * 60 * 60 * 1000;
 /** Abaixo disto de espaço livre o Postgres e o MinIO começam a falhar. */
 export const MIN_FREE_DISK_RATIO = 0.1;
 
@@ -110,6 +112,18 @@ export async function runChecks(deps: HeartbeatDeps): Promise<CheckResult[]> {
             : { name: 'backup', ok: false, detail: `último bom há ${hours(age)}` };
         } catch (error) {
           return { name: 'backup', ok: false, detail: String(error).slice(0, 120) };
+        }
+      })(),
+      (async (): Promise<CheckResult> => {
+        try {
+          const age = await fileAge(join(backupDir, 'ultimo-teste-restauracao.txt'));
+          // Logo depois do primeiro deploy o teste ainda não rodou: não é falha.
+          if (age === null) return { name: 'restauração', ok: true, detail: 'ainda não rodou' };
+          return age <= RESTORE_TEST_MAX_AGE_MS
+            ? { name: 'restauração', ok: true }
+            : { name: 'restauração', ok: false, detail: `último teste há ${hours(age)}` };
+        } catch (error) {
+          return { name: 'restauração', ok: false, detail: String(error).slice(0, 120) };
         }
       })(),
       (async (): Promise<CheckResult> => {

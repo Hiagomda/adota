@@ -41,6 +41,49 @@ run_backup() {
   # Só um dump bom conta como "último backup": a vigia da API alerta quando ele envelhece, e o
   # envio externo só manda quando isto muda.
   if [ "$dump_ok" = 1 ]; then date -u +%Y-%m-%dT%H:%M:%SZ > "$dir/ultimo-backup.txt"; fi
+  restore_test_if_due
+}
+
+# Teste de restauração isolado: restaura o dump mais novo num Postgres temporário dentro deste
+# container (porta e socket só locais, apagado no fim) e confere que as tabelas voltaram. Nunca
+# toca o banco de produção. Roda no máximo a cada RESTORE_TEST_EVERY_DAYS dias; a vigia da API
+# alerta se ultimo-teste-restauracao.txt envelhecer.
+restore_test_if_due() {
+  every_days="${RESTORE_TEST_EVERY_DAYS:-7}"
+  mark="$dir/ultimo-teste-restauracao.txt"
+  if [ -f "$mark" ] && [ -z "$(find "$mark" -mtime +"$((every_days - 1))")" ]; then return 0; fi
+  latest="$(ls -1t "$dir"/banco/patinha-*.dump 2>/dev/null | head -1)"
+  [ -n "$latest" ] || return 0
+  if restore_test "$latest"; then
+    date -u +%Y-%m-%dT%H:%M:%SZ > "$mark"
+  else
+    echo "restauração: ERRO no teste com $(basename "$latest")" >&2
+  fi
+}
+
+restore_test() {
+  bin="$(pg_config --bindir)"
+  tmp="$(mktemp -d /tmp/restauracao.XXXXXX)"
+  chown postgres "$tmp"
+  as_pg() { su postgres -s /bin/sh -c "$1"; }
+  ok=0
+  if as_pg "$bin/initdb -D $tmp/data -A trust -U postgres >/dev/null" \
+    && as_pg "$bin/pg_ctl -D $tmp/data -w -l $tmp/log -o \"-p 5499 -k $tmp -c listen_addresses='' -c shared_buffers=16MB -c fsync=off\" start >/dev/null" \
+    && as_pg "$bin/createdb -h $tmp -p 5499 teste" \
+    && as_pg "$bin/pg_restore -h $tmp -p 5499 -d teste --no-owner --no-privileges --exit-on-error $1"; then
+    expected="$(pg_restore --list "$1" | grep -c 'TABLE DATA')"
+    restored="$(as_pg "$bin/psql -h $tmp -p 5499 -d teste -Atc \"SELECT count(*) FROM pg_stat_user_tables\"")"
+    users="$(as_pg "$bin/psql -h $tmp -p 5499 -d teste -Atc \"SELECT count(*) FROM users\"")"
+    if [ "$restored" -ge "$expected" ] && [ "$users" -ge 1 ]; then
+      ok=1
+      echo "restauração: ok ($(basename "$1"), $restored tabelas, $users contas)"
+    else
+      echo "restauração: ERRO tabelas $restored de $expected, contas $users" >&2
+    fi
+  fi
+  as_pg "$bin/pg_ctl -D $tmp/data -m immediate stop >/dev/null 2>&1" || true
+  rm -rf "$tmp"
+  [ "$ok" = 1 ]
 }
 
 run_backup
