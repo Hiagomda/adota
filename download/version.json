@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "androidVersionCode": 47,
+  "androidVersionCode": 48,
   "notes": [
-    "A pata do animal agora aparece no lugar certo no mapa, igual no Android e no iPhone.",
-    "Seus dados continuam protegidos: endereço, referência e WhatsApp só para quem vai ajudar.",
-    "O botão agora diz \"Encontrou o animal\"."
+    "O aviso de resgate volta a chamar mais gente quando ninguém responde.",
+    "A Casa Amiga não aceita mais o mesmo animal em duas casas ao mesmo tempo.",
+    "Textos mais claros no app, e a conta suspensa agora explica o motivo."
   ]
 }
