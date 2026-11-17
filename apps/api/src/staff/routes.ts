@@ -323,12 +323,27 @@ async function passwordMatches(pool: Pool, userId: string, password: string): Pr
   return verifyPassword(password, stored ?? (await decoyHash()));
 }
 
+/**
+ * Limite de tentativas de login do painel por IP **e** usuário. Contava só por IP: como o painel
+ * chama a API pelo servidor dele, sem o STAFF_PROXY_SECRET todo mundo tem o IP da VPS, e 8
+ * tentativas de qualquer pessoa com qualquer nome travavam o login da equipe inteira. Roda depois
+ * de ler o corpo (preHandler) para saber o usuário. Força bruta espalhada por muitos nomes ainda
+ * esbarra no bloqueio por usuário (assertUnlocked) e no limite global de 600/min por IP.
+ */
+export function staffLoginRateKey(request: FastifyRequest): string {
+  const body = request.body as { username?: unknown } | undefined;
+  const username =
+    typeof body?.username === 'string' ? body.username.trim().toLowerCase().slice(0, 32) : '';
+  return `staff-login:${clientIp(request)}:${username}`;
+}
+
 const loginLimit = {
   config: {
     rateLimit: {
       max: 8,
       timeWindow: '15 minutes',
-      keyGenerator: (request: FastifyRequest) => `staff-login:${clientIp(request)}`,
+      hook: 'preHandler' as const,
+      keyGenerator: staffLoginRateKey,
     },
   },
 };
