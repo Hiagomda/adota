@@ -66,9 +66,19 @@ services:
       - imgproxy-origin
     restart: unless-stopped
     mem_limit: 128m
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/health]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   imgproxy-origin:
     image: darthsim/imgproxy:v3.30.1
+    healthcheck:
+      test: [CMD, imgproxy, health]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     environment:
       IMGPROXY_USE_S3: 'true'
       IMGPROXY_S3_ENDPOINT: http://minio:9000
@@ -116,8 +126,21 @@ services:
       # Endereço do painel da equipe (repositório AdotaSite).
       ADMIN_ORIGIN: https://admin.eguaadota.com.br,https://admin-fpmewu0com3qkbfihrsihc6y.86.48.25.233.sslip.io
       SEED_IF_EMPTY: 'true'
+      # Mesmo valor no recurso do painel (AdotaSite). Com ele, limite e bloqueio de login do painel
+      # contam pelo IP real de cada pessoa da equipe, não pelo IP da VPS. Vazio: como antes.
+      STAFF_PROXY_SECRET: ${STAFF_PROXY_SECRET:-}
       # Erros da API no Sentry. Cole o DSN do projeto da API nas variáveis do Coolify; vazio desliga.
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # Commit do deploy (o Coolify preenche SOURCE_COMMIT): erros no Sentry dizem de qual versão são.
+      SENTRY_RELEASE: ${SOURCE_COMMIT:-}
+      # Vigia interna (src/heartbeat.ts): confere tudo a cada 5 min e manda o sinal ao Sentry Crons.
+      HEARTBEAT_URLS: https://app.eguaadota.com.br/version.json,https://eguaadota.com.br/,https://admin.eguaadota.com.br/
+      HEARTBEAT_BACKUP_DIR: /backups
+      HEARTBEAT_OFFSITE_FILE: /offsite/ultimo-envio.txt
+    volumes:
+      # Só leitura: a vigia olha a idade do último backup e o espaço em disco; nunca mexe neles.
+      - backups:/backups:ro
+      - offsite-status:/offsite:ro
     command:
       - sh
       - -c
@@ -156,6 +179,11 @@ services:
       - apk:/apk
     restart: unless-stopped
     mem_limit: 64m
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/version.json]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   # Backup diário do banco (14 dias) e cópia das fotos, num volume separado na mesma VPS.
   # Protege contra apagar algo por engano ou corromper um volume; não protege se a VPS sumir.
@@ -177,9 +205,32 @@ services:
     restart: unless-stopped
     mem_limit: 128m
 
+  # Cópia criptografada dos backups para um bucket fora da VPS (docker/offsite-loop.sh).
+  # Desligada até as variáveis OFFSITE_* serem preenchidas no Coolify. Lê os backups só para leitura.
+  backup-offsite:
+    build:
+      context: .
+      dockerfile: docker/offsite.Dockerfile
+    environment:
+      OFFSITE_S3_PROVIDER: ${OFFSITE_S3_PROVIDER:-Other}
+      OFFSITE_S3_ENDPOINT: ${OFFSITE_S3_ENDPOINT:-}
+      OFFSITE_S3_REGION: ${OFFSITE_S3_REGION:-}
+      OFFSITE_S3_BUCKET: ${OFFSITE_S3_BUCKET:-}
+      OFFSITE_S3_ACCESS_KEY_ID: ${OFFSITE_S3_ACCESS_KEY_ID:-}
+      OFFSITE_S3_SECRET_ACCESS_KEY: ${OFFSITE_S3_SECRET_ACCESS_KEY:-}
+      OFFSITE_ENCRYPTION_PASSWORD: ${OFFSITE_ENCRYPTION_PASSWORD:-}
+    volumes:
+      - backups:/backups:ro
+      - offsite-status:/status
+    depends_on:
+      - backup
+    restart: unless-stopped
+    mem_limit: 128m
+
 volumes:
   postgres:
   minio:
   apk:
   imgcache:
   backups:
+  offsite-status:

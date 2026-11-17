@@ -1,6 +1,10 @@
 name: Vigia da VPS
 
-# Confere a cada 15 minutos se a API, as fotos e a página de download respondem. Quando algo cai,
+# Segunda camada da vigia. A principal roda dentro da VPS (apps/api/src/heartbeat.ts) e avisa pelo
+# Sentry Crons; esta pega o caso em que a própria VPS some e o Sentry ainda não foi configurado.
+# O GitHub pede a cada 15 min, mas na prática roda de 4 em 4 h ou mais (agendamento sem garantia).
+#
+# Confere se a API, as fotos, a página de download, o site e o painel respondem. Quando algo cai,
 # abre uma issue "VPS fora do ar" para o Hiago (o GitHub avisa por e-mail e no app). Quando tudo
 # volta, comenta e fecha a mesma issue. Uma queda só conta depois de 3 tentativas seguidas.
 
@@ -32,7 +36,9 @@ jobs:
           set -u
           servicos="API|https://api.eguaadota.com.br/health
           Fotos|https://img.eguaadota.com.br/health
-          Página de download|https://app.eguaadota.com.br/version.json"
+          Página de download|https://app.eguaadota.com.br/version.json
+          Site|https://eguaadota.com.br/
+          Painel da equipe|https://admin.eguaadota.com.br/"
           falhas=""
           while IFS='|' read -r nome url; do
             ok=0

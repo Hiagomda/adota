@@ -16,8 +16,12 @@ mkdir -p "$dir/banco" "$dir/fotos"
 run_backup() {
   stamp="$(date -u +%Y%m%d-%H%M%S)"
   file="$dir/banco/patinha-$stamp.dump"
-  if pg_dump --host="${PGHOST:-postgres}" --username=patinha --format=custom --file="$file.tmp" patinha; then
+  dump_ok=0
+  # Confere o dump lendo ele inteiro: arquivo cortado (disco cheio, queda) não conta como bom.
+  if pg_dump --host="${PGHOST:-postgres}" --username=patinha --format=custom --file="$file.tmp" patinha \
+    && pg_restore --file=/dev/null "$file.tmp"; then
     mv "$file.tmp" "$file"
+    dump_ok=1
     echo "backup: banco ok ($(du -h "$file" | cut -f1))"
   else
     rm -f "$file.tmp"
@@ -34,7 +38,9 @@ run_backup() {
     rm -rf "$dir/fotos.tmp"
     echo "backup: ERRO na cópia das fotos" >&2
   fi
-  date -u +%Y-%m-%dT%H:%M:%SZ > "$dir/ultimo-backup.txt"
+  # Só um dump bom conta como "último backup": a vigia da API alerta quando ele envelhece, e o
+  # envio externo só manda quando isto muda.
+  if [ "$dump_ok" = 1 ]; then date -u +%Y-%m-%dT%H:%M:%SZ > "$dir/ultimo-backup.txt"; fi
 }
 
 run_backup

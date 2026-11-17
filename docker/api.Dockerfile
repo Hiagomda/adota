@@ -15,7 +15,10 @@ RUN pnpm --filter @patinha/shared build
 
 FROM node:22-bookworm-slim
 WORKDIR /app
-RUN corepack enable
+# O pnpm fica dentro da imagem. Sem o prepare, o Corepack baixava o pnpm do npm a cada subida do
+# container: com o registry fora do ar (ou a rede da VPS ruim) a API não voltava depois de um restart.
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ENV NODE_ENV=production
 COPY --from=build /app /app
 EXPOSE 3010
