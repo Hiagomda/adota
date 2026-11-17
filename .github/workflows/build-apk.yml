@@ -7,6 +7,9 @@ name: Compilar APK
 # Secrets do repositório:
 #   MOBILE_ENV                  conteúdo inteiro do apps/mobile/.env (valores EXPO_PUBLIC_*, inclusive
 #                               o EXPO_PUBLIC_SENTRY_DSN dos relatos de erro)
+#   GOOGLE_SERVICES_JSON        conteúdo do google-services.json do app Android (console do Firebase,
+#                               projeto egua-adota, app app.egua.adota). Sem ele o Android não gera o
+#                               token de push e nenhum aviso chega ao celular; o check-apk reprova.
 #   EGUA_UPLOAD_KEYSTORE_BASE64 a chave privada de upload em base64. Deixe sem definir até a troca
 #                               de chave: aí o build assina com a chave de debug dos celulares.
 #   EGUA_UPLOAD_STORE_PASSWORD, EGUA_UPLOAD_KEY_ALIAS, EGUA_UPLOAD_KEY_PASSWORD
@@ -67,6 +70,19 @@ jobs:
           set -eu
           test -n "$MOBILE_ENV" || { echo "O secret MOBILE_ENV está vazio"; exit 1; }
           printf '%s\n' "$MOBILE_ENV" > apps/mobile/.env
+
+      # O app.config.ts só liga o Firebase nativo (push) quando este arquivo existe no build.
+      - name: Escrever apps/mobile/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          set -eu
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::O secret GOOGLE_SERVICES_JSON está vazio: o APK sai sem push."
+            exit 0
+          fi
+          printf '%s\n' "$GOOGLE_SERVICES_JSON" > apps/mobile/google-services.json
+          node apps/mobile/scripts/check-google-services.mjs apps/mobile/google-services.json
 
       # App web do iPhone, do mesmo commit do APK. Fica em <download>/app e chama a API e as fotos
       # pelo próprio site (docker/download-nginx.conf), na mesma origem e sem depender de CORS.

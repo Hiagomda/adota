@@ -118,6 +118,12 @@ export default ({ config }: ConfigContext): ExpoConfig =>
         },
         predictiveBackGestureEnabled: false,
         permissions: ['REQUEST_INSTALL_PACKAGES'],
+        // O app não grava áudio nem desenha por cima de outros apps, mas bibliotecas declaravam
+        // isso e "Microfone" aparecia nas permissões do APK. Conferir a câmera no próximo build.
+        blockedPermissions: [
+          'android.permission.RECORD_AUDIO',
+          'android.permission.SYSTEM_ALERT_WINDOW',
+        ],
         ...(existsSync(googleServicesAndroid)
           ? { googleServicesFile: './google-services.json' }
           : {}),

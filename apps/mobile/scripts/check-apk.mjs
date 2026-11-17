@@ -135,6 +135,15 @@ check(
   plainHttp ? 'API em http' : 'API em https',
 );
 check(!/android:debuggable\([^)]*\)=true/.test(manifest), 'não é build de debug');
+// Sem o google-services.json no build o Firebase nativo não inicia, o Android não gera o token de
+// push e nenhum aviso chega ao celular (foi o caso do APK 48). ALLOW_NO_PUSH=1 libera um build
+// de emergência.
+if (process.env.ALLOW_NO_PUSH === '1') {
+  console.log('info push não conferido (ALLOW_NO_PUSH=1)');
+} else {
+  const resources = tool(tools, 'aapt2', ['dump', 'resources', apk]);
+  check(/string\/google_app_id\b/.test(resources), 'Firebase nativo configurado (push)');
+}
 
 const certs = tool(tools, 'apksigner', ['verify', '--print-certs', apk]);
 const signer = /SHA-256 digest: ([0-9a-f]+)/i.exec(certs)?.[1]?.toLowerCase() ?? '';
