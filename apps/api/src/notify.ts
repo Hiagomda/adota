@@ -673,6 +673,10 @@ async function sendPushData(
       tokens,
       notification: { title, body },
       data,
+      // Alta prioridade fura a economia de bateria do Android; o canal "avisos" é o de destaque
+      // criado pelo app (apps/mobile/src/nearby/presence.ts). APK antigo sem o canal cai no padrão.
+      android: { priority: 'high', notification: { channelId: 'avisos' } },
+      apns: { headers: { 'apns-priority': '10' } },
     });
     const dead = deadPushTokens(
       tokens,

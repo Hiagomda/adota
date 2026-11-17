@@ -168,7 +168,17 @@ export default ({ config }: ConfigContext): ExpoConfig =>
               'Égua, adota! usa a câmera para você fotografar o animal que precisa de resgate.',
           },
         ],
-        'expo-notifications',
+        [
+          'expo-notifications',
+          {
+            // Push que chega pelo Firebase vai para o canal de destaque criado em src/nearby/presence.ts.
+            defaultChannel: 'avisos',
+            // Ícone pequeno da barra precisa ser branco com fundo transparente; o ícone colorido
+            // do app vira um quadrado branco no Android.
+            icon: './assets/adaptive-icon-mono.png',
+            color: '#1F7A7A',
+          },
+        ],
         'expo-apple-authentication',
         ['@sentry/react-native/expo', sentryPlugin],
         [

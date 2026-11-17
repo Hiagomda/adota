@@ -235,6 +235,39 @@ describe('proteções do resgate e da adoção', () => {
     expect(tokens).not.toContain('aparelho-numero-0');
   });
 
+  it('ao sair da conta o token do aparelho deixa de receber os avisos dela', async () => {
+    const id = await insertUser('saiu@egua.local', 'saiu');
+    const outra = await insertUser('outra@egua.local', 'outra');
+    await pool.query(
+      `UPDATE users SET fcm_tokens = ARRAY['aparelho-de-quem-saiu', 'tablet']::text[] WHERE id = $1`,
+      [id],
+    );
+    await pool.query(
+      `UPDATE users SET fcm_tokens = ARRAY['aparelho-de-quem-saiu']::text[] WHERE id = $1`,
+      [outra],
+    );
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: '/me/fcm-token',
+      headers: auth('saiu@egua.local'),
+      payload: { token: 'aparelho-de-quem-saiu' },
+    });
+    expect(removed.statusCode).toBe(200);
+    const rows = await pool.query<{ id: string; fcm_tokens: string[] }>(
+      `SELECT id, fcm_tokens FROM users WHERE id = ANY($1::uuid[])`,
+      [[id, outra]],
+    );
+    // Só a conta de quem pediu perde o token; a de outra pessoa não é tocada.
+    expect(rows.rows.find((r) => r.id === id)?.fcm_tokens).toEqual(['tablet']);
+    expect(rows.rows.find((r) => r.id === outra)?.fcm_tokens).toEqual(['aparelho-de-quem-saiu']);
+    const anon = await app.inject({
+      method: 'DELETE',
+      url: '/me/fcm-token',
+      payload: { token: 'aparelho-de-quem-saiu' },
+    });
+    expect(anon.statusCode).toBe(401);
+  });
+
   it('não repete a mesma denúncia aberta da mesma pessoa', async () => {
     const authorId = await insertUser('alvo@egua.local', 'alvo');
     await insertUser('denuncia@egua.local', 'denuncia');

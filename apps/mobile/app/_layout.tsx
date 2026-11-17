@@ -19,7 +19,7 @@ import {
 } from '../src/crash/reporter';
 import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
-import { syncNearbyPresence } from '../src/nearby/presence';
+import { configurePushDisplay, syncNearbyPresence } from '../src/nearby/presence';
 import { usePushOpen } from '../src/nearby/usePushOpen';
 import { primeCreateDraft } from '../src/place/createDraftStore';
 import { primeColorScheme } from '../src/theme/schemeChoice';
@@ -35,6 +35,9 @@ import { logBestEffort } from '../src/crash/bestEffort';
 // Order matters: the reporter first, so the global handlers below can send what they catch.
 startCrashReporter();
 installGlobalErrorHandlers(setFatalError);
+
+// Aviso com o app aberto aparece na tela, e no Android vai para o canal de destaque.
+configurePushDisplay();
 
 // First real work of the app: ask the VPS for a newer APK. It runs alongside fonts and session,
 // gives up after 3 s and never throws, so a dead VPS cannot hold the splash.

@@ -16,6 +16,7 @@ import {
   signUpWithEmail,
 } from './auth/service';
 import { signOutGoogle } from './auth/googleNative';
+import { releasePushToken } from './nearby/presence';
 import { reportError, setReporterUser } from './crash/reporter';
 import { queryClient } from './queryClient';
 import type { Account } from './types';
@@ -120,7 +121,7 @@ async function writeFlags(flags: Flags): Promise<void> {
   else await SecureStore.setItemAsync(flagKey, raw);
 }
 
-export const useSession = create<SessionState>((set) => ({
+export const useSession = create<SessionState>((set, get) => ({
   ready: false,
   token: null,
   user: null,
@@ -208,6 +209,9 @@ export const useSession = create<SessionState>((set) => ({
   clearCupuPrompt: () => set({ cupuPrompt: false }),
   clearSignedOutReason: () => set({ signedOutReason: null }),
   logout: async (reason) => {
+    // Antes de apagar a sessão: o pedido precisa do token da conta que está saindo.
+    const current = get().token;
+    if (current) await releasePushToken(current);
     await signOutGoogle();
     await signOutAuth();
     await writeToken(null);
