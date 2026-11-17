@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "build": 48,
+  "build": 49,
   "notes": [
-    "O aviso de resgate volta a chamar mais gente quando ninguém responde.",
-    "A Casa Amiga não aceita mais o mesmo animal em duas casas ao mesmo tempo.",
-    "Textos mais claros no app, e a conta suspensa agora explica o motivo."
+    "Os avisos de resgate agora chegam no celular, mesmo com o app aberto.",
+    "Ao sair da conta, o celular para de receber os avisos dela.",
+    "O app não pede mais acesso ao microfone."
   ]
 }
