@@ -291,7 +291,12 @@ export async function anonymizeUser(pool: Pool, userId: string): Promise<string 
     );
     await client.query(`DELETE FROM follows WHERE follower_id = $1 OR followed_id = $1`, [userId]);
     await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
-    await client.query(`UPDATE posts SET hidden = true WHERE author_id = $1`, [userId]);
+    // O endereço digitado e a referência são dado pessoal de quem publicou: somem com a conta.
+    await client.query(
+      `UPDATE posts SET hidden = true, address_text = NULL, reference_point = NULL
+       WHERE author_id = $1`,
+      [userId],
+    );
     await client.query(
       `UPDATE comments SET hidden = true, body = 'Comentário apagado.' WHERE user_id = $1`,
       [userId],

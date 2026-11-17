@@ -962,8 +962,17 @@ export async function registerRoutes(
     const id = resourceId(request.params);
     const body = parse(z.object({ action: z.enum(['approve', 'reject']) }), request.body);
     const status = body.action === 'approve' ? 'published' : 'rejected';
-    const updated = await pool.query<{ type: string; urgency: 'high' | 'medium' | 'low' }>(
-      `UPDATE posts SET review_status = $2 WHERE id = $1 RETURNING type, urgency`,
+    // Mesmo cuidado da rota nova (/admin/v1): guarda o estado anterior para que aprovar de novo
+    // um post já publicado não reenvie o aviso de resgate para a vizinhança.
+    const updated = await pool.query<{
+      type: string;
+      urgency: 'high' | 'medium' | 'low';
+      before: string;
+    }>(
+      `UPDATE posts p SET review_status = $2
+       FROM (SELECT id, review_status FROM posts WHERE id = $1 FOR UPDATE) old
+       WHERE p.id = old.id
+       RETURNING p.type, p.urgency, old.review_status AS before`,
       [id, status],
     );
     const post = updated.rows[0];
@@ -973,10 +982,11 @@ export async function registerRoutes(
       action: `post.${body.action}`,
       targetType: 'post',
       targetId: id,
+      before: { reviewStatus: post.before },
       after: { reviewStatus: status, legacy: true },
       ...legacyTrail(request),
     });
-    if (status === 'published' && post.type === 'rescue_alert') {
+    if (status === 'published' && post.before !== 'published' && post.type === 'rescue_alert') {
       await enqueueRescueAlert(queue, id, post.urgency).catch(
         bestEffort(request, 'queue:rescue-alert'),
       );

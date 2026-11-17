@@ -162,4 +162,23 @@ describe('sightings', () => {
     const left = await pool.query(`SELECT count(*)::int AS total FROM sightings`);
     expect(left.rows[0]?.total).toBe(0);
   });
+
+  it('excluir a conta apaga o endereço digitado e a referência dos posts dela', async () => {
+    const postId = await rescue();
+    await pool.query(
+      `UPDATE posts SET address_text = 'Rua dos Mundurucus, 100', reference_point = 'Perto da padaria'
+       WHERE id = $1`,
+      [postId],
+    );
+    const author = await pool.query<{ author_id: string }>(
+      `SELECT author_id FROM posts WHERE id = $1`,
+      [postId],
+    );
+    await anonymizeUser(pool, author.rows[0]!.author_id);
+    const after = await pool.query(
+      `SELECT hidden, address_text, reference_point FROM posts WHERE id = $1`,
+      [postId],
+    );
+    expect(after.rows[0]).toEqual({ hidden: true, address_text: null, reference_point: null });
+  });
 });

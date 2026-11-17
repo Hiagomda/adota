@@ -376,6 +376,16 @@ async function seed(pool: Pool): Promise<void> {
     await removeDemoContent(pool);
     return;
   }
+  // O seed completo apaga o banco inteiro (TRUNCATE). Em produção o compose roda o seed a cada
+  // subida com SEED_IF_EMPTY=true; se essa variável sumir, a API não sobe em vez de zerar tudo.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ALLOW_PRODUCTION_RESET !== 'apagar-tudo'
+  ) {
+    throw new Error(
+      'Seed recusado em produção: ele apaga todos os dados. Defina SEED_IF_EMPTY=true para só limpar os exemplos.',
+    );
+  }
 
   await pool.query(`
     TRUNCATE TABLE

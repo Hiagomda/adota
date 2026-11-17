@@ -741,6 +741,11 @@ export function registerLostMatchRoutes(
     }
     const status = decision === 'confirm' ? 'confirmed' : 'dismissed';
     if (match.status === status) return { status };
+    // Depois que o tutor confirmou, quem encontrou não desfaz sozinho: a palavra final é do tutor
+    // (ou da equipe). Antes, um "não é esse" de quem achou apagava a confirmação.
+    if (match.status === 'confirmed' && decision === 'dismiss' && !isOwner && !operator) {
+      throw new HttpError(409, 'O tutor já reconheceu o animal. Fale com ele pela conversa.');
+    }
     await pool.query(
       `UPDATE lost_matches SET status = $2, decided_by = $3, decided_at = now(), updated_at = now()
        WHERE id = $1`,

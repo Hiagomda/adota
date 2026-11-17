@@ -24,7 +24,12 @@ export const HELP_CHECK_DELAY_MS = 3 * 60 * 60 * 1000;
 export const HELP_EXPIRE_DELAY_MS = 12 * 60 * 60 * 1000;
 
 export function createQueue(redis: Redis): Queue<RescueJob> {
-  return new Queue<RescueJob>(queueName, { connection: redis as unknown as ConnectionOptions });
+  return new Queue<RescueJob>(queueName, {
+    connection: redis as unknown as ConnectionOptions,
+    // Uma queda rápida do banco não perde o aviso de resgate: tenta de novo em 30 s e 2 min.
+    // Repetir é seguro: o aviso só vai a quem ainda não tem a notificação daquele post.
+    defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 30_000 } },
+  });
 }
 
 export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJob> {
@@ -55,6 +60,17 @@ export function startWorker(redis: Redis, pool: Pool, env: Env): Worker<RescueJo
   );
   // Alerta de resgate ou lembrete que falhou some em silêncio se ninguém olhar o log.
   worker.on('failed', (job, error) => {
+    const retrying = job !== undefined && job.attemptsMade < (job.opts.attempts ?? 1);
+    console.error(
+      JSON.stringify({
+        level: retrying ? 'warn' : 'error',
+        where: `worker:${job?.name ?? 'desconhecido'}`,
+        attempt: job?.attemptsMade,
+        error: String(error),
+      }),
+    );
+    // Só a última tentativa vira alerta; as anteriores ficam no log.
+    if (retrying) return;
     captureServerError(error, { where: `worker:${job?.name ?? 'desconhecido'}` });
   });
   return worker;

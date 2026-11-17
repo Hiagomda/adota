@@ -185,6 +185,9 @@ describe('busca de animais perdidos', () => {
        WHERE u.handle = 'achou' AND n.type = 'lost_match_confirmed'`,
     );
     expect(told.rowCount).toBe(1);
+    // Depois da confirmação, quem encontrou não apaga a palavra do tutor.
+    expect((await decide(matchId, 'dismiss', 'achou@egua.local')).statusCode).toBe(409);
+    expect((await decide(matchId, 'confirm', 'tutor@egua.local')).json().status).toBe('confirmed');
   });
 
   it('quem encontrou pode descartar, e a sugestão some para os dois', async () => {
