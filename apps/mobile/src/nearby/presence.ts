@@ -88,3 +88,22 @@ export async function releasePushToken(token: string): Promise<void> {
     reportError(error, { source: 'handled', where: 'presence:push-release' });
   }
 }
+
+/**
+ * O Firebase pode trocar o token do aparelho com o app aberto (reinstalação de serviços, limpeza
+ * de dados). O novo vai para a conta na hora, sem esperar o app voltar do segundo plano.
+ */
+export function watchPushToken(currentToken: () => string | null): () => void {
+  if (Platform.OS === 'web') return () => undefined;
+  const subscription = Notifications.addPushTokenListener((push) => {
+    const value = typeof push.data === 'string' ? push.data : null;
+    const token = currentToken();
+    if (!value || !token) return;
+    api('/me/fcm-token', { method: 'POST', token, body: { token: value } }).catch(
+      (error: unknown) => {
+        reportError(error, { source: 'handled', where: 'presence:push-refresh' });
+      },
+    );
+  });
+  return () => subscription.remove();
+}

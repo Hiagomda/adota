@@ -393,7 +393,7 @@ export async function notifyDiaryNote(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'diary', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
+    await pushIfAllowed(pool, env, person.id, title, body, postId);
   }
 }
 
@@ -433,7 +433,7 @@ export async function notifySighting(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'sighting', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
+    await pushIfAllowed(pool, env, person.id, title, body, postId);
   }
 }
 
@@ -478,7 +478,7 @@ export async function notifyAdoptionInterest(
     `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'adoption_interest', $2::jsonb)`,
     [authorId, JSON.stringify({ postId, title, body })],
   );
-  await sendPush(pool, env, target.fcm_tokens, title, body, postId);
+  await pushIfAllowed(pool, env, authorId, title, body, postId);
 }
 
 /** A equipe decidiu o pedido de selo de ONG ou protetor. Fica só na tela Alertas. */
@@ -529,7 +529,7 @@ export async function notifyComment(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'comment', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body })],
     );
-    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
+    await pushIfAllowed(pool, env, person.id, title, body, postId);
   }
 }
 
@@ -578,8 +578,35 @@ export async function notifyStatusChange(
       `INSERT INTO notifications (user_id, type, payload) VALUES ($1, 'status', $2::jsonb)`,
       [person.id, JSON.stringify({ postId, title, body, status })],
     );
-    await sendPush(pool, env, person.fcm_tokens, title, body, postId);
+    await pushIfAllowed(pool, env, person.id, title, body, postId);
   }
+}
+
+/**
+ * Push de um aviso que já foi gravado em Alertas, respeitando a pessoa: sem push para quem
+ * desligou os avisos, está no horário de silêncio, foi suspensa ou excluiu a conta.
+ */
+async function pushIfAllowed(
+  pool: Pool,
+  env: Env,
+  userId: string,
+  title: string,
+  body: string,
+  postId: string,
+): Promise<void> {
+  const found = await pool.query<{
+    fcm_tokens: string[] | null;
+    quiet_hours_start: number | null;
+    quiet_hours_end: number | null;
+  }>(
+    `SELECT fcm_tokens, quiet_hours_start, quiet_hours_end FROM users
+     WHERE id = $1 AND deleted_at IS NULL AND suspended = false AND notifications_enabled = true`,
+    [userId],
+  );
+  const target = found.rows[0];
+  if (!target?.fcm_tokens?.length) return;
+  if (isQuiet(target.quiet_hours_start, target.quiet_hours_end, belemHour())) return;
+  await sendPush(pool, env, target.fcm_tokens, title, body, postId);
 }
 
 async function sendPush(

@@ -117,6 +117,9 @@ export default ({ config }: ConfigContext): ExpoConfig =>
           monochromeImage: './assets/adaptive-icon-mono.png',
         },
         predictiveBackGestureEnabled: false,
+        // Backup do Android restaurava o token salvo no SecureStore em outro aparelho, onde a
+        // chave de criptografia não existe: a sessão quebrava ao abrir. Melhor entrar de novo.
+        allowBackup: false,
         permissions: ['REQUEST_INSTALL_PACKAGES'],
         // O app não grava áudio nem desenha por cima de outros apps, mas bibliotecas declaravam
         // isso e "Microfone" aparecia nas permissões do APK. Conferir a câmera no próximo build.

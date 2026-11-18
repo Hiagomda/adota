@@ -121,6 +121,9 @@ async function writeFlags(flags: Flags): Promise<void> {
   else await SecureStore.setItemAsync(flagKey, raw);
 }
 
+/** Saída em andamento; outro pedido de logout no meio dela espera a mesma. */
+let signingOut: Promise<void> | null = null;
+
 export const useSession = create<SessionState>((set, get) => ({
   ready: false,
   token: null,
@@ -208,16 +211,24 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   clearCupuPrompt: () => set({ cupuPrompt: false }),
   clearSignedOutReason: () => set({ signedOutReason: null }),
-  logout: async (reason) => {
-    // Antes de apagar a sessão: o pedido precisa do token da conta que está saindo.
-    const current = get().token;
-    if (current) await releasePushToken(current);
-    await signOutGoogle();
-    await signOutAuth();
-    await writeToken(null);
-    setReporterUser(null);
-    queryClient.clear();
-    set({ token: null, user: null, signedOutReason: reason ?? null });
+  logout: (reason) => {
+    // Uma saída por vez: o pedido que solta o token de push pode responder 403 (conta suspensa)
+    // ou 401, e esses avisos chamam logout de novo. Sem a trava, era um laço de pedidos.
+    if (signingOut) return signingOut;
+    signingOut = (async () => {
+      // Antes de apagar a sessão: o pedido precisa do token da conta que está saindo.
+      const current = get().token;
+      if (current) await releasePushToken(current);
+      await signOutGoogle();
+      await signOutAuth();
+      await writeToken(null);
+      setReporterUser(null);
+      queryClient.clear();
+      set({ token: null, user: null, signedOutReason: reason ?? null });
+    })().finally(() => {
+      signingOut = null;
+    });
+    return signingOut;
   },
   setUser: (user) => {
     setReporterUser({ id: user.id, handle: user.handle });
