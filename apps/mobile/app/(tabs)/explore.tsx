@@ -80,7 +80,10 @@ export default function ExploreScreen() {
   const [frame, setFrame] = useState<{ token: number; target: CameraTarget } | null>(null);
   const frameToken = useRef(0);
   // O seletor mostra a cidade no meio da tela: acompanha o mapa quando a pessoa arrasta.
-  const shownCity = settled ? cityAtCenter(settled) : city;
+  // Depois de escolher uma cidade, o nome dela fica até a pessoa arrastar: o meio do retângulo
+  // dos animais pode cair num vizinho (Castanhal abraça Inhangapi) e o botão diria "Fora da área".
+  const [followCenter, setFollowCenter] = useState(false);
+  const shownCity = settled && followCenter ? cityAtCenter(settled) : city;
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
   const [showPartners, setShowPartners] = useState(true);
@@ -231,6 +234,7 @@ export default function ExploreScreen() {
   const goToCity = useCallback(
     async (target: Municipality) => {
       chooseCity(target);
+      setFollowCenter(false);
       setCityOpen(false);
       setSelection(null);
       const token = (frameToken.current += 1);
@@ -286,7 +290,8 @@ export default function ExploreScreen() {
           controlsBottom={locateBottom}
           onSelect={selectPost}
           onDismiss={closeCard}
-          onCommitBounds={(next) => {
+          onCommitBounds={(next, origin) => {
+            if (origin.fromUser) setFollowCenter(true);
             if (aiming && aim && !cameraFramesPoint(next, aim)) return;
             if (aim) setFramedToken(aim.token);
             setBounds(next);

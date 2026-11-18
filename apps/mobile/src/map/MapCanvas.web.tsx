@@ -207,8 +207,20 @@ export function MapCanvas({
     };
     // O evento `load` não dispara se algum ícone do estilo falha.
     // `isStyleLoaded` basta para projetar o pino na tela.
+    let drawLater = false;
     const draw = () => {
-      if (!map.isStyleLoaded()) return;
+      // Patas que chegam enquanto o estilo ainda carrega (ou recebe as camadas da área) eram
+      // descartadas e só apareciam depois do primeiro arrasto. Agora esperam o mapa assentar.
+      if (!map.isStyleLoaded()) {
+        if (!drawLater) {
+          drawLater = true;
+          map.once('idle', () => {
+            drawLater = false;
+            draw();
+          });
+        }
+        return;
+      }
       markers.current.forEach((marker) => marker.remove());
       // Pontos solidários, parceiros e eventos primeiro, para as patas ficarem por cima.
       const feedMarkers = feedPointsRef.current.map((point) => {
