@@ -15,6 +15,7 @@ import type { Env } from './config.js';
 import { cancelEvent, inTransaction, recordChange } from './events.js';
 import { listWaitingForAdoption } from './feed.js';
 import { HttpError } from './http.js';
+import { outsideAreaMessage } from './municipalities.js';
 import { publicMediaUrl } from './media.js';
 import { notifyAdoptionInterest } from './notify.js';
 import { rowsOf, type SessionUser } from './session.js';
@@ -270,7 +271,7 @@ export function registerAdoptionRoutes(
       throw new HttpError(400, 'Essa feira já terminou. Confira o dia e a hora.');
     }
     if (!insideServiceArea(input)) {
-      throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
+      throw new HttpError(400, outsideAreaMessage());
     }
     const title = stripControls(input.title).trim();
     const description = input.description ? stripControls(input.description).trim() : '';

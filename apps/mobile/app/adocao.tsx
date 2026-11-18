@@ -30,7 +30,8 @@ import {
   type AdoptionShelf,
 } from '../src/post/adoptionQuery';
 import { ageBandOf, ageBands, careKeys, careQuestion, type CareKey } from '../src/post/care';
-import { animalHeadline, placeOf } from '../src/animalLabels';
+import { animalHeadline, placeWithCity } from '../src/animalLabels';
+import { municipalities } from '../src/map/serviceArea';
 import { waitingShort } from '../src/post/waiting';
 import { CupuTip } from '../src/cupu/CupuTip';
 import { useSession } from '../src/session';
@@ -69,10 +70,10 @@ function toggleCare(filters: AdoptionFilters, key: CareKey): AdoptionFilters {
 }
 
 function cardSubtitle(post: Post, shelf: AdoptionShelf): string {
-  if (shelf === 'adopted') return `Adotado · ${placeOf(post.approxLabel)}`;
+  if (shelf === 'adopted') return `Adotado · ${placeWithCity(post.approxLabel, post.municipality)}`;
   const band = ageBandOf(post.animal.ageEstimate);
   const age = band ? ageBands.find((item) => item.value === band)?.label : null;
-  return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
+  return [placeWithCity(post.approxLabel, post.municipality), age].filter(Boolean).join(' · ');
 }
 
 /** Quem está para adoção há semanas. Adultos e pretos costumam ficar para trás. */
@@ -123,7 +124,8 @@ export default function AdoptionScreen() {
   }));
   const extra = activeFilterCount({ ...filters, species: undefined, place: '' });
   // A fileira só aparece na vitrine sem filtros além da espécie, para não esconder resultado.
-  const showWaiting = shelf === 'available' && extra === 0 && filters.place.trim() === '';
+  const showWaiting =
+    shelf === 'available' && extra === 0 && filters.place.trim() === '' && !filters.municipality;
   const waiting = useQuery({
     queryKey: ['adoption', 'waiting', filters.species ?? 'all', token],
     queryFn: () => loadWaiting(token, filters.species),
@@ -150,7 +152,10 @@ export default function AdoptionScreen() {
               index={index}
               photoUri={post.media[0]?.thumbUrl || post.media[0]?.url}
               title={animalHeadline(post.animal)}
-              subtitle={waitingShort(post.adoptionSince) ?? placeOf(post.approxLabel)}
+              subtitle={
+                waitingShort(post.adoptionSince) ??
+                placeWithCity(post.approxLabel, post.municipality)
+              }
               onPress={() => router.push(`/post/${post.id}`)}
             />
           ))}
@@ -288,7 +293,7 @@ export default function AdoptionScreen() {
                 }
                 body={
                   activeFilterCount(filters) > 0
-                    ? 'Tire um filtro ou procure em outro bairro.'
+                    ? 'Tire um filtro ou procure em outro bairro ou cidade.'
                     : shelf === 'adopted'
                       ? 'Quando uma adoção for concluída, o animal aparece aqui com a família nova.'
                       : 'Quando alguém colocar um animal para adoção, ele aparece aqui.'
@@ -322,6 +327,22 @@ export default function AdoptionScreen() {
 
       <BottomSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} title="Filtros">
         <View style={styles.sheet}>
+          <AppText variant="bodyStrong">Cidade</AppText>
+          <View style={styles.wrap}>
+            {municipalities.map((city) => (
+              <Chip
+                key={city.code}
+                label={city.name}
+                selected={filters.municipality === city.code}
+                onPress={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    municipality: current.municipality === city.code ? undefined : city.code,
+                  }))
+                }
+              />
+            ))}
+          </View>
           <AppText variant="bodyStrong">Porte</AppText>
           <View style={styles.wrap}>
             {sizeOptions.map((option) => (

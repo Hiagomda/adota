@@ -33,3 +33,26 @@ export function neighborhoodOf(approxLabel: string): string {
 export function placeOf(approxLabel: string): string {
   return approxLabel.split(',')[0]?.trim() || approxLabel;
 }
+
+/** Tira acento e caixa, para saber se o rótulo já traz o nome da cidade. */
+function folded(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+/**
+ * "Umarizal · Belém", "Centro · Castanhal". Com várias cidades atendidas, o bairro sozinho não
+ * diz onde é. Sem município (API antiga), fica só o bairro, como antes.
+ */
+export function placeWithCity(
+  approxLabel: string,
+  municipality: { name: string } | null | undefined,
+  short = true,
+): string {
+  const place = short ? neighborhoodOf(approxLabel) : approxLabel;
+  if (!municipality) return place;
+  if (folded(place).includes(folded(municipality.name))) return place;
+  return `${place} · ${municipality.name}`;
+}

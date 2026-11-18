@@ -55,7 +55,24 @@ export {
   type VolunteerLevelCode,
   type VolunteerSettingsInput,
 } from './volunteer.js';
-export { insideServiceArea } from './serviceArea.js';
+export {
+  BORDER_TOLERANCE_M,
+  coverageText,
+  distanceToMunicipalityM,
+  insideServiceArea,
+  municipalities,
+  municipalitiesNear,
+  municipalityAt,
+  municipalityByCode,
+  municipalityBySlug,
+  resolveMunicipality,
+  type Municipality,
+} from './serviceArea.js';
+export {
+  municipalityCodeSchema,
+  municipalityCodesMatching,
+  municipalityParamSchema,
+} from './municipality.js';
 export { normalizeWhatsApp } from './phone.js';
 export {
   adoptionEventSchema,

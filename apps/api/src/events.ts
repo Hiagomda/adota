@@ -24,6 +24,7 @@ import { canOrganizeEvents } from './adoption.js';
 import { isOperator, requireUser } from './authz.js';
 import type { Env } from './config.js';
 import { HttpError } from './http.js';
+import { outsideAreaMessage } from './municipalities.js';
 import { publicMediaUrl } from './media.js';
 import { notifyPeople } from './notify.js';
 import { rowsOf, type SessionUser } from './session.js';
@@ -506,7 +507,7 @@ export async function createCommunityEvent(
     throw new HttpError(400, 'Esse evento já terminou. Confira o dia e a hora.');
   }
   if (!insideServiceArea(input)) {
-    throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
+    throw new HttpError(400, outsideAreaMessage());
   }
   const title = stripControls(input.title).trim();
   const description = clean(input.description);
@@ -632,7 +633,7 @@ export function registerEventRoutes(
     if (input.category) assertCategoryAllowed(user, input.category);
     if (input.latitude !== undefined && input.longitude !== undefined) {
       if (!insideServiceArea({ latitude: input.latitude, longitude: input.longitude })) {
-        throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
+        throw new HttpError(400, outsideAreaMessage());
       }
     }
     if (input.endsAt && Date.parse(input.endsAt) <= Date.now()) {

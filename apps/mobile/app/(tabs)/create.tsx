@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { outsideAreaDrag, outsideAreaGps, outsideAreaMessage } from '../../src/place/areaText';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,6 +38,7 @@ import {
 import { enqueueAlert } from '../../src/place/outbox';
 import { openAppSettings, openSettingsLabel, permissionOutcome } from '../../src/permissions';
 import { PlacePicker } from '../../src/place/PlacePicker';
+import { PlaceCity, usePlaceCity } from '../../src/place/PlaceCity';
 import { isOfflineError, preparePhoto, newDraftId, publishAlert } from '../../src/place/publish';
 import { useSession } from '../../src/session';
 import { radius, screenColumn, spacing, statusLabel, useTheme } from '../../src/theme';
@@ -221,6 +223,10 @@ export default function CreateScreen() {
   const located = gps.fix && insideServiceArea(gps.fix) ? gps.fix : null;
   const point = moved ? manual : located;
   const { address, looking } = useAddress(point);
+  const placeCity = usePlaceCity(point);
+  const [jumpTo, setJumpTo] = useState<{ token: number; point: MapPoint; zoom: number } | null>(
+    null,
+  );
   // Resgates abertos ali perto: talvez alguém já tenha avisado do mesmo animal.
   const nearbySearch = point && kind === 'rescue_alert' ? duplicateSearch(point) : null;
   const nearby = useQuery({
@@ -363,7 +369,7 @@ export default function CreateScreen() {
       return;
     }
     if (!point || !insideServiceArea(point)) {
-      setMessage('Esse ponto fica fora de Belém. Escolha um lugar dentro da área verde.');
+      setMessage(outsideAreaMessage);
       return;
     }
     setPending(true);
@@ -388,7 +394,8 @@ export default function CreateScreen() {
       accuracyM: gps.fix?.accuracy ?? null,
       addressText: address,
       referencePoint: reference.trim(),
-      approxLabel: placeLabel(point, address),
+      approxLabel: placeLabel(point, address, placeCity.city?.name),
+      ...(placeCity.city ? { municipalityCode: placeCity.city.code } : {}),
     };
     try {
       const created = await publishAlert(draft);
@@ -688,7 +695,7 @@ export default function CreateScreen() {
                   {moved
                     ? 'Ponto escolhido no mapa.'
                     : gps.fix && !located
-                      ? 'Sua localização está fora de Belém. Mova o mapa até a área verde.'
+                      ? outsideAreaGps
                       : gps.message}
                 </AppText>
                 {gps.action ? (
@@ -704,10 +711,9 @@ export default function CreateScreen() {
                     focus={moved ? null : located}
                     accuracyM={moved ? null : (located?.accuracy ?? null)}
                     urgency={urgency}
+                    jumpTo={jumpTo}
                     onOutside={() => {
-                      setMessage(
-                        'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
-                      );
+                      setMessage(outsideAreaDrag);
                     }}
                     onChange={(next, fromUser) => {
                       if (!fromUser || !insideServiceArea(next)) return;
@@ -741,6 +747,16 @@ export default function CreateScreen() {
                     {looking ? 'Buscando o endereço...' : (address ?? coordinates)}
                   </AppText>
                 </View>
+                <PlaceCity
+                  state={placeCity}
+                  onJump={(city) => {
+                    // A sede vira o ponto marcado; a pessoa arrasta até o lugar certo.
+                    setMoved(true);
+                    setManual(city.seat);
+                    setJumpTo({ token: Date.now(), point: city.seat, zoom: city.zoom + 2 });
+                    setMessage(null);
+                  }}
+                />
                 <Input
                   label="Ponto de referência"
                   value={reference}

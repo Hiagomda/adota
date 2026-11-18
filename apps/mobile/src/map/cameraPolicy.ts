@@ -9,11 +9,14 @@ export interface MapBounds {
 }
 
 /**
- * O máximo que dá para afastar. Com 8,5 a pessoa puxava até ver o Pará inteiro, com Belém
- * pequenininha e quase tudo coberto pelo véu de fora da área. 10 ainda mostra Belém, as ilhas
- * e Mosqueiro numa tela de celular.
+ * O máximo que dá para afastar. Com 8,5 a pessoa puxava até ver o Pará inteiro. Desde a chegada
+ * de Castanhal e Barcarena a área tem ~130 km de leste a oeste: 9 mostra a região toda num
+ * celular deitado e quase toda num em pé, sem chegar ao estado inteiro. O `maxBounds` da câmera
+ * (área + margem) segura o resto.
  */
-export const MIN_MAP_ZOOM = 10;
+export const MIN_MAP_ZOOM = 9;
+/** Mais perto que isso a foto do satélite some e só sobra a rua; também evita pin "gigante". */
+export const MAX_MAP_ZOOM = 18;
 export const CITY_ZOOM = 12;
 export const USER_ZOOM = 14;
 export const PIN_ZOOM = 15;
@@ -36,11 +39,20 @@ export const initialCameraState: CameraState = {
   loaded: null,
 };
 
-export type CameraMove = {
-  center: LngLat;
-  zoom: number;
-  reason: 'initial' | 'locate' | 'pin';
-};
+export type CameraMove =
+  | {
+      center: LngLat;
+      zoom: number;
+      reason: 'initial' | 'locate' | 'pin' | 'city';
+    }
+  | {
+      /** Enquadra o retângulo inteiro (animais de uma cidade, resultado de busca). */
+      bounds: MapBounds;
+      reason: 'city';
+    };
+
+/** Para onde a pessoa pediu para ir: o centro de uma cidade ou um retângulo para enquadrar. */
+export type CameraTarget = { center: LngLat; zoom: number } | { bounds: MapBounds };
 
 export type CameraEvent =
   | { type: 'gps'; point: LngLat; inside: boolean }
@@ -48,6 +60,8 @@ export type CameraEvent =
   | { type: 'gesture' }
   | { type: 'locate' }
   | { type: 'pin'; point: LngLat }
+  /** Toque da pessoa em "Voltar ao início" ou numa cidade da lista. */
+  | { type: 'frame'; target: CameraTarget }
   | { type: 'dismissPin' }
   | { type: 'data' }
   | { type: 'region'; bounds: MapBounds; fromUser: boolean };
@@ -59,7 +73,8 @@ export interface CameraStep {
 
 /**
  * The only place that decides to move the camera.
- * It centers on the person once; after that only "Minha localização" and a chosen pin move it.
+ * It centers on the person once; after that only "Minha localização", "Voltar ao início", a
+ * city picked from the list and a chosen pin move it.
  * There is no follow mode: it stayed on whenever Android did not report the gesture, and the
  * map kept pulling back to the person.
  */
@@ -95,6 +110,14 @@ export function reduceCamera(state: CameraState, event: CameraEvent): CameraStep
         state: { ...state, centered: true },
         move: { center: event.point, zoom: PIN_ZOOM, reason: 'pin' },
       };
+    case 'frame': {
+      // É um pedido da pessoa, então vale mesmo depois de ela ter arrastado o mapa.
+      const move: CameraMove =
+        'bounds' in event.target
+          ? { bounds: event.target.bounds, reason: 'city' }
+          : { center: event.target.center, zoom: event.target.zoom, reason: 'city' };
+      return { state: { ...state, centered: true }, move };
+    }
     case 'dismissPin':
     case 'data':
       return { state, move: null };

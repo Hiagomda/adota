@@ -6,6 +6,7 @@ import { requireUser } from './authz.js';
 import type { Env } from './config.js';
 import { reverseNeighborhood } from './geocode.js';
 import { HttpError } from './http.js';
+import { outsideAreaMessage } from './municipalities.js';
 import { notifySighting } from './notify.js';
 import type { SessionUser } from './session.js';
 import { stripControls } from './text.js';
@@ -101,7 +102,7 @@ export function registerSightingRoutes(
       if (existing) return reply.code(200).send({ id: existing, replayed: true });
     }
     if (!insideServiceArea({ latitude, longitude })) {
-      throw new HttpError(400, 'Esse ponto fica fora de Belém.');
+      throw new HttpError(400, outsideAreaMessage());
     }
     const note = body.data.note ? stripControls(body.data.note).trim() : '';
     if (note && looksLikeAnimalSale(note))

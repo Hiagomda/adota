@@ -1,6 +1,8 @@
 import {
   canTransitionStatus,
-  insideServiceArea,
+  municipalityByCode,
+  municipalityCodesMatching,
+  resolveMunicipality,
   looksLikeAnimalSale,
   ownerOnlyStatus,
   selfAdoption,
@@ -14,6 +16,7 @@ import {
 import type { Pool, PoolClient } from 'pg';
 import type { Env } from './config.js';
 import { isOperator } from './authz.js';
+import { outsideAreaMessage } from './municipalities.js';
 import { HttpError } from './http.js';
 import { assertOwnedMedia, ownedMediaKey } from './mediaPolicy.js';
 import { publicMediaUrl } from './media.js';
@@ -61,6 +64,7 @@ interface PostRow {
   accuracy_m: number | null;
   address_text: string | null;
   reference_point: string | null;
+  municipality_code: string | null;
   like_count: number;
   comment_count: number;
   liked: boolean;
@@ -103,7 +107,15 @@ export async function listPosts(
   if (query.type) where.push(`p.type = ${add(query.type)}`);
   if (query.authorId) where.push(`p.author_id = ${add(query.authorId)}`);
   if (query.age) where.push(`a.age_estimate ILIKE ${add(`${query.age}%`)}`);
-  if (query.place) where.push(`p.approx_label ILIKE ${add(`%${likeText(query.place)}%`)}`);
+  if (query.municipality) {
+    where.push(`p.municipality_code = ${add(query.municipality)}`);
+  }
+  if (query.place) {
+    // A busca por lugar também acha pelo nome do município ("castanhal", "barcarena").
+    const text = add(`%${likeText(query.place)}%`);
+    const codes = add(municipalityCodesMatching(query.place));
+    where.push(`(p.approx_label ILIKE ${text} OR p.municipality_code = ANY(${codes}::text[]))`);
+  }
   if (query.neutered) where.push('a.neutered = true');
   if (query.vaccinated) where.push('a.vaccinated = true');
   if (query.goodWithKids) where.push('a.good_with_kids = true');
@@ -296,9 +308,8 @@ export async function getPost(pool: Pool, env: Env, id: string, viewer: SessionU
 export async function createPost(pool: Pool, env: Env, user: SessionUser, input: CreatePostInput) {
   if (input.parentPostId) return addDiaryNote(pool, user, input);
   // Updates reuse the rescue's own point, so only a new rescue is checked against the area.
-  if (!insideServiceArea(input)) {
-    throw new HttpError(400, 'Por enquanto o Égua, adota! funciona só em Belém e região.');
-  }
+  const municipality = resolveMunicipality(input, input.municipalityCode);
+  if (!municipality) throw new HttpError(400, outsideAreaMessage());
   assertHelpRequest(user, input);
   assertOwnedMedia(
     user.id,
@@ -345,10 +356,10 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
     const post = await client.query<{ id: string }>(
       `INSERT INTO posts (
          author_id, animal_id, type, urgency, description, location, approx_label, status, parent_post_id, review_status,
-         accuracy_m, address_text, reference_point, client_key
+         accuracy_m, address_text, reference_point, client_key, municipality_code
        ) VALUES (
          $1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $14, $9, $10,
-         $11, $12, $13, $15
+         $11, $12, $13, $15, $16
        ) RETURNING id`,
       [
         user.id,
@@ -366,6 +377,7 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
         input.referencePoint ?? null,
         openingStatus,
         input.clientKey ?? null,
+        municipality.code,
       ],
     );
     const postId = post.rows[0]?.id;
@@ -402,6 +414,11 @@ export async function createPost(pool: Pool, env: Env, user: SessionUser, input:
   } finally {
     client.release();
   }
+}
+
+function municipalityOut(code: string | null) {
+  const municipality = municipalityByCode(code);
+  return municipality ? { code: municipality.code, name: municipality.name } : null;
 }
 
 async function postByClientKey(
@@ -938,7 +955,7 @@ function postColumns(viewerParam: string): string {
     ST_X(ST_SnapToGrid(p.location::geometry, 0.005)::geometry) AS approx_lng,
     ST_Y(p.location::geometry) AS exact_lat,
     ST_X(p.location::geometry) AS exact_lng,
-    p.accuracy_m, p.address_text, p.reference_point,
+    p.accuracy_m, p.address_text, p.reference_point, p.municipality_code,
     (SELECT count(*)::int FROM likes l WHERE l.post_id = p.id) AS like_count,
     (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id AND c.hidden = false) AS comment_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${viewerParam}) AS liked,
@@ -980,6 +997,8 @@ async function hydrate(pool: Pool, env: Env, rows: PostRow[], viewer: SessionUse
       urgency: row.urgency,
       description: row.description,
       approxLabel: row.approx_label,
+      // Município do ponto (código IBGE + nome). Campo novo: APKs antigos ignoram.
+      municipality: municipalityOut(row.municipality_code),
       status: row.status,
       createdAt: row.created_at.toISOString(),
       boosted: row.boosted,
