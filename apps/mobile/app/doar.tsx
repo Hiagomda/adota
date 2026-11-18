@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { outsideAreaDrag, outsideAreaMessage } from '../src/place/areaText';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,7 +22,7 @@ import {
 } from '../src/components/ui';
 import { reportError } from '../src/crash/reporter';
 import type { MapPoint } from '../src/map/geo';
-import { insideServiceArea } from '../src/map/serviceArea';
+import { insideServiceArea, municipalityAt } from '../src/map/serviceArea';
 import { useAddress, placeLabel } from '../src/place/address';
 import { useAnimalGps } from '../src/place/gps';
 import { PlacePicker } from '../src/place/PlacePicker';
@@ -136,7 +137,7 @@ export default function DonateScreen() {
       return;
     }
     if (!point || !insideServiceArea(point)) {
-      setMessage('Esse ponto fica fora de Belém. Escolha um lugar dentro da área verde.');
+      setMessage(outsideAreaMessage);
       return;
     }
     setPending(true);
@@ -157,7 +158,7 @@ export default function DonateScreen() {
         accuracyM: gps.fix?.accuracy ?? null,
         addressText: address,
         referencePoint: '',
-        approxLabel: placeLabel(point, address),
+        approxLabel: placeLabel(point, address, municipalityAt(point)?.name),
         helpRequest: {
           kind: helpKind,
           pixKey: pix,
@@ -331,11 +332,7 @@ export default function DonateScreen() {
                   focus={moved ? null : located}
                   accuracyM={moved ? null : (located?.accuracy ?? null)}
                   urgency="low"
-                  onOutside={() =>
-                    setMessage(
-                      'Esse ponto fica fora de Belém. O mapa só libera a cidade e a região em volta.',
-                    )
-                  }
+                  onOutside={() => setMessage(outsideAreaDrag)}
                   onChange={(next, fromUser) => {
                     if (!fromUser || !insideServiceArea(next)) return;
                     setMoved(true);

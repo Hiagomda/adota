@@ -23,6 +23,8 @@ export interface Post {
   urgency: 'low' | 'medium' | 'high';
   description: string;
   approxLabel: string;
+  /** Município do ponto (código IBGE). APIs antigas não mandam. */
+  municipality?: { code: string; name: string } | null;
   status: string;
   createdAt: string;
   boosted: boolean;

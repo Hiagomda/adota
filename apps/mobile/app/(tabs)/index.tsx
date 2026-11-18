@@ -7,7 +7,7 @@ import { RefreshControl, ScrollView, StyleSheet, View, useColorScheme } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, loadFeed, loadMe, loadNotifications, messageFrom } from '../../src/api';
 import { BugButton } from '../../src/bugReport/BugButton';
-import { animalHeadline, neighborhoodOf, placeOf } from '../../src/animalLabels';
+import { animalHeadline, neighborhoodOf, placeWithCity } from '../../src/animalLabels';
 import { PostCard } from '../../src/components/PostCard';
 import {
   AnimalCard,
@@ -177,7 +177,7 @@ const Stories = memo(function Stories({
 function posterSubtitle(post: Post): string {
   const band = ageBandOf(post.animal.ageEstimate);
   const age = band ? ageBands.find((item) => item.value === band)?.label : null;
-  return [placeOf(post.approxLabel), age].filter(Boolean).join(' · ');
+  return [placeWithCity(post.approxLabel, post.municipality), age].filter(Boolean).join(' · ');
 }
 
 /** Fileira de pôsteres de adoção que rola para o lado, no estilo dos catálogos de streaming. */

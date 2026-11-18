@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import { campaignReviewSchema } from '@patinha/shared';
+import { campaignReviewSchema, municipalityByCode, municipalityParamSchema } from '@patinha/shared';
 import type { Env } from '../config.js';
 import { HttpError } from '../http.js';
 import { publicMediaUrl } from '../media.js';
@@ -44,6 +44,8 @@ const postListSchema = z
   .object({
     filter: z.enum(['pending', 'hidden', 'recent']).default('pending'),
     q: z.string().trim().max(80).optional(),
+    // Código IBGE ou slug do município ("castanhal").
+    municipality: municipalityParamSchema.optional(),
   })
   .strict();
 
@@ -687,6 +689,7 @@ export function registerModerationRoutes(
       hidden: boolean;
       description: string;
       approx_label: string;
+      municipality_code: string | null;
       created_at: Date;
       author_id: string;
       author_handle: string;
@@ -696,7 +699,7 @@ export function registerModerationRoutes(
       cover: string | null;
     }>(
       `SELECT p.id, p.type, p.urgency, p.status, p.review_status, p.hidden,
-              left(p.description, 400) AS description, p.approx_label, p.created_at,
+              left(p.description, 400) AS description, p.approx_label, p.municipality_code, p.created_at,
               u.id AS author_id, u.handle AS author_handle, u.name AS author_name,
               a.name AS animal_name, a.species,
               (SELECT m.url FROM post_media m WHERE m.post_id = p.id
@@ -706,9 +709,10 @@ export function registerModerationRoutes(
        JOIN animals a ON a.id = p.animal_id
        WHERE ${where}
          AND ($1::text IS NULL OR p.description ILIKE $1 OR u.handle ILIKE $1 OR a.name ILIKE $1)
+         AND ($2::text IS NULL OR p.municipality_code = $2)
        ORDER BY p.created_at DESC
        LIMIT 60`,
-      [likePattern(query.q)],
+      [likePattern(query.q), query.municipality ?? null],
     );
     return {
       posts: rowsOf<(typeof result.rows)[number]>(result).map((row) => ({
@@ -720,6 +724,8 @@ export function registerModerationRoutes(
         hidden: row.hidden,
         description: row.description,
         approxLabel: row.approx_label,
+        municipality: municipalityByCode(row.municipality_code)?.name ?? null,
+        municipalityCode: row.municipality_code,
         createdAt: row.created_at.toISOString(),
         authorId: row.author_id,
         authorHandle: row.author_handle,

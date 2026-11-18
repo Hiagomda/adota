@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { outsideAreaDrag } from '../../src/place/areaText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -359,7 +360,7 @@ function EventForm({
                 focus={editFocus ?? (manual ? null : located)}
                 accuracyM={manual ? null : (located?.accuracy ?? null)}
                 urgency="low"
-                onOutside={() => setMessage('Esse ponto fica fora de Belém.')}
+                onOutside={() => setMessage(outsideAreaDrag)}
                 onChange={(next, fromUser) => {
                   if (!fromUser || !insideServiceArea(next)) return;
                   setManual(next);

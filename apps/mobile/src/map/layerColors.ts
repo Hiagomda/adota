@@ -11,6 +11,10 @@ export const mapColors = {
   /** Ponto de quem usa o app, no mapa do navegador (o nativo usa o do MapLibre). */
   userDot: lightColors.info,
   userDotRing: lightColors.surface,
+  /** Grupo de patas: turquesa com número branco (5,1:1), diferente das gotas de urgência. */
+  cluster: lightColors.primary,
+  clusterRing: lightColors.surface,
+  clusterText: lightColors.onPrimary,
   /** Área de toque invisível (opacidade quase zero) sobre os marcadores. */
   hitArea: lightColors.shadow,
 } as const;

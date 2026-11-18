@@ -43,7 +43,12 @@ export function useAddress(point: MapPoint | null) {
   return { address, looking: looking || (key !== null && fetched?.key !== key) };
 }
 
-export function placeLabel(point: MapPoint, address: string | null): string {
+/**
+ * O rótulo público do lugar. Sem endereço (zona rural, ilha, beira de estrada), vale o nome da
+ * cidade; as coordenadas só ficam quando nem a cidade é conhecida.
+ */
+export function placeLabel(point: MapPoint, address: string | null, city?: string | null): string {
   if (address) return address.slice(0, 120);
+  if (city) return city;
   return `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
 }

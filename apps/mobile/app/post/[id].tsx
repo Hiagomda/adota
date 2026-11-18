@@ -16,7 +16,14 @@ import { api, isNetworkError, loadFeed, loadPost, messageFrom } from '../../src/
 import { PendingRecords } from '../../src/net/PendingRecords';
 import { enqueueRecord } from '../../src/net/recordQueue';
 import { requestMapFocus } from '../../src/map/focusRequest';
-import { animalHeadline, placeOf, sexLabel, sizeLabel, speciesLabel } from '../../src/animalLabels';
+import {
+  animalHeadline,
+  placeOf,
+  placeWithCity,
+  sexLabel,
+  sizeLabel,
+  speciesLabel,
+} from '../../src/animalLabels';
 import {
   AnimalCard,
   AppText,
@@ -543,7 +550,8 @@ export default function PostScreen() {
   }
 
   const away = distanceLabel(here, item.location);
-  const placeLine = away ? `${item.approxLabel} · ${away}` : item.approxLabel;
+  const placeFull = placeWithCity(item.approxLabel, item.municipality, false);
+  const placeLine = away ? `${placeFull} · ${away}` : placeFull;
   const placePrecision = item.location.exact ? 'Ponto exato' : 'Ponto aproximado, cerca de 500 m';
 
   return (

@@ -21,6 +21,20 @@ function at(state: CameraState, point: LngLat, inside = true) {
 }
 
 describe('map camera', () => {
+  it('goes to the city or frames the results only when the person asks, even after a drag', () => {
+    const dragged = reduceCamera(initialCameraState, { type: 'gesture' }).state;
+    const city = reduceCamera(dragged, {
+      type: 'frame',
+      target: { center: pin, zoom: 13 },
+    });
+    assert.deepEqual(city.move, { center: pin, zoom: 13, reason: 'city' });
+    assert.equal(city.state.centered, true);
+    const results = reduceCamera(city.state, { type: 'frame', target: { bounds: view } });
+    assert.deepEqual(results.move, { bounds: view, reason: 'city' });
+    // Um GPS que chega depois não puxa a câmera de volta para a pessoa.
+    assert.equal(at(results.state, home).move, null);
+  });
+
   it('centers once on the first fix inside the city and ignores the next fixes', () => {
     const first = at(initialCameraState, home);
     assert.deepEqual(first.move, { center: home, zoom: USER_ZOOM, reason: 'initial' });

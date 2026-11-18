@@ -52,6 +52,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             </span>
           </div>
           <h1>{post.approxLabel}</h1>
+          {post.municipality ? <p>{post.municipality.name}, Pará</p> : null}
           <p>{post.description}</p>
           <p>
             {post.animal.name?.trim() || speciesLabel[post.animal.species] || 'Animal'} · publicado

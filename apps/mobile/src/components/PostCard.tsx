@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Animated, { BounceIn, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { sharePost } from '../post/sharePost';
-import { animalHeadline, neighborhoodOf } from '../animalLabels';
+import { animalHeadline, placeWithCity } from '../animalLabels';
 import { reportError } from '../crash/reporter';
 import { distanceLabel, formatWhen } from '../format';
 import { useViewerLocation } from '../place/deviceLocation';
@@ -73,7 +73,9 @@ export const PostCard = memo(function PostCard({ post, onOpen, onLike }: PostCar
   const likes = post.counts.likes === 1 ? '1 curtida' : `${post.counts.likes} curtidas`;
   const comments =
     post.counts.comments === 1 ? '1 comentário' : `${post.counts.comments} comentários`;
-  const placeLine = away ? `${neighborhoodOf(post.approxLabel)} · ${away}` : post.approxLabel;
+  const placeLine = away
+    ? `${placeWithCity(post.approxLabel, post.municipality)} · ${away}`
+    : placeWithCity(post.approxLabel, post.municipality, false);
   // Aberto e urgente é como um story que ninguém atendeu ainda: o anel quente em volta do autor.
   const ring = post.status === 'open' && post.urgency === 'high' ? 'story' : undefined;
 

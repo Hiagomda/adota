@@ -4,6 +4,8 @@ export interface PublicPost {
   urgency: 'low' | 'medium' | 'high';
   description: string;
   approxLabel: string;
+  /** Município do ponto. APIs antigas não mandam. */
+  municipality?: { code: string; name: string } | null;
   status: 'open' | 'on_the_way' | 'not_found' | 'rescued' | 'fostered' | 'for_adoption' | 'adopted';
   createdAt: string;
   boosted: boolean;

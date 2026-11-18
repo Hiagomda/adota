@@ -1,9 +1,10 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MIN_MAP_ZOOM } from './cameraPolicy';
 import { mapColors, serviceLimit } from './layerColors';
-import { serviceCamera, serviceMask, serviceOutline } from './serviceArea';
+import { municipalityBorders, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
 
-export function limitMapToBelem(map: MapLibreMap) {
+/** Prende a câmera na área atendida (todos os municípios) com uma margem. */
+export function limitMapToServiceArea(map: MapLibreMap) {
   map.setMinZoom(MIN_MAP_ZOOM);
   map.setMaxBounds([
     [serviceCamera.west, serviceCamera.south],
@@ -20,6 +21,18 @@ export function showServiceLimit(map: MapLibreMap) {
       type: 'fill',
       source: 'service-mask',
       paint: { 'fill-color': mapColors.outsideArea, 'fill-opacity': serviceLimit.maskOpacity },
+    });
+    map.addSource('municipality-borders', { type: 'geojson', data: municipalityBorders });
+    map.addLayer({
+      id: 'municipality-borders',
+      type: 'line',
+      source: 'municipality-borders',
+      paint: {
+        'line-color': mapColors.areaOutline,
+        'line-width': 1,
+        'line-opacity': 0.45,
+        'line-dasharray': [3, 2],
+      },
     });
     map.addSource('service-outline', { type: 'geojson', data: serviceOutline });
     map.addLayer({

@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
+import {
+  coverageText,
+  insideServiceArea,
+  serviceCamera,
+  serviceMask,
+  serviceOutline,
+} from './serviceArea';
 
 export interface MapPost {
   id: string;
@@ -56,7 +62,7 @@ export function CityMap({ posts }: { posts: MapPost[] }) {
             zoom: 11,
             attributionControl: false,
           });
-          map.setMinZoom(8.5);
+          map.setMinZoom(9);
           map.setMaxBounds([
             [serviceCamera.west, serviceCamera.south],
             [serviceCamera.east, serviceCamera.north],
@@ -89,7 +95,7 @@ export function CityMap({ posts }: { posts: MapPost[] }) {
           function showPosition(position: GeolocationPosition) {
             const { longitude, latitude } = position.coords;
             if (!insideServiceArea({ latitude, longitude })) {
-              setGpsMessage('Sua localização está fora de Belém. O mapa fica na região da cidade.');
+              setGpsMessage(`Sua localização está fora das cidades atendidas (${coverageText}).`);
               return;
             }
             if (!userMarker) {

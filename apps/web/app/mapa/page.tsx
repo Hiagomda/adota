@@ -15,7 +15,7 @@ export default async function MapPage({
   return (
     <main className="page">
       <section className="intro">
-        <h1>Onde estão os alertas em Belém.</h1>
+        <h1>Onde estão os alertas em Belém e região.</h1>
         <p>O mapa pede o GPS do celular e marca onde você está. Toque num alerta para abrir.</p>
       </section>
       <nav className="filters">
@@ -32,7 +32,9 @@ export default async function MapPage({
       <CityMap
         posts={posts.map((post) => ({
           id: post.id,
-          label: post.approxLabel,
+          label: post.municipality
+            ? `${post.approxLabel} · ${post.municipality.name}`
+            : post.approxLabel,
           status: statusLabelFor(post.type, post.status),
           urgency: post.urgency,
           latitude: post.location.latitude,
