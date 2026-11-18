@@ -4,6 +4,7 @@ import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { placeWithCity } from '../../src/animalLabels';
 import { api, loadFeed, messageFrom } from '../../src/api';
 import {
   AppText,
@@ -26,7 +27,12 @@ import { mergePaws } from '../../src/map/knownPaws';
 import { MapCanvas } from '../../src/map/MapCanvas';
 import { MapLayersButton, MapLayersPanel } from '../../src/map/MapLayers';
 import { useAppSwitches } from '../../src/appSwitches';
-import { belemBounds, boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
+import { boundsAround, cameraFramesPoint, type MapBounds } from '../../src/map/geo';
+import type { CameraTarget } from '../../src/map/cameraPolicy';
+import { useSavedCity } from '../../src/map/cityChoice';
+import { cityAtCenter, cityTarget, cityViewBounds, frameForAnimals } from '../../src/map/cityFrame';
+import { CityButton, CitySheet } from '../../src/map/CityPicker';
+import type { Municipality } from '../../src/map/serviceArea';
 import { liveEvent } from '../../src/home/highlights';
 import { Mascot } from '../../src/mascot';
 import { countPartnerTap, loadPartnersIn } from '../../src/partners/api';
@@ -61,11 +67,20 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const focused = useIsFocused();
-  const token = useSession((state) => state.token);
+  const sessionToken = useSession((state) => state.token);
+  const token = sessionToken;
   const here = useViewerLocation();
   const aim = useMapAim();
+  const { city, loaded: cityLoaded, choose: chooseCity } = useSavedCity();
   // O que o mapa mostra quando para, por movimento do app ou gesto da pessoa, carrega sozinho.
-  const [bounds, setBounds] = useState<MapBounds>(belemBounds);
+  // Antes da primeira parada, a área de abertura da cidade escolhida.
+  const [settled, setBounds] = useState<MapBounds | null>(null);
+  const bounds = settled ?? cityViewBounds(city);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [frame, setFrame] = useState<{ token: number; target: CameraTarget } | null>(null);
+  const frameToken = useRef(0);
+  // O seletor mostra a cidade no meio da tela: acompanha o mapa quando a pessoa arrasta.
+  const shownCity = settled ? cityAtCenter(settled) : city;
   const [framedToken, setFramedToken] = useState<number | null>(null);
   const [selection, setSelection] = useState<string | null>(null);
   const [showPartners, setShowPartners] = useState(true);
@@ -209,6 +224,32 @@ export default function ExploreScreen() {
     setFeedPointSelection(null);
     setEventSelection((current) => (current?.id === event.id ? null : event));
   }, []);
+  /**
+   * Leva o mapa à cidade e enquadra os animais dela que estão no mapa (a mesma busca da lista,
+   * filtrada pelo município). Sem animal ou sem rede, abre a sede.
+   */
+  const goToCity = useCallback(
+    async (target: Municipality) => {
+      chooseCity(target);
+      setCityOpen(false);
+      setSelection(null);
+      const token = (frameToken.current += 1);
+      let next: CameraTarget = cityTarget(target);
+      try {
+        const found = await loadFeed(sessionToken, `?limit=100&municipality=${target.code}`);
+        next = frameForAnimals(
+          target,
+          found.posts.filter(onMap).map((post) => post.location),
+        );
+      } catch (error) {
+        console.warn('[map:city-frame]', error instanceof Error ? error.message : String(error));
+      }
+      // Outro toque já pediu outra cidade: este resultado chegou atrasado.
+      if (token !== frameToken.current) return;
+      setFrame({ token, target: next });
+    },
+    [chooseCity, sessionToken],
+  );
   const cardOpen =
     selected !== null ||
     partnerSelection !== null ||
@@ -227,31 +268,48 @@ export default function ExploreScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <MapCanvas
-        posts={posts}
-        partners={partners}
-        onSelectPartner={selectPartner}
-        feedPoints={feedPoints}
-        onSelectFeedPoint={selectFeedPoint}
-        events={events}
-        onSelectEvent={selectEvent}
-        selectedId={selection}
-        tracking={focused}
-        controlsBottom={locateBottom}
-        onSelect={selectPost}
-        onDismiss={closeCard}
-        onCommitBounds={(next) => {
-          if (aiming && aim && !cameraFramesPoint(next, aim)) return;
-          if (aim) setFramedToken(aim.token);
-          setBounds(next);
-        }}
-        focus={focusPoint}
+      {cityLoaded ? (
+        <MapCanvas
+          start={cityTarget(city)}
+          frame={frame}
+          cityName={city.name}
+          onHome={() => void goToCity(shownCity ?? city)}
+          posts={posts}
+          partners={partners}
+          onSelectPartner={selectPartner}
+          feedPoints={feedPoints}
+          onSelectFeedPoint={selectFeedPoint}
+          events={events}
+          onSelectEvent={selectEvent}
+          selectedId={selection}
+          tracking={focused}
+          controlsBottom={locateBottom}
+          onSelect={selectPost}
+          onDismiss={closeCard}
+          onCommitBounds={(next) => {
+            if (aiming && aim && !cameraFramesPoint(next, aim)) return;
+            if (aim) setFramedToken(aim.token);
+            setBounds(next);
+          }}
+          focus={focusPoint}
+        />
+      ) : null}
+      {!cardOpen ? (
+        <View pointerEvents="box-none" style={[styles.cityRow, { top: insets.top + spacing.md }]}>
+          <CityButton label={shownCity?.name ?? 'Fora da área'} onPress={() => setCityOpen(true)} />
+        </View>
+      ) : null}
+      <CitySheet
+        visible={cityOpen}
+        current={shownCity?.code ?? null}
+        onClose={() => setCityOpen(false)}
+        onChoose={(next) => void goToCity(next)}
       />
       {!cardOpen && (feed.isError || inView.length === 0) ? (
         <Card
           padding="md"
           elevation="md"
-          style={[styles.banner, { top: insets.top + spacing.giant + spacing.xl }]}
+          style={[styles.banner, { top: insets.top + spacing.giant * 2 + spacing.lg }]}
         >
           <View style={styles.bannerRow}>
             {feed.isFetching ? null : (
@@ -318,7 +376,9 @@ export default function ExploreScreen() {
                     {speciesLabel[selected.animal.species] ?? 'Animal'}
                   </AppText>
                   <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
-                    {selected.referencePoint || selected.addressText || selected.approxLabel}
+                    {selected.referencePoint ||
+                      selected.addressText ||
+                      placeWithCity(selected.approxLabel, selected.municipality, false)}
                   </AppText>
                   <AppText variant="caption" color="textSecondary">
                     {[formatWhen(selected.createdAt), distanceLabel(here, selected.location)]
@@ -429,6 +489,7 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   banner: { position: 'absolute', left: spacing.lg, right: spacing.lg },
+  cityRow: { position: 'absolute', left: spacing.lg, right: spacing.lg, zIndex: 25 },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   bannerAction: { marginTop: spacing.md },
   bannerText: { flex: 1 },

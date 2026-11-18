@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { outsideAreaDrag } from '../../src/place/areaText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -105,7 +106,7 @@ export default function SightingScreen() {
                 focus={manual ? null : located}
                 accuracyM={manual ? null : (located?.accuracy ?? null)}
                 urgency="medium"
-                onOutside={() => setMessage('Esse ponto fica fora de Belém.')}
+                onOutside={() => setMessage(outsideAreaDrag)}
                 onChange={(next, fromUser) => {
                   if (!fromUser || !insideServiceArea(next)) return;
                   setManual(next);

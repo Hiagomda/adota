@@ -31,6 +31,7 @@ export const postSchema: Schema<Post> = z.object({
   urgency: z.enum(['low', 'medium', 'high']),
   description: z.string(),
   approxLabel: z.string(),
+  municipality: z.object({ code: z.string(), name: z.string() }).nullable().optional(),
   status: z.string(),
   createdAt: isoDate,
   boosted: z.boolean(),

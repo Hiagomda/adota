@@ -7,6 +7,8 @@ export interface AdoptionFilters {
   age?: AgeBand;
   care: CareKey[];
   place: string;
+  /** Código IBGE da cidade. Vazio: todas as cidades atendidas. */
+  municipality?: string;
 }
 
 export const noAdoptionFilters: AdoptionFilters = { care: [], place: '' };
@@ -30,6 +32,7 @@ export function adoptionQuery(
   for (const key of filters.care) params.set(key, 'true');
   const place = filters.place.trim();
   if (place.length >= 2) params.set('place', place);
+  if (filters.municipality) params.set('municipality', filters.municipality);
   if (cursor) params.set('cursor', cursor);
   return `?${params.toString()}`;
 }
@@ -40,6 +43,7 @@ export function activeFilterCount(filters: AdoptionFilters): number {
     (filters.size ? 1 : 0) +
     (filters.age ? 1 : 0) +
     filters.care.length +
-    (filters.place.trim().length >= 2 ? 1 : 0)
+    (filters.place.trim().length >= 2 ? 1 : 0) +
+    (filters.municipality ? 1 : 0)
   );
 }

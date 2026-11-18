@@ -42,6 +42,11 @@ export const alertDraftSchema = z.object({
   addressText: z.string().nullable(),
   referencePoint: z.string(),
   approxLabel: z.string().min(1),
+  // Cidade confirmada pela pessoa perto de uma divisa. Rascunhos antigos não têm.
+  municipalityCode: z
+    .string()
+    .regex(/^[0-9]{7}$/)
+    .optional(),
 });
 
 export type AlertDraft = z.infer<typeof alertDraftSchema> & { point: MapPoint };
@@ -179,6 +184,7 @@ export async function publishAlert(
       addressText: draft.addressText ?? undefined,
       referencePoint: draft.referencePoint.trim() || undefined,
       approxLabel: draft.approxLabel,
+      ...(draft.municipalityCode ? { municipalityCode: draft.municipalityCode } : {}),
       // Se a resposta se perder e a fila mandar de novo, a API devolve o mesmo resgate.
       ...(clientKeyPattern.test(draft.id) ? { clientKey: draft.id } : {}),
       media,

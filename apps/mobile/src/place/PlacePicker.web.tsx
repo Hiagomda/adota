@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
-import { belem, mapStyleUrl, type MapPoint } from '../map/geo';
+import { useCityChoice } from '../map/cityChoice';
+import { mapStyleUrl, type MapPoint } from '../map/geo';
 import { ensureMapCss } from '../map/mapCss';
 import { insideServiceArea } from '../map/serviceArea';
-import { limitMapToBelem, showServiceLimit } from '../map/serviceOverlay';
+import { limitMapToServiceArea, showServiceLimit } from '../map/serviceOverlay';
 import type { Urgency } from '../map/paw';
 import { PawPin } from './PawPin';
 
@@ -14,8 +15,10 @@ export function PlacePicker({
   urgency,
   onChange,
   onOutside,
+  jumpTo,
 }: {
   focus: MapPoint | null;
+  jumpTo?: { token: number; point: MapPoint; zoom: number } | null;
   accuracyM: number | null;
   urgency: Urgency;
   onChange: (point: MapPoint, fromUser: boolean) => void;
@@ -46,14 +49,17 @@ export function PlacePicker({
     const map = new maplibregl.Map({
       container: node,
       style: mapStyleUrl,
-      center: belem,
-      zoom: 17,
+      center: [
+        useCityChoice.getState().city.seat.longitude,
+        useCityChoice.getState().city.seat.latitude,
+      ],
+      zoom: 15,
       attributionControl: false,
     });
-    limitMapToBelem(map);
+    limitMapToServiceArea(map);
     showServiceLimit(map);
     mapRef.current = map;
-    const lastInside = { latitude: belem[1], longitude: belem[0] };
+    const lastInside = { ...useCityChoice.getState().city.seat };
     let snapping = false;
     map.on('dragstart', () => {
       dragged.current = true;
@@ -116,6 +122,18 @@ export function PlacePicker({
       mapRef.current = null;
     };
   }, []);
+
+  const jumped = useRef<number | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !jumpTo || jumped.current === jumpTo.token) return;
+    jumped.current = jumpTo.token;
+    map.easeTo({
+      center: [jumpTo.point.longitude, jumpTo.point.latitude],
+      zoom: jumpTo.zoom,
+      duration: 600,
+    });
+  }, [jumpTo]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -11,6 +11,7 @@ import {
   UserLocation,
   type CameraRef,
   type OnPressEvent,
+  type ShapeSourceRef,
 } from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import {
@@ -35,15 +36,17 @@ import { openAppSettings, openSettingsLabel, permissionOutcome } from '../permis
 import type { Post } from '../types';
 import { radius, size, spacing, useTheme } from '../theme';
 import {
+  MAX_MAP_ZOOM,
   MIN_MAP_ZOOM,
+  PIN_ZOOM,
   initialCameraState,
   reduceCamera,
   type CameraEvent,
   type CameraState,
+  type CameraTarget,
   type LngLat,
 } from './cameraPolicy';
 import {
-  belem,
   boundsMoved,
   cameraFramesPoint,
   mapStyleUrl,
@@ -53,7 +56,13 @@ import {
   type MapBounds,
 } from './geo';
 import { mapColors, serviceLimit } from './layerColors';
-import { insideServiceArea, serviceCamera, serviceMask, serviceOutline } from './serviceArea';
+import {
+  insideServiceArea,
+  municipalityBorders,
+  serviceCamera,
+  serviceMask,
+  serviceOutline,
+} from './serviceArea';
 
 const pawImages = {
   pawHigh: require('../../assets/paw-high.png') as number,
@@ -80,8 +89,10 @@ const cameraBounds = {
   sw: [serviceCamera.west, serviceCamera.south] as [number, number],
 };
 
-// Constante de módulo: um objeto novo a cada render faria a <Camera> renderizar de novo.
-const defaultCamera = { centerCoordinate: belem, zoomLevel: 12 };
+/** Até este zoom as patas próximas viram uma bolinha com o número; depois aparecem soltas. */
+const CLUSTER_MAX_ZOOM = PIN_ZOOM - 1;
+/** Folga (pontos) em volta do retângulo enquadrado, para nenhum pino ficar sob os botões. */
+const FRAME_PADDING = { paddingTop: 120, paddingBottom: 160, paddingLeft: 48, paddingRight: 48 };
 
 /** Duração dos movimentos do próprio app (primeiro centro, "Minha localização", pata escolhida). */
 const MOVE_MS = 600;
@@ -102,6 +113,13 @@ const outlineStyle: ComponentProps<typeof LineLayer>['style'] = {
   lineJoin: 'round',
   lineCap: 'round',
 };
+// Divisa entre os municípios atendidos: tracejada e mais fraca que a borda de fora.
+const borderStyle: ComponentProps<typeof LineLayer>['style'] = {
+  lineColor: mapColors.areaOutline,
+  lineWidth: 1,
+  lineOpacity: 0.45,
+  lineDasharray: [3, 2],
+};
 const maskStyle: ComponentProps<typeof FillLayer>['style'] = {
   fillColor: mapColors.outsideArea,
   fillOpacity: serviceLimit.maskOpacity,
@@ -112,6 +130,24 @@ const hitStyle: ComponentProps<typeof CircleLayer>['style'] = {
   circleColor: mapColors.hitArea,
   circleOpacity: 0.01,
   circleTranslate: [0, -44],
+};
+// Grupo de patas: bolinha coral com o número, maior conforme cresce. O toque aproxima até soltar.
+const clusterFilter = ['has', 'point_count'] as const;
+const singleFilter = ['!', ['has', 'point_count']] as const;
+const clusterStyle: ComponentProps<typeof CircleLayer>['style'] = {
+  circleColor: mapColors.cluster,
+  circleRadius: ['step', ['get', 'point_count'], 18, 10, 22, 50, 28],
+  circleStrokeColor: mapColors.clusterRing,
+  circleStrokeWidth: 3,
+  circleOpacity: 0.95,
+};
+const clusterCountStyle: ComponentProps<typeof SymbolLayer>['style'] = {
+  textField: ['get', 'point_count_abbreviated'],
+  textFont: ['Noto Sans Bold'],
+  textSize: 14,
+  textColor: mapColors.clusterText,
+  textAllowOverlap: true,
+  textIgnorePlacement: true,
 };
 const pinStyle: ComponentProps<typeof SymbolLayer>['style'] = {
   iconImage: [
@@ -222,20 +258,27 @@ const UserPuck = memo(function UserPuck({ visible }: { visible: boolean }) {
  * e o Android reaplicava junto o último `stop` gravado pelo setCamera: no meio de um arrasto, o
  * mapa pulava de volta para onde estava antes (as "teleportadas"). Só o ref a move.
  */
-const StableCamera = memo(function StableCamera({
-  cameraRef,
-}: {
-  cameraRef: RefObject<CameraRef | null>;
-}) {
-  return (
-    <Camera
-      ref={cameraRef}
-      minZoomLevel={MIN_MAP_ZOOM}
-      maxBounds={cameraBounds}
-      defaultSettings={defaultCamera}
-    />
-  );
-});
+const StableCamera = memo(
+  function StableCamera({
+    cameraRef,
+    start,
+  }: {
+    cameraRef: RefObject<CameraRef | null>;
+    start: { centerCoordinate: LngLat; zoomLevel: number };
+  }) {
+    return (
+      <Camera
+        ref={cameraRef}
+        minZoomLevel={MIN_MAP_ZOOM}
+        maxZoomLevel={MAX_MAP_ZOOM}
+        maxBounds={cameraBounds}
+        defaultSettings={start}
+      />
+    );
+  },
+  // Só o primeiro `start` vale: trocar a cidade depois anda pelo ref, nunca por prop.
+  () => true,
+);
 
 export function MapCanvas({
   posts,
@@ -252,6 +295,10 @@ export function MapCanvas({
   onDismiss,
   onCommitBounds,
   focus,
+  start,
+  frame,
+  onHome,
+  cityName,
 }: {
   posts: Post[];
   /** Parceiros do Cupu (casinha turquesa), desenhados por baixo das patas. */
@@ -274,10 +321,20 @@ export function MapCanvas({
   onCommitBounds?: (bounds: MapBounds, origin: BoundsOrigin) => void;
   /** Abre a câmera neste pino, antes do centro pelo GPS. */
   focus?: LngLat | null;
+  /** Onde o mapa abre antes do GPS (a cidade escolhida). Só o primeiro valor conta. */
+  start: { center: LngLat; zoom: number };
+  /** Pedido da pessoa para ir a uma cidade ou enquadrar resultados; cada `token` novo anda uma vez. */
+  frame?: { token: number; target: CameraTarget } | null;
+  /** "Voltar ao início": a tela decide para onde (a cidade escolhida e os animais dela). */
+  onHome?: () => void;
+  /** Nome da cidade onde o mapa abre sem GPS, para o aviso. */
+  cityName: string;
 }) {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const camera = useRef<CameraRef>(null);
+  const alertsSource = useRef<ShapeSourceRef>(null);
+  const [startCamera] = useState(() => ({ centerCoordinate: start.center, zoomLevel: start.zoom }));
   const policy = useRef<CameraState>(initialCameraState);
   const commitRef = useRef(onCommitBounds);
   const dismissRef = useRef(onDismiss);
@@ -347,12 +404,22 @@ export function MapCanvas({
     if (step.move) {
       programmaticUntil.current = Date.now() + 1000;
       moveEndsAt.current = Date.now() + MOVE_MS;
-      camera.current?.setCamera({
-        centerCoordinate: step.move.center,
-        zoomLevel: step.move.zoom,
-        animationDuration: MOVE_MS,
-        animationMode: 'easeTo',
-      });
+      if ('bounds' in step.move) {
+        const { bounds } = step.move;
+        camera.current?.setCamera({
+          bounds: { ne: [bounds.east, bounds.north], sw: [bounds.west, bounds.south] },
+          padding: FRAME_PADDING,
+          animationDuration: MOVE_MS,
+          animationMode: 'easeTo',
+        });
+      } else {
+        camera.current?.setCamera({
+          centerCoordinate: step.move.center,
+          zoomLevel: step.move.zoom,
+          animationDuration: MOVE_MS,
+          animationMode: 'easeTo',
+        });
+      }
     }
     return step;
   }, []);
@@ -441,6 +508,14 @@ export function MapCanvas({
       for (const timer of timers) clearTimeout(timer);
     };
   }, [apply, focus, styleReady, tracking]);
+
+  // Cidade escolhida ou "Voltar ao início": anda uma vez por pedido, quando o estilo existe.
+  const framedToken = useRef<number | null>(null);
+  useEffect(() => {
+    if (!frame || !styleReady || framedToken.current === frame.token) return;
+    framedToken.current = frame.token;
+    apply({ type: 'frame', target: frame.target });
+  }, [apply, frame, styleReady]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -612,7 +687,32 @@ export function MapCanvas({
 
   const onPinPress = useCallback(
     (event: OnPressEvent) => {
-      const id = event.features[0]?.properties?.id;
+      const feature = event.features[0];
+      if (feature?.properties?.cluster) {
+        // Grupo de patas: aproxima até ele se abrir, no ponto do grupo.
+        pressedPin.current = true;
+        const geometry = feature.geometry;
+        if (geometry.type !== 'Point') return;
+        const point = geometry.coordinates as LngLat;
+        const source = alertsSource.current;
+        if (!source) return;
+        source
+          .getClusterExpansionZoom(feature)
+          .then((zoom) => {
+            programmaticUntil.current = Date.now() + 1000;
+            camera.current?.setCamera({
+              centerCoordinate: point,
+              zoomLevel: Math.min(Math.max(zoom, MIN_MAP_ZOOM), PIN_ZOOM),
+              animationDuration: MOVE_MS,
+              animationMode: 'easeTo',
+            });
+          })
+          .catch((error: unknown) =>
+            reportError(error, { source: 'handled', where: 'map:cluster' }),
+          );
+        return;
+      }
+      const id = feature?.properties?.id;
       if (typeof id !== 'string') return;
       const post = posts.find((item) => item.id === id);
       if (!post) return;
@@ -696,11 +796,11 @@ export function MapCanvas({
 
   const gpsHint =
     gps === 'denied'
-      ? 'Sem a localização, o mapa abre em Belém.'
+      ? `Sem a localização, o mapa abre em ${cityName}.`
       : gps === 'blocked'
-        ? 'A localização está bloqueada. O mapa abre em Belém.'
+        ? `A localização está bloqueada. O mapa abre em ${cityName}.`
         : gps === 'disabled'
-          ? 'O GPS está desligado. O mapa abre em Belém.'
+          ? `O GPS está desligado. O mapa abre em ${cityName}.`
           : gps === 'timeout'
             ? 'O GPS demorou. Toque no alvo para tentar de novo.'
             : null;
@@ -734,9 +834,12 @@ export function MapCanvas({
         onPress={onMapPress}
         onRegionDidChange={onRegionDidChange}
       >
-        <StableCamera cameraRef={camera} />
+        <StableCamera cameraRef={camera} start={startCamera} />
         <ShapeSource id="service-mask" shape={serviceMask}>
           <FillLayer id="service-mask-fill" style={maskStyle} />
+        </ShapeSource>
+        <ShapeSource id="municipality-borders" shape={municipalityBorders}>
+          <LineLayer id="municipality-borders-line" style={borderStyle} />
         </ShapeSource>
         <ShapeSource id="service-outline" shape={serviceOutline}>
           <LineLayer id="service-outline-line" style={outlineStyle} />
@@ -777,9 +880,20 @@ export function MapCanvas({
           </ShapeSource>
         ) : null}
         {pinsReady ? (
-          <ShapeSource key={sprite} id="alerts" shape={shape} onPress={onPinPress}>
-            <CircleLayer id="pin-hit" style={hitStyle} />
-            <SymbolLayer id="pins" style={pinStyle} />
+          <ShapeSource
+            key={sprite}
+            ref={alertsSource}
+            id="alerts"
+            shape={shape}
+            onPress={onPinPress}
+            cluster
+            clusterRadius={44}
+            clusterMaxZoomLevel={CLUSTER_MAX_ZOOM}
+          >
+            <CircleLayer id="pin-hit" style={hitStyle} filter={singleFilter} />
+            <SymbolLayer id="pins" style={pinStyle} filter={singleFilter} />
+            <CircleLayer id="pin-cluster" style={clusterStyle} filter={clusterFilter} />
+            <SymbolLayer id="pin-cluster-count" style={clusterCountStyle} filter={clusterFilter} />
           </ShapeSource>
         ) : null}
       </MapView>
@@ -787,12 +901,26 @@ export function MapCanvas({
         {gpsHint ? (
           <View
             pointerEvents="none"
-            style={[styles.hint, { top: insets.top + spacing.md, backgroundColor: colors.surface }]}
+            style={[
+              styles.hint,
+              // Abaixo do botão da cidade, que fica no topo da tela do mapa.
+              { top: insets.top + spacing.giant + spacing.lg, backgroundColor: colors.surface },
+            ]}
           >
             <AppText variant="caption">{gpsHint}</AppText>
           </View>
         ) : null}
         <View pointerEvents="box-none" style={[styles.locate, { bottom: controlsBottom }]}>
+          {onHome ? (
+            <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
+              <IconButton
+                icon="home"
+                variant="tonal"
+                accessibilityLabel={`Voltar ao início: ${cityName}`}
+                onPress={onHome}
+              />
+            </View>
+          ) : null}
           <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
             <IconButton
               icon="crosshair"
@@ -817,7 +945,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  locate: { position: 'absolute', right: spacing.lg },
+  locate: { position: 'absolute', right: spacing.lg, gap: spacing.sm },
   locateButton: {
     width: size.touch,
     height: size.touch,

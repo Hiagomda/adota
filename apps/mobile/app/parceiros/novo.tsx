@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { outsideAreaDrag } from '../../src/place/areaText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -298,7 +299,7 @@ function PartnerForm({ initial }: { initial: OwnPartner | null }) {
                   focus={editFocus ?? (manual ? null : located)}
                   accuracyM={manual ? null : (located?.accuracy ?? null)}
                   urgency="low"
-                  onOutside={() => setMessage('Por enquanto só aparecem parceiros de Belém.')}
+                  onOutside={() => setMessage(outsideAreaDrag)}
                   onChange={(next, fromUser) => {
                     if (!fromUser || !insideServiceArea(next)) return;
                     setManual(next);

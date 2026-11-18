@@ -8,21 +8,54 @@ import { ensureDeviceWatch, readDeviceFix, useViewerLocation } from '../place/de
 import { permissionOutcome } from '../permissions';
 import { radius, size, spacing, useTheme } from '../theme';
 import {
+  MAX_MAP_ZOOM,
+  PIN_ZOOM,
   initialCameraState,
   reduceCamera,
   type CameraEvent,
   type CameraState,
+  type CameraTarget,
+  type LngLat,
 } from './cameraPolicy';
+import { clusterPoints } from './clusters';
 import { mapColors } from './layerColors';
 import { insideServiceArea } from './serviceArea';
 import { categoryLabels, type CommunityEvent } from '../events/agenda';
 import type { FeedPoint } from '../feedPoints/feedPoints';
 import { partnerPinKind, type Partner } from '../partners/partners';
 import type { Post } from '../types';
-import { belem, mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
-import { limitMapToBelem, showServiceLimit } from './serviceOverlay';
+import { mapStyleUrl, type BoundsOrigin, type MapBounds } from './geo';
+import { limitMapToServiceArea, showServiceLimit } from './serviceOverlay';
 import { ensureMapCss } from './mapCss';
 import { eventPinUri, feedPointPinUri, partnerPinUri, pawUri } from './paw';
+
+/** Mesmo limite do Android: até este zoom as patas próximas viram grupo. */
+const CLUSTER_MAX_ZOOM = PIN_ZOOM - 1;
+const FRAME_PADDING = { top: 120, bottom: 160, left: 48, right: 48 };
+
+function clusterButton(count: number, onPress: () => void): HTMLButtonElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.setAttribute('aria-label', `${count} animais aqui. Toque para aproximar.`);
+  const diameter = count >= 50 ? 56 : count >= 10 ? 44 : 36;
+  Object.assign(element.style, {
+    width: `${diameter}px`,
+    height: `${diameter}px`,
+    borderRadius: '999px',
+    border: `3px solid ${mapColors.clusterRing}`,
+    background: mapColors.cluster,
+    color: mapColors.clusterText,
+    font: '700 14px Nunito, sans-serif',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(11, 31, 31, 0.3)',
+  });
+  element.textContent = count > 99 ? '99+' : String(count);
+  element.onclick = (event) => {
+    event.stopPropagation();
+    onPress();
+  };
+  return element;
+}
 
 function pinButton(label: string, uri: string, size: number): HTMLButtonElement {
   const element = document.createElement('button');
@@ -61,6 +94,10 @@ export function MapCanvas({
   onDismiss,
   onCommitBounds,
   focus,
+  start,
+  frame,
+  onHome,
+  cityName,
 }: {
   posts: Post[];
   partners?: Partner[];
@@ -77,7 +114,12 @@ export function MapCanvas({
   onDismiss?: () => void;
   onCommitBounds?: (bounds: MapBounds, origin: BoundsOrigin) => void;
   focus?: [number, number] | null;
+  start: { center: LngLat; zoom: number };
+  frame?: { token: number; target: CameraTarget } | null;
+  onHome?: () => void;
+  cityName: string;
 }) {
+  const startRef = useRef(start);
   const host = useRef<HTMLElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
@@ -103,9 +145,19 @@ export function MapCanvas({
   const apply = useCallback((event: CameraEvent) => {
     const step = reduceCamera(policy.current, event);
     policy.current = step.state;
-    if (step.move) {
-      mapRef.current?.easeTo({ center: step.move.center, zoom: step.move.zoom, duration: 600 });
+    const move = step.move;
+    if (!move) return;
+    if ('bounds' in move) {
+      mapRef.current?.fitBounds(
+        [
+          [move.bounds.west, move.bounds.south],
+          [move.bounds.east, move.bounds.north],
+        ],
+        { padding: FRAME_PADDING, duration: 600, maxZoom: PIN_ZOOM },
+      );
+      return;
     }
+    mapRef.current?.easeTo({ center: move.center, zoom: move.zoom, duration: 600 });
   }, []);
 
   useEffect(() => {
@@ -130,11 +182,12 @@ export function MapCanvas({
     const map = new maplibregl.Map({
       container: node,
       style: mapStyleUrl,
-      center: belem,
-      zoom: 12,
+      center: startRef.current.center,
+      zoom: startRef.current.zoom,
+      maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
     });
-    limitMapToBelem(map);
+    limitMapToServiceArea(map);
     showServiceLimit(map);
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -192,16 +245,53 @@ export function MapCanvas({
           .setLngLat([item.location.longitude, item.location.latitude])
           .addTo(map);
       });
-      const postMarkers = postsRef.current.map((post) => {
+      const byId = new Map(postsRef.current.map((post) => [post.id, post]));
+      const grouped = clusterPoints(
+        postsRef.current.map((post) => ({
+          id: post.id,
+          latitude: post.location.latitude,
+          longitude: post.location.longitude,
+        })),
+        map.getZoom(),
+        { maxZoom: CLUSTER_MAX_ZOOM, keepSingle: selectedRef.current },
+      );
+      const postMarkers = grouped.flatMap((entry) => {
+        if (entry.kind === 'group') {
+          // Toque no grupo: enquadra os animais dele, o que já solta o grupo.
+          const element = clusterButton(entry.count, () => {
+            apply({ type: 'gesture' });
+            map.fitBounds(
+              [
+                [entry.bounds.west, entry.bounds.south],
+                [entry.bounds.east, entry.bounds.north],
+              ],
+              {
+                padding: FRAME_PADDING,
+                duration: 500,
+                maxZoom: PIN_ZOOM,
+                minZoom: Math.min(map.getZoom() + 2, PIN_ZOOM),
+              },
+            );
+          });
+          return [
+            new maplibregl.Marker({ element, anchor: 'center' })
+              .setLngLat([entry.longitude, entry.latitude])
+              .addTo(map),
+          ];
+        }
+        const post = byId.get(entry.item.id);
+        if (!post) return [];
         const selected = post.id === selectedRef.current;
         const element = pinButton(post.approxLabel, pawUri(post.urgency), selected ? 72 : 64);
         element.onclick = (event) => {
           event.stopPropagation();
           onSelectRef.current(post);
         };
-        return new maplibregl.Marker({ element, anchor: 'bottom' })
-          .setLngLat([post.location.longitude, post.location.latitude])
-          .addTo(map);
+        return [
+          new maplibregl.Marker({ element, anchor: 'bottom' })
+            .setLngLat([post.location.longitude, post.location.latitude])
+            .addTo(map),
+        ];
       });
       markers.current = [...feedMarkers, ...partnerMarkers, ...eventMarkers, ...postMarkers];
     };
@@ -322,6 +412,13 @@ export function MapCanvas({
     };
   }, [apply, focus, tracking]);
 
+  const styleReadyFrame = useRef<number | null>(null);
+  useEffect(() => {
+    if (!frame || styleReadyFrame.current === frame.token) return;
+    styleReadyFrame.current = frame.token;
+    apply({ type: 'frame', target: frame.target });
+  }, [apply, frame]);
+
   return (
     <View style={styles.map}>
       <View
@@ -330,8 +427,19 @@ export function MapCanvas({
         }}
         style={styles.map}
       />
-      {gpsReady ? (
-        <View pointerEvents="box-none" style={[styles.locate, { bottom: controlsBottom }]}>
+      <View pointerEvents="box-none" style={[styles.locate, { bottom: controlsBottom }]}>
+        {onHome ? (
+          <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
+            <IconButton
+              icon="home"
+              variant="tonal"
+              accessibilityLabel={`Voltar ao início: ${cityName}`}
+              onPress={onHome}
+            />
+          </View>
+        ) : null}
+        {/* Só aparece depois que a pessoa autorizou e o GPS respondeu. */}
+        {gpsReady ? (
           <View style={[styles.locateButton, shadows.md, { backgroundColor: colors.surface }]}>
             <IconButton
               icon="crosshair"
@@ -340,15 +448,15 @@ export function MapCanvas({
               onPress={() => apply({ type: 'locate' })}
             />
           </View>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   map: { flex: 1, overflow: 'hidden' },
-  locate: { position: 'absolute', right: spacing.lg },
+  locate: { position: 'absolute', right: spacing.lg, gap: spacing.sm },
   locateButton: {
     width: size.touch,
     height: size.touch,

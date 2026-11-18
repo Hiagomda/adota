@@ -31,3 +31,11 @@ test('the Adotados tab lists adopted animals with the same filters', () => {
     '?status=adopted&limit=20&species=dog',
   );
 });
+
+test('filtra pela cidade com o código IBGE', () => {
+  assert.equal(
+    adoptionQuery({ care: [], place: '', municipality: '1502400' }),
+    '?status=for_adoption&limit=20&municipality=1502400',
+  );
+  assert.equal(activeFilterCount({ care: [], place: '', municipality: '1501303' }), 1);
+});
