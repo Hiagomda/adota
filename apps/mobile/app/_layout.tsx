@@ -19,7 +19,7 @@ import {
 } from '../src/crash/reporter';
 import CupuOnboarding from '../src/cupu/CupuOnboarding';
 import { DeviceFrame } from '../src/deviceFrame';
-import { configurePushDisplay, syncNearbyPresence } from '../src/nearby/presence';
+import { configurePushDisplay, syncNearbyPresence, watchPushToken } from '../src/nearby/presence';
 import { usePushOpen } from '../src/nearby/usePushOpen';
 import { primeCreateDraft } from '../src/place/createDraftStore';
 import { primeColorScheme } from '../src/theme/schemeChoice';
@@ -86,6 +86,9 @@ function RootLayout() {
     if (!token) return;
     void syncNearbyPresence(token);
   }, [token]);
+
+  // Token de push trocado com o app aberto vai para a conta que estiver logada no momento.
+  useEffect(() => watchPushToken(() => useSession.getState().token), []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
