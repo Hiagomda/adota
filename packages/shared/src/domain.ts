@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { animalColorsSchema } from './lostMatch.js';
 import { normalizeWhatsApp } from './phone.js';
+import { municipalityCodeSchema, municipalityParamSchema } from './municipality.js';
 
 export const roleSchema = z.enum(['user', 'protector', 'ngo', 'moderator', 'admin']);
 export const speciesSchema = z.enum(['dog', 'cat', 'other']);
@@ -139,6 +140,8 @@ export const createPostSchema = z.object({
   addressText: z.string().trim().max(240).optional(),
   referencePoint: z.string().trim().max(200).optional(),
   approxLabel: z.string().trim().min(1).max(120),
+  // Município escolhido à mão perto da divisa. Opcional: sem ele, vale o que contém o ponto.
+  municipalityCode: municipalityCodeSchema.optional(),
   parentPostId: z.string().uuid().optional(),
   /** Gerada pelo celular para cada resgate: reenviar com a mesma chave não cria outro. */
   clientKey: z
@@ -183,6 +186,8 @@ export const feedQuerySchema = z.object({
   // Adoption filters. Each care flag only narrows to animals marked yes.
   age: ageBandSchema.optional(),
   place: z.string().trim().min(2).max(60).optional(),
+  // Código IBGE ou slug ("castanhal").
+  municipality: municipalityParamSchema.optional(),
   neutered: z.enum(['true']).optional(),
   vaccinated: z.enum(['true']).optional(),
   goodWithKids: z.enum(['true']).optional(),

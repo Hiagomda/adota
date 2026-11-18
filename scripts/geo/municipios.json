@@ -1,0 +1,54 @@
+{
+  "comment": "Municípios atendidos, na ordem em que aparecem no app. Para incluir um município do Pará: acrescente aqui (código IBGE de 7 dígitos, slug, nome, sede e zoom de abertura) e rode `python3 scripts/geo/build-municipalities.py --migration`. O script regrava serviceArea.ts (pacote shared, app e site) e cria a migração com o contorno do município.",
+  "municipalities": [
+    {
+      "code": "1501402",
+      "slug": "belem",
+      "name": "Belém",
+      "seat": [-48.4902, -1.4558],
+      "zoom": 12
+    },
+    {
+      "code": "1500800",
+      "slug": "ananindeua",
+      "name": "Ananindeua",
+      "seat": [-48.372, -1.3656],
+      "zoom": 13
+    },
+    {
+      "code": "1504422",
+      "slug": "marituba",
+      "name": "Marituba",
+      "seat": [-48.3421, -1.3602],
+      "zoom": 13
+    },
+    {
+      "code": "1501501",
+      "slug": "benevides",
+      "name": "Benevides",
+      "seat": [-48.2448, -1.3617],
+      "zoom": 13
+    },
+    {
+      "code": "1506351",
+      "slug": "santa-barbara-do-para",
+      "name": "Santa Bárbara do Pará",
+      "seat": [-48.2945, -1.2235],
+      "zoom": 13
+    },
+    {
+      "code": "1502400",
+      "slug": "castanhal",
+      "name": "Castanhal",
+      "seat": [-47.9262, -1.2964],
+      "zoom": 13
+    },
+    {
+      "code": "1501303",
+      "slug": "barcarena",
+      "name": "Barcarena",
+      "seat": [-48.6253, -1.5058],
+      "zoom": 12.5
+    }
+  ]
+}
