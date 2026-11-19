@@ -61,17 +61,22 @@ function buildTools() {
   return path.join(root, latest);
 }
 
+// A lista de recursos do APK (aapt2 dump resources) passa de 1 MB, o limite padrão do Node.
+const toolOptions = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
+
 function tool(dir, name, toolArgs) {
   if (process.platform !== 'win32') {
-    return execFileSync(path.join(dir, name), toolArgs, { encoding: 'utf8' });
+    return execFileSync(path.join(dir, name), toolArgs, toolOptions);
   }
   // No Windows o apksigner é um .bat, que só o cmd.exe executa.
   if (name === 'apksigner') {
-    return execFileSync('cmd.exe', ['/d', '/c', path.join(dir, 'apksigner.bat'), ...toolArgs], {
-      encoding: 'utf8',
-    });
+    return execFileSync(
+      'cmd.exe',
+      ['/d', '/c', path.join(dir, 'apksigner.bat'), ...toolArgs],
+      toolOptions,
+    );
   }
-  return execFileSync(path.join(dir, `${name}.exe`), toolArgs, { encoding: 'utf8' });
+  return execFileSync(path.join(dir, `${name}.exe`), toolArgs, toolOptions);
 }
 
 /** Lê um arquivo de dentro do APK (um zip) sem extrair tudo. */
