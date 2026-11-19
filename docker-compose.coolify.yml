@@ -203,7 +203,9 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    mem_limit: 128m
+    # O teste semanal de restauração sobe um Postgres temporário com PostGIS aqui dentro; com
+    # 128 MB o kernel matava o processo (OOM) ao criar a extensão. A cópia das fotos também conta.
+    mem_limit: 384m
 
   # Cópia criptografada dos backups para um bucket fora da VPS (docker/offsite-loop.sh).
   # Desligada até as variáveis OFFSITE_* serem preenchidas no Coolify. Lê os backups só para leitura.
